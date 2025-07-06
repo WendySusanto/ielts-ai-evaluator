@@ -1,0 +1,10 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskLabel": "task-IELTS.AI.Evaluator.Functions",
+      "appliesTo": "IELTS.AI.Evaluator.Functions/IELTS.AI.Evaluator.Functions.csproj",
+      "type": "msbuild"
+    }
+  ]
+}

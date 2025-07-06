@@ -1,0 +1,6 @@
+* {
+  max-width: 100%;
+  border-spacing: 0;
+  box-sizing: border-box;
+  scroll-behavior: auto;
+}

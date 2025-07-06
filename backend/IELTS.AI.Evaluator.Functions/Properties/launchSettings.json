@@ -1,0 +1,9 @@
+{
+  "profiles": {
+    "IELTS.AI.Evaluator.Functions": {
+      "commandName": "Project",
+      "commandLineArgs": "--port 7103",
+      "launchBrowser": false
+    }
+  }
+}
