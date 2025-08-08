@@ -13,7 +13,6 @@ namespace IELTS.AI.Evaluator.Data.Models
         public EvaluatorDbContext(DbContextOptions<EvaluatorDbContext> options) : base(options) { }
 
         public DbSet<User> Users => Set<User>();
-        public DbSet<Essay> Essays => Set<Essay>();
         public DbSet<EssayEvaluation> EssayEvaluations => Set<EssayEvaluation>();
         //public DbSet<SpeakingAnswer> SpeakingAnswers => Set<SpeakingAnswer>();
         public DbSet<WritingPrompt> WritingPrompts => Set<WritingPrompt>();
@@ -30,10 +29,20 @@ namespace IELTS.AI.Evaluator.Data.Models
                 }
             }
 
-            modelBuilder.Entity<Essay>()
-                .HasOne(e => e.Evaluation)
-                .WithOne(ev => ev.Essay)
-                .HasForeignKey<EssayEvaluation>(ev => ev.EssayId);
+            modelBuilder.Entity<User>().HasKey(u => u.UserId);
+            modelBuilder.Entity<EssayEvaluation>().HasKey(e => e.EssayEvaluationId);
+            modelBuilder.Entity<WritingPrompt>().HasKey(p => p.WritingPromptId);
+
+            modelBuilder.Entity<EssayEvaluation>()
+                .HasOne(e => e.User)
+                .WithMany(u => u.Essays)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<EssayEvaluation>()
+                .HasOne(e => e.WritingPrompt)
+                .WithMany() // You can create a `ICollection<EssayEvaluation>` in `WritingPrompt` if needed
+                .OnDelete(DeleteBehavior.Cascade);
+
 
             base.OnModelCreating(modelBuilder);
         }

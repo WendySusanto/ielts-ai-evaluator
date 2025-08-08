@@ -8,22 +8,17 @@ namespace IELTS.AI.Evaluator.Data.Models
 {
     public class EssayEvaluation : BaseEntity
     {
+        public Guid EssayEvaluationId { get; set; }
         public decimal OverallBand { get; set; }
-
-        public decimal TaskResponseBand { get; set; }
-        public decimal CoherenceCohesionBand { get; set; }
-        public decimal LexicalResourceBand { get; set; }
-        public decimal GrammaticalRangeAccuracyBand { get; set; }
-
-        public string? TaskResponseGeneralFeedback { get; set; }
-        public string? CoherenceCohesionGeneralFeedback { get; set; }
-        public string? LexicalResourceGeneralFeedback { get; set; }
-        public string? GrammaticalRangeAccuracyGeneralFeedback { get; set; }
-
         public string RawJson { get; set; } = default!;
+        public string UserAnswer { get; set; } = default!;
+        public User User { get; set; } = default!;
+        public WritingPrompt WritingPrompt { get; set; } = default!;
 
-        public Guid EssayId { get; set; }
-        public Essay Essay { get; set; } = default!;
+        //Gemini AI Response
+        public string AiModel { get; set; } = default!;
+        public int PromptTokenCount { get; set; }
+        public int CandidatesTokenCount {  get; set; }
     }
-
 }
+

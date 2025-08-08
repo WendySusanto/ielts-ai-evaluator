@@ -8,12 +8,18 @@ namespace IELTS.AI.Evaluator.Data.Models
 {
     public class WritingPrompt : BaseEntity
     {
+        public Guid WritingPromptId {  get; set; }
         public string Topic { get; set; } = default!;
-        public string QuestionType { get; set; } = default!;
+        public string Description { get; set; } = default!;
+        public string Preview { get; set; } = default!;
+        public string QuestionType { get; set; } = default!; //Line Graph, Table, Pie Chart
         public string QuestionText { get; set; } = default!;
+        public int Duration { get; set; } = default!;
+        public int MinimumWords {  get; set; } = default!;
         public string TaskType { get; set; } = "Task2"; // Or "Task1"
         public string Level { get; set; } = "Academic"; // or "General"
         public string? ImageUrl { get; set; } // For Task 1 prompts that require an image
+        public string? ImageDescription { get; set; }
     }
 
 }

@@ -1,137 +1,35 @@
 {
-    "overallBand": 6.5,
-    "criteria": {
-        "taskResponse": {
-            "band": 6.5,
-            "generalFeedback": "lorem ipsum",
-            "subScores": {
-                "addressAllPartsOfQuestion": {
-                    "score": 7,
-                    "comment": "The response mostly addresses all parts, but minor elements are underdeveloped."
-                },
-                "clearOpinionIfRequired": {
-                    "score": 6,
-                    "comment": "The opinion is stated but not consistently maintained throughout."
-                },
-                "wellDevelopedIdeas": {
-                    "score": 6,
-                    "comment": "Ideas are somewhat developed, but lack depth in explanation and argumentation."
-                },
-                "examplesAndSupport": {
-                    "score": 7,
-                    "comment": "Examples are present but occasionally generic or not clearly linked to the argument."
-                }
-            },
-            "issues": [
-                {
-                    "text": "I think the government should take care of the environment.",
-                    "comment": "This opinion is too general and not elaborated with a clear reason or example."
-                },
-                {
-                    "text": "For example, pollution is bad.",
-                    "comment": "Vague example. Be more specific about how pollution impacts people or ecosystems."
-                }
-            ]
-        },
-        "coherenceCohesion": {
-            "band": 6.0,
-            "generalFeedback": "",
-            "subScores": {
-                "logicalFlowOfIdeas": {
-                    "score": 6,
-                    "comment": "The structure is mostly logical but lacks clear transitions between some paragraphs."
-                },
-                "paragraphing": {
-                    "score": 6,
-                    "comment": "Paragraphing is used but sometimes contains multiple ideas or lacks topic sentences."
-                },
-                "cohesiveDevices": {
-                    "score": 5,
-                    "comment": "Basic cohesive devices are overused and mechanical in places."
-                },
-                "referencingClarity": {
-                    "score": 7,
-                    "comment": "Referencing is mostly clear, but could be improved for clarity in pronoun use."
-                }
-            },
-            "issues": [
-                {
-                    "text": "First of all, secondly, thirdly, finally...",
-                    "comment": "Avoid formulaic listing. Use more natural transitions."
-                },
-                {
-                    "text": "This shows the problem.",
-                    "comment": "What is 'this'? Clarify the reference to maintain coherence."
-                }
-            ]
-        },
-        "lexicalResource": {
-            "band": 6.0,
-            "generalFeedback": "",
-            "subScores": {
-                "vocabularyRange": {
-                    "score": 6,
-                    "comment": "Shows some range, but repetition of common words like 'important' weakens impact."
-                },
-                "wordChoiceAccuracy": {
-                    "score": 6,
-                    "comment": "Some imprecise word choices reduce clarity."
-                },
-                "collocations": {
-                    "score": 5,
-                    "comment": "Occasional awkward combinations indicate a need to improve collocation usage."
-                },
-                "spelling": {
-                    "score": 7,
-                    "comment": "Spelling is generally accurate with minor issues."
-                }
-            },
-            "issues": [
-                {
-                    "text": "This is a big problem for the nature.",
-                    "comment": "Use 'environment' instead of 'the nature'."
-                },
-                {
-                    "text": "Very good solution can be done.",
-                    "comment": "Awkward phrasing; consider 'A highly effective solution could be implemented.'"
-                }
-            ]
-        },
-        "grammaticalRangeAccuracy": {
-            "band": 6.0,
-            "generalFeedback": "",
-            "subScores": {
-                "sentenceVariety": {
-                    "score": 6,
-                    "comment": "Some variety, but repetitive sentence patterns reduce effectiveness."
-                },
-                "tenseAccuracy": {
-                    "score": 6,
-                    "comment": "Occasional tense errors affect clarity."
-                },
-                "subjectVerbAgreement": {
-                    "score": 7,
-                    "comment": "Mostly accurate with a few minor errors."
-                },
-                "articleAndPrepositionUse": {
-                    "score": 5,
-                    "comment": "Frequent misuse of articles and prepositions impacts grammatical accuracy."
-                },
-                "errorDensity": {
-                    "score": 6,
-                    "comment": "Frequent minor errors but do not obscure meaning."
-                }
-            },
-            "issues": [
-                {
-                    "text": "The people is worrying about climate change.",
-                    "comment": "Incorrect subject-verb agreement. Use 'people are'."
-                },
-                {
-                    "text": "Government should take a action.",
-                    "comment": "Incorrect article usage. It should be 'an action'."
-                }
-            ]
-        }
+  "candidates": [
+    {
+      "content": {
+        "parts": [
+          {
+            "text": "```json\n\n```"
+          }
+        ],
+        "role": "model"
+      },
+      "finishReason": "STOP",
+      "avgLogprobs": -0.22118993857211339
     }
+  ],
+  "usageMetadata": {
+    "promptTokenCount": 934,
+    "candidatesTokenCount": 1206,
+    "totalTokenCount": 2140,
+    "promptTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 934
+      }
+    ],
+    "candidatesTokensDetails": [
+      {
+        "modality": "TEXT",
+        "tokenCount": 1206
+      }
+    ]
+  },
+  "modelVersion": "gemini-2.0-flash",
+  "responseId": "6m-MaKLFFKuq7dcPl__Y2AM"
 }
