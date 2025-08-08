@@ -17,6 +17,8 @@
         public decimal IELTSTargetScore {  get; set; }
         public DateTimeOffset TargetTestDate { get; set; }
 
+        public DateTimeOffset LastLogin { get; set; }
+
         public ICollection<EssayEvaluation> Essays { get; set; } = new List<EssayEvaluation>();
     }
 

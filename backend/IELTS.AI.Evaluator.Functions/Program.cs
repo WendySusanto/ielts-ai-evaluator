@@ -6,7 +6,7 @@ using IELTS.AI.Evaluator.Data.Models;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.Extensions.Configuration;
 
-// For .NET 8 isolated functions, using IHostBuilder gives you the flexibility
+//For.NET 8 isolated functions, using IHostBuilder gives you the flexibility
 // to configure middleware like CORS.
 var host = new HostBuilder()
     // This configures the function's application pipeline to use ASP.NET Core integration.
