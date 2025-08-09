@@ -9,6 +9,9 @@ import Writing from "./pages/Writing";
 import WritingPractice from "./pages/WritingPractice";
 import FeedbackHistory from "./pages/FeedbackHistory";
 import DetailedFeedback from "./pages/DetailedFeedback";
+import Admin from "./pages/Admin";
+import { Toaster } from "sonner";
+import NotFound from "./pages/NotFound";
 
 function App() {
   return (
@@ -23,6 +26,7 @@ function App() {
           path="/*"
           element={
             <ThemeProvider>
+              <Toaster />
               <SidebarProvider>
                 <AppSidebar />
                 <main className="flex-1">
@@ -32,7 +36,7 @@ function App() {
                       <Route path="/speaking" element={<div>Speaking</div>} />
                       <Route path="/writing" element={<Writing />} />
                       <Route
-                        path="/writing-practice/:taskType/:taskId"
+                        path="/writing/:taskType/:taskId"
                         element={<WritingPractice />}
                       />
                       <Route
@@ -40,8 +44,9 @@ function App() {
                         element={<DetailedFeedback />}
                       />
                       <Route path="/feedback" element={<FeedbackHistory />} />
+                      <Route path="/admin" element={<Admin />} />
                       <Route path="/premium" element={<div>premium</div>} />
-                      <Route path="*" element={<div>Not Found</div>} />
+                      <Route path="*" element={<NotFound />} />
                     </Routes>
                   </MainLayout>
                 </main>

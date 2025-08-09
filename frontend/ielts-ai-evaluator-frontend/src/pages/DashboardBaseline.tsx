@@ -75,13 +75,13 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="space-y-6 min-h-full">
+    <div className="p-6 space-y-6 bg-gradient-to-br from-gray-50/80 via-white/90 to-indigo-50/50 dark:from-gray-950/80 dark:via-gray-900/90 dark:to-indigo-950/50 min-h-full">
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
           Welcome back, Sarah! 👋
         </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <p className="text-gray-600 dark:text-gray-400 text-lg">
           Ready to continue your IELTS journey? Let's achieve your target score
           together.
         </p>
@@ -92,23 +92,23 @@ const Dashboard = () => {
         {stats.map((stat, index) => (
           <Card
             key={index}
-            className="border-0 shadow-lg bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300"
+            className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300 hover:scale-105"
           >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground-bold mb-1">
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
                     {stat.title}
                   </p>
-                  <p className="text-2xl font-bold text-card-foreground">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {stat.value}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
                     {stat.change}
                   </p>
                 </div>
                 <div
-                  className={`p-3 rounded-full bg-muted dark:bg-muted/50 ${stat.color}`}
+                  className={`p-3 rounded-full bg-gray-50 dark:bg-gray-700/50 ${stat.color}`}
                 >
                   <stat.icon className="h-6 w-6" />
                 </div>
@@ -121,10 +121,10 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
         <div className="lg:col-span-2">
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Clock className="h-5 w-5 text-secondary" />
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                <Clock className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 Recent Activity
               </CardTitle>
             </CardHeader>
@@ -132,7 +132,7 @@ const Dashboard = () => {
               {recentActivities.map((activity, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border"
+                  className="flex items-center justify-between p-4 rounded-xl bg-gray-50/80 dark:bg-gray-700/50 border border-gray-100 dark:border-gray-600"
                 >
                   <div className="flex items-center gap-4">
                     <div
@@ -149,10 +149,10 @@ const Dashboard = () => {
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-card-foreground">
+                      <p className="font-medium text-gray-900 dark:text-white">
                         {activity.type}
                       </p>
-                      <p className="text-sm text-muted-foreground-bold">
+                      <p className="text-sm text-gray-600 dark:text-gray-400">
                         {activity.topic}
                       </p>
                     </div>
@@ -160,11 +160,11 @@ const Dashboard = () => {
                   <div className="text-right">
                     <Badge
                       variant="secondary"
-                      className="mb-1 bg-badge-indigo text-badge-indigo-foreground"
+                      className="mb-1 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300"
                     >
                       {activity.score}
                     </Badge>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-gray-500 dark:text-gray-500">
                       {activity.date}
                     </p>
                   </div>
@@ -176,10 +176,10 @@ const Dashboard = () => {
 
         {/* Goals & Progress */}
         <div>
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Target className="h-5 w-5 text-secondary" />
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                <Target className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 Weekly Goals
               </CardTitle>
             </CardHeader>
@@ -187,10 +187,10 @@ const Dashboard = () => {
               {upcomingGoals.map((goal, index) => (
                 <div key={index} className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium text-card-foreground">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
                       {goal.title}
                     </p>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-gray-500 dark:text-gray-500">
                       {goal.progress}%
                     </span>
                   </div>
@@ -201,10 +201,10 @@ const Dashboard = () => {
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm mt-6">
+          <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm mt-6">
             <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Star className="h-5 w-5 text-secondary" />
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                <Star className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                 Quick Start
               </CardTitle>
             </CardHeader>

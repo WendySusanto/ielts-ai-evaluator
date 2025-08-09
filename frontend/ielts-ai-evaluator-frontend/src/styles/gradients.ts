@@ -7,4 +7,4 @@ export const GRADIENT_INDIGO_BUTTON =
 export const GRADIENT_INDIGO = "bg-gradient-to-r from-indigo-600 to-purple-600";
 
 export const GRADIENT_BACKGROUND =
-  " bg-gradient-to-br  from-gray-50/80 via-white/90 to-indigo-50/50 dark:from-gray-950/80 dark:via-gray-900/90 dark:to-indigo-950/50 ";
+  "bg-gradient-to-br  from-gray-50/80 via-white/90 to-indigo-50/50 dark:from-gray-950/80 dark:via-gray-900/90 dark:to-indigo-950/50 ";
