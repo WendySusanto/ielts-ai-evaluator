@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { AxiosRequestConfig } from "axios";
 import ApiResponse from "@/types/ApiResponse";
 import axiosInstance from "@/lib/axiosInstance";
+import { auth } from "@/lib/firebase";
 
 interface UseFetchState<T> {
   data: T | null;
@@ -39,9 +40,12 @@ export function useFetch<T>(
   const fetchData = useCallback(async (): Promise<void> => {
     try {
       setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+      const token = await auth.currentUser?.getIdToken();
       const response = await axiosInstance<ApiResponse<T>>(url, {
         ...config,
         headers: {
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           ...config?.headers,
         },
@@ -68,11 +72,14 @@ export function useFetch<T>(
       try {
         setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-        const response = await axiosInstance<T>({
+        const token = await auth.currentUser?.getIdToken();
+
+        const response = await axiosInstance<ApiResponse<T>>({
           url,
           method,
           data,
           headers: {
+            Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
             ...config?.headers,
           },
@@ -81,10 +88,10 @@ export function useFetch<T>(
 
         setState((prev) => ({
           ...prev,
-          data: response.data,
+          data: response.data.data,
           isLoading: false,
         }));
-        onSuccess?.(response.data);
+        onSuccess?.(response.data.data);
       } catch (error) {
         const err =
           error instanceof Error ? error : new Error("An error occurred");

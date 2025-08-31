@@ -5,12 +5,25 @@ import { Bell, LogOutIcon, Moon, Sun, User } from "lucide-react";
 import { useDropdown } from "@/hooks/use-trigger-dropdown";
 import { useNavigate } from "react-router";
 import { GRADIENT_BACKGROUND } from "@/styles/gradients";
+import { signOut } from "firebase/auth";
+import { auth as authFirebase } from "@/lib/firebase";
+import { useAuth } from "@/contexts/AuthContext";
 
 function MainLayout({ children }: { children: React.ReactNode }) {
   const { theme, setTheme } = useThemeContext();
 
   const { isDropdownOpen, toggleDropdown } = useDropdown();
 
+  const handleSignOut = async () => {
+    try {
+      await signOut(authFirebase);
+      navigate("/login");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
+
+  const auth = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -57,13 +70,18 @@ function MainLayout({ children }: { children: React.ReactNode }) {
                     isDropdownOpen ? "opacity-100" : "opacity-0 hidden"
                   }`}
                 >
-                  <ul className="text-xs text-foreground w-28">
+                  <ul className="text-xs text-foreground w-content ml-6">
                     <li
-                      className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2 pr-3 mx-1 my-1 rounded-md cursor-pointer"
+                      className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2 pr-3 mx-1 my-1 rounded-md cursor-pointer pl-4"
                       onClick={() => navigate("/profile")}
                     >
-                      Profile
+                      <b>{auth.user?.displayName}</b>
+                      <div className="h-3"></div>
+                      <span className="text-muted-foreground-bold">
+                        {auth.user?.email}
+                      </span>
                     </li>
+                    <hr></hr>
                     <li
                       className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2 pr-3 mx-1 my-1 rounded-md cursor-pointer"
                       onClick={() => navigate("/settings")}
@@ -79,7 +97,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
                     <hr></hr>
                     <li
                       className="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground py-2 pr-3 mx-1 my-1 rounded-md cursor-pointer"
-                      onClick={() => navigate("/logout")}
+                      onClick={() => handleSignOut()}
                     >
                       <LogOutIcon className="h-3 w-3 inline mr-2" />
                       <span>Logout</span>

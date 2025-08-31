@@ -30,12 +30,15 @@ import { formatText } from "@/lib/utils";
 import { EssayEvaluate } from "@/types/EssayEvaluate";
 import { toast } from "sonner";
 import { set } from "react-hook-form";
+import { useAuth } from "@/contexts/AuthContext";
 
 const WritingPractice = () => {
   const { taskType, taskId } = useParams<{
     taskType: string;
     taskId: string;
   }>();
+
+  const { user } = useAuth();
 
   const {
     data: writingPrompt = null,
@@ -116,7 +119,7 @@ const WritingPractice = () => {
 
     const payload: EssayEvaluate = {
       writingPromptId: writingPrompt?.writingPromptId ?? taskId ?? "", // Use nullish coalescing,
-      userId: "52bab978-b23b-4f3a-85a5-6e1b1feb0d55", //will do it later
+      userId: user?.userId ?? "",
       userAnswer: essay,
       taskType: taskTypeDesc,
       question: writingPrompt?.questionText || "",
@@ -131,6 +134,7 @@ const WritingPractice = () => {
         setIsAnalyzing(false);
         setIsSubmitted(true);
         toast.success("Essay analyzed successfully!");
+        navigate("/feedback");
       },
       onError: (error) => {
         toast.error(`Error analyzing essay: ${error.message}`);
@@ -149,10 +153,6 @@ const WritingPractice = () => {
   if (!isLoadingPrompts && !writingPrompt) {
     return <NotFound />;
   }
-
-  console.log("Writing Prompt Data:", writingPrompt);
-
-  // ...existing code...
 
   const Task1Tips = () => (
     <>

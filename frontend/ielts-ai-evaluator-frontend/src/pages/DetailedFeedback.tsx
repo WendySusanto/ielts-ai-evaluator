@@ -91,6 +91,23 @@ const DetailedFeedback = () => {
     );
   };
 
+  const getHighlightColorHover = (criteriaKey: string) => {
+    const colors = {
+      taskResponse:
+        "bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 border-red-300 dark:border-red-600",
+      coherenceCohesion:
+        "bg-orange-100 dark:bg-orange-900 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-600",
+      lexicalResource:
+        "bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-600",
+      grammaticalRangeAccuracy:
+        "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-600",
+    };
+    return (
+      colors[criteriaKey as keyof typeof colors] ||
+      "bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-600"
+    );
+  };
+
   const shouldShowIssue = (criteriaKey: string) => {
     return selectedFilter === criteriaKey;
   };
@@ -108,9 +125,10 @@ const DetailedFeedback = () => {
             "gi"
           );
           const colorClass = getHighlightColor(criteriaKey);
+          const colorClassHover = getHighlightColorHover(criteriaKey);
           highlightedText = highlightedText.replace(
             regex,
-            `<span class="group relative ${colorClass} px-1 py-0.5 rounded cursor-pointer border-b-2" data-issue="${index}" data-criteria="${criteriaKey}">$1<div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 min-w-64 p-3 ${colorClass} border rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none whitespace-normal">${issue.comment}</div></span>`
+            `<span class="group relative ${colorClass} px-1 py-0.5 rounded cursor-pointer border-b-2" data-issue="${index}" data-criteria="${criteriaKey}">$1<div class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 min-w-64 p-3 ${colorClassHover} border rounded-lg shadow-lg z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none whitespace-normal">${issue.comment}</div></span>`
           );
         });
       }

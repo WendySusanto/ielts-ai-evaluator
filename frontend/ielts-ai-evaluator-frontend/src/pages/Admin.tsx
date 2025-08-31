@@ -31,7 +31,7 @@ import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
 import WritingPromptResponse from "@/types/WritingPrompt";
-import User from "@/types/User";
+import { User } from "@/types/User";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -109,7 +109,7 @@ const Admin = () => {
       data,
       onSuccess: () => {
         toast.success("User created/updated successfully");
-        refetchPrompts();
+        refetchUsers();
       },
       onError: (error) => {
         toast.error("Failed to create/update user", {
@@ -150,20 +150,21 @@ const Admin = () => {
     onSubmit: (data: WritingPrompt) => void;
     onClose: () => void;
   }) => {
-    const { register, handleSubmit, reset, setValue } = useForm<WritingPrompt>({
-      defaultValues: prompt || {
-        topic: "",
-        description: "",
-        preview: "",
-        questionType: "",
-        questionText: "",
-        duration: 40,
-        minimumWords: 250,
-        taskType: "Task2",
-        level: "Academic",
-        imageUrl: "",
-      },
-    });
+    const { register, handleSubmit, reset, setValue, watch } =
+      useForm<WritingPrompt>({
+        defaultValues: prompt || {
+          topic: "",
+          description: "",
+          preview: "",
+          questionType: "",
+          questionText: "",
+          duration: 40,
+          minimumWords: 250,
+          taskType: "Task2",
+          level: "Academic",
+          imageUrl: "",
+        },
+      });
 
     const handleFormSubmit = (data: WritingPrompt) => {
       onSubmit(data);
@@ -184,7 +185,7 @@ const Admin = () => {
           <div>
             <Label htmlFor="questionType">Question Type</Label>
             <Select
-              value={prompt?.questionType}
+              value={watch("questionType")}
               onValueChange={(value) => setValue("questionType", value)}
             >
               <SelectTrigger>
@@ -249,7 +250,7 @@ const Admin = () => {
           <div>
             <Label htmlFor="taskType">Task Type</Label>
             <Select
-              value={prompt?.taskType}
+              value={watch("taskType")}
               onValueChange={(value) =>
                 setValue("taskType", value as "Task1" | "Task2")
               }
@@ -266,7 +267,7 @@ const Admin = () => {
           <div>
             <Label htmlFor="level">Level</Label>
             <Select
-              value={prompt?.level}
+              value={watch("level")}
               onValueChange={(value) =>
                 setValue("level", value as "Academic" | "General")
               }
@@ -291,11 +292,12 @@ const Admin = () => {
         </div>
 
         <div className="flex justify-end space-x-2">
-          <DialogClose>
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" onClick={() => onClose()}>
               Cancel
             </Button>
           </DialogClose>
+
           <Button type="submit">{prompt ? "Update" : "Create"}</Button>
         </div>
       </form>
@@ -314,7 +316,7 @@ const Admin = () => {
     const { register, handleSubmit, reset, setValue } = useForm<User>({
       defaultValues: user || {
         email: "",
-        authProvider: "Email",
+        authProvider: "",
         plan: "Free",
         writingQuotaUsed: 0,
         speakingQuotaUsed: 0,
@@ -347,15 +349,14 @@ const Admin = () => {
             <Select
               value={user?.authProvider}
               onValueChange={(value) =>
-                setValue("authProvider", value as "Email" | "Google")
+                setValue("authProvider", value as string)
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select provider" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Email">Email</SelectItem>
-                <SelectItem value="Google">Google</SelectItem>
+                <SelectItem value="Firebase">Firebase</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -418,8 +419,8 @@ const Admin = () => {
         </div>
 
         <div className="flex justify-end space-x-2">
-          <DialogClose>
-            <Button type="button" variant="outline" onClick={onClose}>
+          <DialogClose asChild>
+            <Button type="button" variant={"outline"} onClick={() => onClose()}>
               Cancel
             </Button>
           </DialogClose>
@@ -609,15 +610,6 @@ const Admin = () => {
                     </CardDescription>
                   </div>
                   <Dialog>
-                    <DialogTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className=" border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add User
-                      </Button>
-                    </DialogTrigger>
                     <DialogContent className="w-2xl">
                       <DialogHeader>
                         <DialogTitle>Create User</DialogTitle>
