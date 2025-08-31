@@ -1,11 +1,16 @@
-using System;
-using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Services;
+using IELTS.AI.Evaluator.Functions.Extensions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Net;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Threading;
 
 namespace IELTS.AI.Evaluator.Functions.Functions
 {
@@ -24,12 +29,21 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("UpsertUser")]
         public async Task<IActionResult> UpsertUserAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "user")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "user")] HttpRequest req, FunctionContext context)
         {
             try
             {
+                var userIdContext = context.GetUserId();
+
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var payload = JsonSerializer.Deserialize<UserUpsertRequestDto>(requestBody);
+
+
+                if (userIdContext != payload?.UserId)
+                {
+                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
+                }
+
                 var result = await _userService.UpsertUserAsync(payload);
 
                 if (!result.Success)
@@ -52,46 +66,62 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetUser")]
         public async Task<IActionResult> GetUserAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "user")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "user")] HttpRequest req, FunctionContext context)
         {
             try
             {
-                var idParam = req.Query["id"].ToString();
+
+                var isAdmin = context.IsAdmin();
                 
-                if (string.IsNullOrEmpty(idParam))
+                if (!isAdmin)
                 {
-                    // If no ID is provided, return all users
-                    var listResult = await _userService.GetUsersAsync();
-                    if (!listResult.Success)
-                    {
-                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                    }
-                    return new OkObjectResult(listResult);
+                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
                 }
 
-                // If ID is provided, return specific user
-                if (!Guid.TryParse(idParam, out Guid userId))
+                // If no ID is provided, return all users
+                var listResult = await _userService.GetUsersAsync();
+                if (!listResult.Success)
                 {
-                    return new BadRequestObjectResult(new UserResponseDto
-                    {
-                        Success = false,
-                        Message = "Invalid user ID format."
-                    });
-                }
-
-                var result = await _userService.GetUserAsync(userId);
-                if (!result.Success)
-                {
-                    if (result.Message == "User not found.")
-                        return new NotFoundObjectResult(result);
                     return new StatusCodeResult(StatusCodes.Status500InternalServerError);
                 }
-
-                return new OkObjectResult(result);
+                return new OkObjectResult(listResult);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in GetUser function.");
+                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+            }
+        }
+
+        [Function("GetUserProfile")]
+        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req, FunctionContext context)
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(context.GetUserId().ToString()))
+                {
+                    var user = await _userService.GetUserAsync(context.GetUserId());
+
+                    if (user == null)
+                    {
+                        return new UnauthorizedObjectResult("No user found");
+                    }
+          
+                    user.Data.ClaimsUpdated = context.WereClaimsUpdated();
+                    
+                    if (!user.Success)
+                    {
+                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
+                    }
+                    return new OkObjectResult(user);
+                } else
+                {
+                    return new UnauthorizedObjectResult("Id not available in the context");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetUserProfile function.");
                 return new StatusCodeResult(StatusCodes.Status500InternalServerError);
             }
         }

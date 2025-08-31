@@ -8,7 +8,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
     public interface IUserService
     {
         Task<UserResponseDto> UpsertUserAsync(UserUpsertRequestDto payload);
-        Task<UserResponseDto> GetUserAsync(Guid userId);
+        Task<UserResponseDto> GetUserAsync(Guid? userId);
         Task<UserListResponseDto> GetUsersAsync();
     }
 
@@ -38,17 +38,6 @@ namespace IELTS.AI.Evaluator.Functions.Services
                     };
                 }
 
-                var existingUser = await _dbContext.Users
-                    .FirstOrDefaultAsync(u => u.Email == payload.Email && u.UserId != payload.UserId);
-                if (existingUser != null)
-                {
-                    return new UserResponseDto
-                    {
-                        Success = false,
-                        Message = "Email already exists."
-                    };
-                }
-
                 User user;
                 if (payload.UserId.HasValue)
                 {
@@ -68,8 +57,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 {
                     user = new User
                     {
-                        UserId = Guid.NewGuid(),
-                        CreatedAt = DateTime.UtcNow
+                        UserId = Guid.NewGuid()
                     };
                     _dbContext.Users.Add(user);
                 }
@@ -82,8 +70,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 user.SpeakingQuotaUsed = payload.SpeakingQuotaUsed;
                 user.IELTSTargetType = payload.IELTSTargetType;
                 user.IELTSTargetScore = payload.IELTSTargetScore;
-                user.TargetTestDate = payload.TargetTestDate.ToUniversalTime();
- 
+                user.TargetTestDate = ConvertToUtc(payload.TargetTestDate, payload.DateTimeOffset);
 
                 await _dbContext.SaveChangesAsync();
 
@@ -105,7 +92,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
-        public async Task<UserResponseDto> GetUserAsync(Guid userId)
+        public async Task<UserResponseDto> GetUserAsync(Guid? userId)
         {
             try
             {
@@ -167,6 +154,8 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
+
+
         private static UserDto MapToDto(User user)
         {
             return new UserDto
@@ -184,6 +173,22 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 UpdatedAt = user.UpdatedAt,
                 IsDeleted = user.IsDeleted
             };
+        }
+        private DateTimeOffset ConvertToUtc(DateTime localDateTime, int? offsetMinutes)
+        {
+            if (offsetMinutes.HasValue)
+            {
+                // JavaScript getTimezoneOffset() returns positive for behind UTC, negative for ahead
+                var offset = TimeSpan.FromMinutes(-offsetMinutes.Value);
+                var dateTimeOffset = new DateTimeOffset(localDateTime, offset);
+                return dateTimeOffset.ToUniversalTime();
+            }
+            else
+            {
+                // No offset provided - treat as UTC
+                _logger.LogWarning("No timezone offset provided, treating date as UTC");
+                return new DateTimeOffset(localDateTime, TimeSpan.Zero);
+            }
         }
     }
 }

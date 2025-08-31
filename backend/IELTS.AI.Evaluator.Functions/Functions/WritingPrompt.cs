@@ -1,11 +1,14 @@
-﻿using System;
-using System.Text.Json;
-using IELTS.AI.Evaluator.Functions.DTOs;
+﻿using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
+using System;
+using System.Net;
+using System.Security.Claims;
+using System.Text.Json;
+using System.Threading;
 
 namespace IELTS.AI.Evaluator.Functions.Functions
 {
@@ -50,10 +53,17 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetWritingPrompt")]
         public async Task<IActionResult> GetWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "writing-prompt")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "writing-prompt")] HttpRequest req, FunctionContext executionContext)
         {
             try
             {
+                var user = executionContext.Items.TryGetValue("User", out var u) ? u as ClaimsPrincipal : null;
+
+                if (user == null)
+                {
+                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
+                }
+
                 var idParam = req.Query["id"].ToString();
                 
                 if (string.IsNullOrEmpty(idParam))

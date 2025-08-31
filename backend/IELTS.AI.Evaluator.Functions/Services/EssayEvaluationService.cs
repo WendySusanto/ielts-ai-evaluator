@@ -25,7 +25,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
         private readonly EvaluatorDbContext _dbContext;
         private readonly ILogger<EssayEvaluationService> _logger;
         private readonly IConfiguration _configuration;
-        private readonly string _sampleJsonPath = "C:\\Workspace\\ielts-ai-evaluator\\backend\\IELTS.AI.Evaluator.Functions\\bin\\Debug\\net8.0\\Data\\sampleAIResponse.json";
+        //private readonly string _sampleJsonPath = "C:\\Workspace\\ielts-ai-evaluator\\backend\\IELTS.AI.Evaluator.Functions\\bin\\Debug\\net8.0\\Data\\sampleAIResponse.json";
 
         public EssayEvaluationService(
             IGeminiApiClient geminiApiClient,
@@ -79,13 +79,15 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 //    };
                 //}
 
-                string aiResponseJson = await _geminiApiClient.EvaluateEssayAsync(payload.UserAnswer, payload.Question, payload.TaskType, geminiApiKey);
+                string aiResponseJson = await _geminiApiClient.EvaluateEssayAsync(payload.UserAnswer, payload.ImageDescription, payload.Question, payload.TaskType, geminiApiKey);
+
+                _logger.LogInformation(aiResponseJson);
 
                 var aiResponse = JsonDocument.Parse(aiResponseJson);
                 var overallBand = ExtractOverallBand(aiResponse);
                 var aiModel = aiResponse.RootElement.GetProperty("modelVersion").GetString();
-                var promptTokenCount = aiResponse.RootElement.GetProperty("usageMetadata").GetProperty("promptTokenCount").GetInt32();
-                var candidatesTokenCount = aiResponse.RootElement.GetProperty("usageMetadata").GetProperty("candidatesTokenCount").GetInt32();
+                var promptTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "promptTokenCount");
+                var candidatesTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "candidatesTokenCount");
 
                 var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == payload.UserId);
                 var writingPrompt = await _dbContext.WritingPrompts.FirstOrDefaultAsync(wp => wp.WritingPromptId == payload.WritingPromptId);
@@ -275,6 +277,23 @@ namespace IELTS.AI.Evaluator.Functions.Services
             {
                 return null;
             }
+        }
+
+        private int GetSafeTokenCount(JsonDocument response, string metadataPath, string tokenPath)
+        {
+            try
+            {
+                if (response.RootElement.TryGetProperty(metadataPath, out var metadata) &&
+                    metadata.TryGetProperty(tokenPath, out var tokenElement))
+                {
+                    return tokenElement.GetInt32();
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to extract {TokenPath} from response", tokenPath);
+            }
+            return 0; // Default value if extraction fails
         }
     }
 }

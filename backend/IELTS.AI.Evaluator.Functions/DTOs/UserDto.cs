@@ -13,6 +13,9 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
         [JsonPropertyName("email")]
         public string Email { get; set; } = string.Empty;
 
+        [JsonPropertyName("fullName")]
+        public string FullName { get; set; } = string.Empty;
+
         [JsonPropertyName("authProvider")]
         public string AuthProvider { get; set; } = "Email";
 
@@ -33,6 +36,9 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
 
         [JsonPropertyName("targetTestDate")]
         public DateTime TargetTestDate { get; set; }
+
+        [JsonPropertyName("dateTimeOffset")]
+        public int? DateTimeOffset{ get; set; }
     }
 
     public class UserResponseDto
@@ -67,6 +73,9 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
         [JsonPropertyName("email")]
         public string Email { get; set; } = string.Empty;
 
+        [JsonPropertyName("fullName")]
+        public string FullName { get; set; } = string.Empty;
+
         [JsonPropertyName("authProvider")]
         public string AuthProvider { get; set; } = "Email";
 
@@ -93,6 +102,10 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
 
         [JsonPropertyName("updatedAt")]
         public DateTime UpdatedAt { get; set; }
+
+        [JsonPropertyName("ClaimsUpdated")]
+        public bool? ClaimsUpdated { get; set; }
+
 
         [JsonPropertyName("isDeleted")]
         public bool IsDeleted { get; set; }
