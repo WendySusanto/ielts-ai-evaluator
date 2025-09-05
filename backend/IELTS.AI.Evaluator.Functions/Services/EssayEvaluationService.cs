@@ -113,6 +113,9 @@ namespace IELTS.AI.Evaluator.Functions.Services
                     PromptTokenCount = promptTokenCount,
                     CandidatesTokenCount = candidatesTokenCount
                 };
+
+                user.WritingQuotaUsed += 1;
+
                 _dbContext.EssayEvaluations.Add(essayEvaluation);
                 await _dbContext.SaveChangesAsync();
 

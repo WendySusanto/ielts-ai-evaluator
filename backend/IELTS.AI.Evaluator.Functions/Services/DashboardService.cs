@@ -104,6 +104,8 @@ namespace IELTS.AI.Evaluator.Functions.Services
                     .Select(e => new { e.OverallBand, e.CreatedAt })
                     .ToListAsync();
 
+                var daysStreak = CalculateDaysStreak(allEvaluations.Select(e => e.CreatedAt).ToList());
+
                 var quickStats = new DashboardQuickStatsDto
                 {
                     TotalEvaluations = allEvaluations.Count,
@@ -111,7 +113,8 @@ namespace IELTS.AI.Evaluator.Functions.Services
                     SpeakingQuotaUsed = user.SpeakingQuotaUsed,
                     AverageBand = allEvaluations.Count > 0 ? allEvaluations.Average(e => e.OverallBand) : 0,
                     LastEvaluationDate = allEvaluations.Count > 0 ? allEvaluations.Max(e => e.CreatedAt) : null,
-                    ProgressToTarget = CalculateProgressToTarget(allEvaluations.Count > 0 ? allEvaluations.Average(e => e.OverallBand) : 0, user.IELTSTargetScore)
+                    ProgressToTarget = CalculateProgressToTarget(allEvaluations.Count > 0 ? allEvaluations.Average(e => e.OverallBand) : 0, user.IELTSTargetScore),
+                    DaysStreak = daysStreak
                 };
 
                 var userStats = new DashboardUserStatsDto
@@ -159,6 +162,47 @@ namespace IELTS.AI.Evaluator.Functions.Services
             // Calculate percentage of progress towards target
             var progress = (currentAverage / targetScore) * 100;
             return Math.Round(progress, 1);
+        }
+
+        private static int CalculateDaysStreak(List<DateTime> evaluationDates)
+        {
+            if (!evaluationDates.Any()) return 0;
+
+            // Group evaluations by date (ignore time) and get unique dates
+            var distinctDates = evaluationDates
+                .Select(d => d.Date)              // Convert to date only
+                .Distinct()                       // Remove duplicates
+                .OrderByDescending(d => d)        // Most recent first
+                .ToList();
+
+            if (!distinctDates.Any()) return 0;
+
+            var today = DateTime.UtcNow.Date;
+            var streak = 0;
+
+            // Check if there's recent activity (today or yesterday)
+            var mostRecentDate = distinctDates[0];
+            if (mostRecentDate != today && mostRecentDate != today.AddDays(-1))
+            {
+                // No recent activity - streak is broken
+                return 0;
+            }
+
+            var expectedDate = mostRecentDate;
+            foreach (var evalDate in distinctDates)
+            {
+                if (evalDate == expectedDate)
+                {
+                    streak++;
+                    expectedDate = expectedDate.AddDays(-1);
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return streak;
         }
     }
 }

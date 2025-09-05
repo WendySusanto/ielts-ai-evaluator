@@ -130,5 +130,8 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
 
         [JsonPropertyName("progressToTarget")]
         public decimal ProgressToTarget { get; set; }
+
+        [JsonPropertyName("daysStreak")]
+        public decimal DaysStreak { get; set; }
     }
 }

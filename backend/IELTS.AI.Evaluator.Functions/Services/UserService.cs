@@ -64,10 +64,10 @@ namespace IELTS.AI.Evaluator.Functions.Services
 
                 // Update properties
                 user.Email = payload.Email;
-                user.AuthProvider = payload.AuthProvider;
-                user.Plan = payload.Plan;
-                user.WritingQuotaUsed = payload.WritingQuotaUsed;
-                user.SpeakingQuotaUsed = payload.SpeakingQuotaUsed;
+                //user.AuthProvider = payload.AuthProvider;
+                //user.Plan = payload.Plan;
+                //user.WritingQuotaUsed = payload.WritingQuotaUsed;
+                //user.SpeakingQuotaUsed = payload.SpeakingQuotaUsed;
                 user.IELTSTargetType = payload.IELTSTargetType;
                 user.IELTSTargetScore = payload.IELTSTargetScore;
                 user.TargetTestDate = ConvertToUtc(payload.TargetTestDate, payload.DateTimeOffset);
