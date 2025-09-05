@@ -36,6 +36,7 @@ import {
 import { useFetch } from "@/hooks/use-fetch";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfileSkeleton } from "@/components/skeleton/ProfileSkeleton";
+import ErrorPage from "./ErrorPage";
 
 const Profile = () => {
   const { user: currentUser } = useAuth();
@@ -111,16 +112,11 @@ const Profile = () => {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <p className="text-red-600 dark:text-red-400 mb-4">
-              Failed to load profile: {error.message}
-            </p>
-            <Button onClick={() => refetch()}>Try Again</Button>
-          </CardContent>
-        </Card>
-      </div>
+      <ErrorPage
+        title="Failed to load profile"
+        message={error.message}
+        onRetry={refetch}
+      />
     );
   }
 

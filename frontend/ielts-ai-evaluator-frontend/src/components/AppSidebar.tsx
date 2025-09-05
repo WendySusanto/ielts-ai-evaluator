@@ -34,11 +34,14 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-  const collapsed = state === "collapsed";
+
+  const { isMobile } = useSidebar();
+
+  const collapsed = !isMobile && state === "collapsed";
 
   const isActive = (path: string) => currentPath === path;
-  const getNavCls = ({ isActive }: { isActive: boolean }) =>
-    isActive ? "border-r-2 font-medium" : "hover:border hover:font-medium";
+  const getNavCls = (isActive: boolean) =>
+    isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "";
 
   return (
     <Sidebar
@@ -74,11 +77,9 @@ export function AppSidebar() {
                     <NavLink
                       to={item.url}
                       end
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${getNavCls(
-                          { isActive }
-                        )}`
-                      }
+                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${getNavCls(
+                        isActive(item.url)
+                      )}`}
                     >
                       <item.icon className="h-5 w-5 flex-shrink-0" />
                       {!collapsed && (

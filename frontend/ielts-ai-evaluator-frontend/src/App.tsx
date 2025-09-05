@@ -17,6 +17,8 @@ import { PrivateRoute } from "./components/PrivateRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Profile from "./pages/Profile";
+import ComingSoon from "./pages/ComingSoon";
+import Premium from "./pages/Premium";
 
 function App() {
   return (
@@ -58,7 +60,12 @@ function App() {
                           path="/speaking"
                           element={
                             <PrivateRoute>
-                              <div>Speaking</div>
+                              <ComingSoon
+                                title="Speaking Practice"
+                                feature="AI-Powered Speaking Analysis"
+                                description="Our advanced AI will analyze your pronunciation, fluency, and speaking patterns to provide detailed feedback for IELTS preparation."
+                                estimatedDate="Q1 2025"
+                              />
                             </PrivateRoute>
                           }
                         />
@@ -106,7 +113,7 @@ function App() {
                           path="/premium"
                           element={
                             <PrivateRoute>
-                              <div>premium</div>
+                              <Premium />
                             </PrivateRoute>
                           }
                         />

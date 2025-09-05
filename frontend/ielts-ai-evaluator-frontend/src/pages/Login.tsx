@@ -100,6 +100,7 @@ export default function Login() {
         remember ? browserLocalPersistence : browserSessionPersistence
       );
       await signIn(email.trim(), password);
+      debugger;
       navigate(from, { replace: true });
     } catch (err: any) {
       setError(mapAuthError(err.code || ""));

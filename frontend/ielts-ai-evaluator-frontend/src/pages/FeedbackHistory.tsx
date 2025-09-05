@@ -24,6 +24,7 @@ import type {
   EvaluationType,
 } from "@/types/feedbackHistory";
 import { useAuth } from "@/contexts/AuthContext";
+import ErrorPage from "./ErrorPage";
 
 const FeedbackHistory = () => {
   const navigate = useNavigate();
@@ -47,12 +48,10 @@ const FeedbackHistory = () => {
   // Show error state
   if (error) {
     return (
-      <div className="p-6 space-y-6 min-h-full">
-        <div className="text-center text-red-500">
-          <p>Error loading feedback history: </p>
-          {error?.message || "Failed to load data"}
-        </div>
-      </div>
+      <ErrorPage
+        title="Error loading feedback history"
+        message={error?.message || "Failed to load data"}
+      />
     );
   }
 

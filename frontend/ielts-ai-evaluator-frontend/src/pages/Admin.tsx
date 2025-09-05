@@ -63,6 +63,7 @@ import { useFetch } from "@/hooks/use-fetch";
 import ApiResponse from "@/types/ApiResponse";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/skeleton/TableSkeleton";
+import ErrorPage from "./ErrorPage";
 
 const Admin = () => {
   const [selectedTask, setSelectedTask] = useState<
@@ -122,20 +123,16 @@ const Admin = () => {
   // Show errors
   if (promptsError || usersError) {
     return (
-      <div className="p-4">
-        <p className="text-red-500">
-          {promptsError?.message || usersError?.message}
-        </p>
-        <Button
-          onClick={() => {
-            refetchPrompts();
-            refetchUsers();
-          }}
-          className="mt-4"
-        >
-          Retry
-        </Button>
-      </div>
+      <ErrorPage
+        title="Failed to load admin data"
+        message={
+          promptsError?.message || usersError?.message || "An error occurred"
+        }
+        onRetry={() => {
+          refetchPrompts();
+          refetchUsers();
+        }}
+      />
     );
   }
 

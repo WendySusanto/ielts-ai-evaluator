@@ -41,8 +41,10 @@ export const signInWithGooglePopup = async () => {
 
 export const signOutUser = () => signOut(auth);
 
-export const sendResetPassword = (email: string) =>
-  sendPasswordResetEmail(auth, email);
+export const sendResetPassword = async (email: string) => {
+  console.log("Sending password reset email to:", email);
+  await sendPasswordResetEmail(auth, email);
+};
 
 export const sendVerificationEmail = (user: any) => sendEmailVerification(user);
 

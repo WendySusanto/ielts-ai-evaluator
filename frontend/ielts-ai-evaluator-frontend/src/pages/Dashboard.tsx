@@ -5,85 +5,121 @@ import { Badge } from "@/components/ui/badge";
 import {
   BookOpen,
   Target,
-  TrendingUp,
   Clock,
-  Award,
   Mic,
   PenTool,
   BarChart3,
-  Calendar,
   Star,
+  User,
 } from "lucide-react";
+import { useFetch } from "@/hooks/use-fetch";
+import { DashboardData } from "@/types/dashboard";
+import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
+import { GRADIENT_INDIGO } from "@/styles/gradients";
+import { useNavigate } from "react-router";
+import ErrorPage from "./ErrorPage";
 
 const Dashboard = () => {
+  // Fetch dashboard data from API
+  const {
+    data: dashboardData,
+    isLoading,
+    error,
+    refetch,
+  } = useFetch<DashboardData>("/api/dashboard");
+
+  const navigate = useNavigate();
+
+  // Calculate days since member joined
+  const getDaysSinceMember = (memberSince: string) => {
+    const memberDate = new Date(memberSince);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - memberDate.getTime());
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  // Format date to relative time
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <ErrorPage
+        title="Failed to load dashboard"
+        message={error.message}
+        onRetry={refetch}
+      />
+    );
+  }
+
+  if (!dashboardData) {
+    return null;
+  }
+
+  const { userStats, recentEvaluations, quickStats } = dashboardData;
+
+  // Dynamic stats based on API data
   const stats = [
     {
-      title: "Speaking Sessions",
-      value: "12",
-      change: "+3 this week",
-      icon: Mic,
+      title: "Total Evaluations",
+      value: quickStats.totalEvaluations.toString(),
+      change: `Average: ${quickStats.averageBand.toFixed(1)}`,
+      icon: BookOpen,
       color: "text-blue-600 dark:text-blue-400",
     },
     {
       title: "Writing Tasks",
-      value: "8",
-      change: "+2 this week",
+      value: quickStats.writingQuotaUsed.toString(),
+      change: quickStats.lastEvaluationDate
+        ? `Last: ${getRelativeTime(quickStats.lastEvaluationDate)}`
+        : "No recent activity",
       icon: PenTool,
       color: "text-green-600 dark:text-green-400",
     },
     {
-      title: "Average Score",
-      value: "7.5",
-      change: "+0.5 improvement",
-      icon: BarChart3,
+      title: "Speaking Tasks",
+      value: quickStats.speakingQuotaUsed.toString(),
+      change: `Target: ${userStats.ieltsTargetScore}`,
+      icon: Mic,
       color: "text-purple-600 dark:text-purple-400",
     },
     {
-      title: "Study Streak",
-      value: "15 days",
-      change: "Keep it up!",
+      title: "Days Streak",
+      value: `${quickStats.daysStreak}`,
+      change: `Keep it up!`,
       icon: Target,
       color: "text-orange-600 dark:text-orange-400",
     },
-  ];
-
-  const recentActivities = [
-    {
-      type: "Speaking",
-      topic: "Technology & Innovation",
-      score: 8.0,
-      date: "Today",
-    },
-    {
-      type: "Writing Task 1",
-      topic: "Data Analysis",
-      score: 7.5,
-      date: "Yesterday",
-    },
-    {
-      type: "Writing Task 2",
-      topic: "Environmental Issues",
-      score: 8.5,
-      date: "2 days ago",
-    },
-  ];
-
-  const upcomingGoals = [
-    { title: "Complete 5 Speaking Sessions", progress: 60 },
-    { title: "Improve Writing Task 1 Score", progress: 40 },
-    { title: "Practice Academic Vocabulary", progress: 80 },
   ];
 
   return (
     <div className="space-y-6 min-h-full">
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
-          Welcome back, Sarah! 👋
+        <h1
+          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
+        >
+          Welcome back, {userStats.fullName || "Student"}! 👋
         </h1>
         <p className="text-muted-foreground-bold text-lg">
-          Ready to continue your IELTS journey? Let's achieve your target score
-          together.
+          Ready to continue your IELTS journey? You're targeting a{" "}
+          <span className="font-semibold text-card-foreground">
+            {userStats.ieltsTargetScore}
+          </span>{" "}
+          band score.
         </p>
       </div>
 
@@ -121,87 +157,187 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Activity */}
         <div className="lg:col-span-2">
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm h-[500px]">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
                 <Clock className="h-5 w-5 text-secondary" />
-                Recent Activity
+                Recent Evaluations
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentActivities.map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border"
-                >
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`p-2 rounded-lg ${
-                        activity.type.includes("Speaking")
-                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                          : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
-                      }`}
-                    >
-                      {activity.type.includes("Speaking") ? (
-                        <Mic className="h-4 w-4" />
-                      ) : (
-                        <PenTool className="h-4 w-4" />
-                      )}
+              {recentEvaluations.length > 0 ? (
+                recentEvaluations.map((evaluation) => (
+                  <div
+                    key={evaluation.essayEvaluationId}
+                    className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`p-2 rounded-lg ${
+                          evaluation.evaluationType === "Speaking"
+                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
+                            : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                        }`}
+                      >
+                        {evaluation.evaluationType === "Speaking" ? (
+                          <Mic className="h-4 w-4" />
+                        ) : (
+                          <PenTool className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-medium text-card-foreground">
+                          {evaluation.evaluationType === "Writing" &&
+                          evaluation.taskType == "Task1"
+                            ? "Task 1"
+                            : "Task 2"}
+                        </p>
+                        <p className="text-sm text-muted-foreground-bold">
+                          {evaluation.topic}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium text-card-foreground">
-                        {activity.type}
-                      </p>
-                      <p className="text-sm text-muted-foreground-bold">
-                        {activity.topic}
+                    <div className="text-right">
+                      <Badge
+                        variant="secondary"
+                        className="mb-1 bg-badge-indigo text-badge-indigo-foreground"
+                      >
+                        {evaluation.overallBand.toFixed(1)}
+                      </Badge>
+                      <p className="text-xs text-muted-foreground">
+                        {getRelativeTime(evaluation.createdAt)}
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <Badge
-                      variant="secondary"
-                      className="mb-1 bg-badge-indigo text-badge-indigo-foreground"
-                    >
-                      {activity.score}
-                    </Badge>
-                    <p className="text-xs text-muted-foreground">
-                      {activity.date}
-                    </p>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <p className="text-muted-foreground-bold">
+                    No evaluations yet. Start your first practice!
+                  </p>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Goals & Progress */}
-        <div>
+        {/* User Profile & Progress */}
+        <div className="space-y-6">
+          {/* User Profile Card */}
           <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Target className="h-5 w-5 text-secondary" />
-                Weekly Goals
+                <User className="h-5 w-5 text-secondary" />
+                Your Profile
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground-bold">
+                    Plan
+                  </span>
+                  <Badge
+                    variant={
+                      userStats.plan === "Free" ? "secondary" : "default"
+                    }
+                    className="bg-badge-indigo text-badge-indigo-foreground"
+                  >
+                    {userStats.plan}
+                  </Badge>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground-bold">
+                    Target Score
+                  </span>
+                  <span className="text-sm font-medium text-card-foreground">
+                    {userStats.ieltsTargetScore}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground-bold">
+                    Target Type
+                  </span>
+                  <span className="text-sm font-medium text-card-foreground">
+                    {userStats.ieltsTargetType}
+                  </span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground-bold">
+                    Member Since
+                  </span>
+                  <span className="text-sm font-medium text-card-foreground">
+                    {getDaysSinceMember(userStats.memberSince)} days
+                  </span>
+                </div>
+
+                {userStats.targetTestDate && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground-bold">
+                      Target Date
+                    </span>
+                    <span className="text-sm font-medium text-card-foreground">
+                      {new Date(userStats.targetTestDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Progress Overview */}
+          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-card-foreground">
+                <BarChart3 className="h-5 w-5 text-secondary" />
+                Progress Overview
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              {upcomingGoals.map((goal, index) => (
-                <div key={index} className="space-y-2">
+              <div className="space-y-4">
+                <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-card-foreground">
-                      {goal.title}
+                      Days Streak
                     </p>
                     <span className="text-xs text-muted-foreground">
-                      {goal.progress}%
+                      {quickStats.daysStreak} days / 5 days
                     </span>
                   </div>
-                  <Progress value={goal.progress} className="h-2" />
+                  <Progress
+                    value={Math.min(quickStats.daysStreak * 2 * 10, 100)}
+                    className="h-2"
+                  />
                 </div>
-              ))}
+
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-medium text-card-foreground">
+                      Current Average
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {quickStats.averageBand.toFixed(1)} /{" "}
+                      {userStats.ieltsTargetScore}
+                    </span>
+                  </div>
+                  <Progress
+                    value={
+                      (quickStats.averageBand / userStats.ieltsTargetScore) *
+                      100
+                    }
+                    className="h-2"
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
           {/* Quick Actions */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm mt-6">
+          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
                 <Star className="h-5 w-5 text-secondary" />
@@ -209,13 +345,17 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button className="w-full justify-start bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0">
+              <Button
+                onClick={() => navigate("/speaking")}
+                className="w-full justify-start bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+              >
                 <Mic className="h-4 w-4 mr-2" />
                 Start Speaking Practice
               </Button>
               <Button
                 variant="outline"
                 className="w-full justify-start border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={() => navigate("/writing")}
               >
                 <PenTool className="h-4 w-4 mr-2" />
                 Begin Writing Task
@@ -223,6 +363,7 @@ const Dashboard = () => {
               <Button
                 variant="outline"
                 className="w-full justify-start border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                onClick={() => navigate("/feedback")}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />
                 View Progress Report

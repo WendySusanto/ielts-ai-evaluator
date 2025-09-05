@@ -23,6 +23,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useFetch } from "@/hooks/use-fetch";
 import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
 import type { EvaluationDetail } from "@/types/evaluation";
+import ErrorPage from "./ErrorPage";
 
 const DetailedFeedback = () => {
   const navigate = useNavigate();
@@ -44,11 +45,10 @@ const DetailedFeedback = () => {
   // Show error state
   if (error || !evaluationData) {
     return (
-      <div className="p-6 space-y-6">
-        <div className="text-center text-red-500">
-          Error loading evaluation details: {error?.message}
-        </div>
-      </div>
+      <ErrorPage
+        title="Error loading evaluation details"
+        message={error?.message || "Evaluation not found"}
+      />
     );
   }
 

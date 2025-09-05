@@ -11,16 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  PenTool,
-  Clock,
-  Target,
-  BarChart3,
-  Brain,
-  FileText,
-  CheckCircle,
-  ArrowLeft,
-} from "lucide-react";
-import ApiResponse from "@/types/ApiResponse";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PenTool, BarChart3, ArrowLeft, AlertTriangle } from "lucide-react";
 import WritingPrompt from "@/types/WritingPrompt";
 import { useFetch } from "@/hooks/use-fetch";
 import { useNavigate, useParams } from "react-router";
@@ -29,7 +27,6 @@ import NotFound from "./NotFound";
 import { formatText } from "@/lib/utils";
 import { EssayEvaluate } from "@/types/EssayEvaluate";
 import { toast } from "sonner";
-import { set } from "react-hook-form";
 import { useAuth } from "@/contexts/AuthContext";
 
 const WritingPractice = () => {
@@ -40,13 +37,8 @@ const WritingPractice = () => {
 
   const { user } = useAuth();
 
-  const {
-    data: writingPrompt = null,
-    isLoading: isLoadingPrompts,
-    error: promptsError,
-    refetch: refetchPrompts,
-    mutate: mutatePrompts,
-  } = useFetch<WritingPrompt>(`/api/writing-prompt?id=${taskId}`);
+  const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
+    useFetch<WritingPrompt>(`/api/writing-prompt?id=${taskId}`);
 
   const initialTimeValue = writingPrompt?.duration
     ? writingPrompt.duration
@@ -80,13 +72,11 @@ const WritingPractice = () => {
   const [wordCount, setWordCount] = useState(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [showWordCountDialog, setShowWordCountDialog] = useState(false);
 
-  const { data, isLoading, mutate } = useFetch<EssayEvaluate>(
-    "/api/writing/evaluate",
-    {
-      skipInitialFetch: true,
-    }
-  );
+  const { mutate } = useFetch<EssayEvaluate>("/api/writing/evaluate", {
+    skipInitialFetch: true,
+  });
 
   const navigate = useNavigate();
 
@@ -115,6 +105,15 @@ const WritingPractice = () => {
   };
 
   const handleAnalyze = async () => {
+    if (wordCount < (writingPrompt?.minimumWords || 150)) {
+      setShowWordCountDialog(true);
+      return;
+    }
+
+    await submitEssay();
+  };
+
+  const submitEssay = async () => {
     setIsAnalyzing(true);
 
     const payload: EssayEvaluate = {
@@ -130,7 +129,7 @@ const WritingPractice = () => {
       url: "/api/writing/evaluate",
       method: "POST",
       data: payload,
-      onSuccess: (data) => {
+      onSuccess: () => {
         setIsAnalyzing(false);
         setIsSubmitted(true);
         toast.success("Essay analyzed successfully!");
@@ -375,7 +374,7 @@ const WritingPractice = () => {
                 {/* <Button variant="outline">Save Draft</Button> */}
                 <Button
                   onClick={handleAnalyze}
-                  disabled={wordCount < minWords || isAnalyzing}
+                  disabled={isAnalyzing}
                   className={`min-w-[120px] bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white`}
                 >
                   {isAnalyzing ? "Analyzing..." : "Get AI Feedback"}
@@ -408,6 +407,40 @@ const WritingPractice = () => {
           </Card>
         </div>
       </div>
+
+      {/* Word Count Confirmation Dialog */}
+      <Dialog open={showWordCountDialog} onOpenChange={setShowWordCountDialog}>
+        <DialogContent className="w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              Word Count Below Minimum
+            </DialogTitle>
+            <DialogDescription>
+              Your essay has {wordCount} words, but the minimum requirement is{" "}
+              {writingPrompt?.minimumWords || 150} words. Submitting an essay
+              below the minimum word count may result in a lower band score.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowWordCountDialog(false)}
+            >
+              Continue Writing
+            </Button>
+            <Button
+              onClick={async () => {
+                setShowWordCountDialog(false);
+                await submitEssay();
+              }}
+              className="bg-yellow-600 hover:bg-yellow-700"
+            >
+              Submit Anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
