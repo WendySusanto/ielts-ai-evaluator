@@ -170,7 +170,7 @@ const Profile = () => {
                     </Button>
                     <Button
                       onClick={handleSubmit(handleSaveProfile)}
-                      disabled={isSaving || isDirty}
+                      disabled={isSaving || !isDirty}
                       className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
                     >
                       {isSaving ? (

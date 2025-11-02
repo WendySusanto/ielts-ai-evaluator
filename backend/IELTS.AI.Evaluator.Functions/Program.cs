@@ -30,7 +30,7 @@ var host = new HostBuilder()
             {
                 // Define the allowed origins. For production, you should be
                 // more specific than using a wildcard.
-                policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+                policy.AllowAnyOrigin()
                       .AllowAnyHeader() // Allows all request headers.
                       .AllowAnyMethod() // Allows all HTTP methods (GET, POST, etc.)
                       .AllowCredentials(); // Important for front-ends sending credentials.

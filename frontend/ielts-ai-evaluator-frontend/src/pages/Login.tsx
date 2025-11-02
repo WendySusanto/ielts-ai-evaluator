@@ -244,14 +244,14 @@ export default function Login() {
                 >
                   Password
                 </label>
-                <button
+                {/* <button
                   type="button"
                   onClick={handleForgotPassword}
                   className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
                   disabled={submitting}
                 >
                   Forgot password?
-                </button>
+                </button> */}
               </div>
               <div className="relative">
                 <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
