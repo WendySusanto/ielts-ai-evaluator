@@ -21,30 +21,29 @@ jobs:
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22' # or any version you need
+          node-version: '22'
 
-      # The Azure Static Web Apps action will install deps and build by default using Oryx.
-      # For Vite, make sure output_location is "dist".
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Vite app
+        run: npm run build
+
       - name: Deploy to Azure Static Web Apps
         uses: Azure/static-web-apps-deploy@v1
         with:
-          node-version: '22' # or any version you need
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }} # For PR comments
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "/frontend/ielts-ai-evaluator-frontend"          # Change if your app is in a subfolder (e.g., "frontend")
-          api_location: ""           # Set to your Functions API folder if you have one (e.g., "api")
-          output_location: "dist"    # Vite build output
-          app_build_command: 'npm run build'
-          skip_api_build: true
-          # Optional: override Oryx build commands if you need a specific package manager or flags:
-          # app_build_command: "npm ci && npm run build"
-          # api_build_command: ""
+          app_location: "/frontend/ielts-ai-evaluator-frontend"
+          output_location: "dist"
+
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
