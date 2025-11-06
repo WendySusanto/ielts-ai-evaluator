@@ -30,7 +30,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Build Vite app
         run: npm run build
@@ -43,7 +43,7 @@ jobs:
           action: "upload"
           app_location: "/frontend/ielts-ai-evaluator-frontend"
           output_location: "dist"
-
+          skip_app_build: true 
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
