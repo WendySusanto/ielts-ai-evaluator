@@ -35,6 +35,8 @@ jobs:
           app_location: "/frontend/ielts-ai-evaluator-frontend"          # Change if your app is in a subfolder (e.g., "frontend")
           api_location: ""           # Set to your Functions API folder if you have one (e.g., "api")
           output_location: "dist"    # Vite build output
+          skip_app_build: true
+          skip_api_build: true
           # Optional: override Oryx build commands if you need a specific package manager or flags:
           # app_build_command: "npm ci && npm run build"
           # api_build_command: ""
