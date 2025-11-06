@@ -11,7 +11,6 @@ import FeedbackHistory from "./pages/FeedbackHistory";
 import DetailedFeedback from "./pages/DetailedFeedback";
 import Admin from "./pages/Admin";
 import { Toaster } from "sonner";
-import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
 import { PrivateRoute } from "./components/PrivateRoute";
 import Login from "./pages/Login";

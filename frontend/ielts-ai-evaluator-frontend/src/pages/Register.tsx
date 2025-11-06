@@ -22,7 +22,6 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  LogIn,
   Mail,
   Lock,
   UserPlus,
@@ -30,9 +29,6 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
-import { useFetch } from "@/hooks/use-fetch";
-import { toast } from "sonner";
-import { User as UserType } from "@/types/User";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;

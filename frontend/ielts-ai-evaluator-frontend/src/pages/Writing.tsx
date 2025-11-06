@@ -1,26 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import {
-  BookOpen,
-  Target,
-  TrendingUp,
-  Clock,
-  Award,
-  Mic,
-  PenTool,
-  BarChart3,
-  Calendar,
-  Star,
-  Paperclip,
-  FileText,
-} from "lucide-react";
-import {
-  GRADIENT_BACKGROUND,
-  GRADIENT_INDIGO,
-  GRADIENT_INDIGO_BUTTON,
-} from "@/styles/gradients";
+import { Target, Clock, PenTool, BarChart3, FileText } from "lucide-react";
+import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
@@ -34,26 +16,9 @@ const Writing = () => {
 
   const navigate = useNavigate();
 
-  const {
-    data: writingPrompts = [],
-    isLoading: isLoadingPrompts,
-    error: promptsError,
-    refetch: refetchPrompts,
-    mutate: mutatePrompts,
-  } = useFetch<ApiResponse<WritingPrompt>>("/api/writing-prompt");
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case "Easy":
-        return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
-      case "Medium":
-        return "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300";
-      case "Hard":
-        return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300";
-      default:
-        return "bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300";
-    }
-  };
+  const { data: writingPrompts = [], isLoading: isLoadingPrompts } = useFetch<
+    ApiResponse<WritingPrompt>
+  >("/api/writing-prompt");
 
   if (isLoadingPrompts) {
     return <WritingSkeleton />;

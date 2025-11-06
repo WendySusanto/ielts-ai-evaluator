@@ -18,15 +18,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Eye,
-  EyeOff,
-  Loader2,
-  LogIn,
-  Mail,
-  Lock,
-  KeyRound,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2, Mail, Lock, KeyRound } from "lucide-react";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -51,8 +43,7 @@ const mapAuthError = (code: string): string => {
 };
 
 export default function Login() {
-  const { signIn, signInWithGoogle, sendPasswordReset, user, loading } =
-    useAuth();
+  const { signIn, signInWithGoogle, user, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -121,28 +112,6 @@ export default function Login() {
       );
       await signInWithGoogle();
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(mapAuthError(err.code || ""));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const handleForgotPassword = async () => {
-    setError(null);
-    setResetMessage(null);
-    if (!email) {
-      setError("Enter your email first to reset password.");
-      return;
-    }
-    if (!emailRegex.test(email)) {
-      setError("Enter a valid email to reset password.");
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await sendPasswordReset(email.trim());
-      setResetMessage("Password reset email sent.");
     } catch (err: any) {
       setError(mapAuthError(err.code || ""));
     } finally {

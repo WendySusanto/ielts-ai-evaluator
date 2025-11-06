@@ -9,28 +9,11 @@ import { Button } from "@/components/ui/button";
 import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import {
-  BookOpen,
-  Target,
-  TrendingUp,
-  Clock,
-  Award,
-  Mic,
-  PenTool,
-  BarChart3,
-  Calendar,
-  Star,
-  Paperclip,
-  FileText,
-  Users2,
-  Edit,
-  Plus,
-} from "lucide-react";
+import { FileText, Users2, Edit, Plus } from "lucide-react";
 import { GRADIENT_INDIGO } from "@/styles/gradients";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
-import WritingPromptResponse from "@/types/WritingPrompt";
 import { User } from "@/types/User";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -83,7 +66,6 @@ const Admin = () => {
     isLoading: isLoadingUsers,
     error: usersError,
     refetch: refetchUsers,
-    mutate: mutateUsers,
   } = useFetch<User[]>("/api/user");
 
   const handleUpsertPrompt = async (data: WritingPrompt) => {

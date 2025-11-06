@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Rocket,
-  Clock,
   Star,
   ArrowLeft,
   Sparkles,
@@ -25,7 +24,6 @@ const ComingSoon = ({
   title = "Coming Soon",
   feature = "This Feature",
   description = "We're working hard to bring you something amazing! This feature is currently under development and will be available soon.",
-  estimatedDate = "Q4 2024",
 }: ComingSoonProps) => {
   const navigate = useNavigate();
 
