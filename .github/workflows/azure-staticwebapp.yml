@@ -29,14 +29,24 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Deploy (build + upload)
-        uses: Azure/static-web-apps-deploy@v1
-        with:
-          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          action: "upload"
-          app_location: frontend/ielts-ai-evaluator-frontend
-          output_location: dist
+      # Fail fast if secret is missing (common on PRs from forks)
+      - name: Debug Firebase key length
+        run: |
+          if [ -z "$VITE_FIREBASE_API_KEY" ]; then
+            echo "VITE_FIREBASE_API_KEY is EMPTY. If this is a PR from a fork, secrets are not available."
+            exit 1
+          fi
+          echo "VITE_FIREBASE_API_KEY length: ${#VITE_FIREBASE_API_KEY}"
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend/ielts-ai-evaluator-frontend
+
+      - name: Build Vite app with env
+        run: npm run build
+        working-directory: frontend/ielts-ai-evaluator-frontend
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -46,6 +56,35 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
           VITE_FIREBASE_APP_MEASUREMENT_ID: ${{ vars.VITE_FIREBASE_APP_MEASUREMENT_ID }}
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      # Confirm the key was embedded in the built bundle (prints redacted snippet)
+      - name: Grep for Firebase key in dist (redacted)
+        run: |
+          PARTIAL="${VITE_FIREBASE_API_KEY:0:6}"
+          if grep -R "$PARTIAL" dist/ >/dev/null 2>&1; then
+            echo "Found partial API key in dist (as expected)."
+            grep -R -n "$PARTIAL" dist/ | sed 's/'"$PARTIAL"'/*******/g'
+          else
+            echo "Did NOT find partial API key in dist. Build likely didn't receive env."
+            exit 1
+          fi
+        working-directory: frontend/ielts-ai-evaluator-frontend
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+
+      - name: Upload dist as artifact (for inspection)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: frontend/ielts-ai-evaluator-frontend/dist
+
+      - name: Deploy prebuilt assets to Azure Static Web Apps
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          action: "upload"
+          app_location: frontend/ielts-ai-evaluator-frontend/dist
+          skip_app_build: true
 
   close_pull_request:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
