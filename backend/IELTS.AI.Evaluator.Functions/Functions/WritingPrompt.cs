@@ -27,7 +27,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("UpsertWritingPrompt")]
         public async Task<IActionResult> UpsertWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "writing-prompt")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing-prompt")] HttpRequest req)
         {
             try
             {
@@ -53,7 +53,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetWritingPrompt")]
         public async Task<IActionResult> GetWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "writing-prompt")] HttpRequest req, FunctionContext executionContext)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "writing-prompt")] HttpRequest req, FunctionContext executionContext)
         {
             try
             {

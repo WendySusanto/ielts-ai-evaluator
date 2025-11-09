@@ -22,7 +22,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
         }
 
         [Function("EvaluateEssay")]
-        public async Task<IActionResult> EvaluateEssayAsync([HttpTrigger(AuthorizationLevel.Function, "post", Route = "writing/evaluate")] HttpRequest req)
+        public async Task<IActionResult> EvaluateEssayAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing/evaluate")] HttpRequest req)
         {
             try
             {
@@ -50,7 +50,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetEvaluationHistory")]
         public async Task<IActionResult> GetEvaluationHistoryAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "evaluation-history")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-history")] HttpRequest req)
         {
             try
             {
@@ -79,7 +79,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetEvaluationDetail")]
         public async Task<IActionResult> GetEvaluationDetailAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "evaluation-detail")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-detail")] HttpRequest req)
         {
             try
             {

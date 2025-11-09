@@ -29,7 +29,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("UpsertUser")]
         public async Task<IActionResult> UpsertUserAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "post", Route = "user")] HttpRequest req, FunctionContext context)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "user")] HttpRequest req, FunctionContext context)
         {
             try
             {
@@ -66,7 +66,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetUser")]
         public async Task<IActionResult> GetUserAsync(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "user")] HttpRequest req, FunctionContext context)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "user")] HttpRequest req, FunctionContext context)
         {
             try
             {
