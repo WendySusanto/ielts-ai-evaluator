@@ -103,7 +103,7 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
         [JsonPropertyName("updatedAt")]
         public DateTime UpdatedAt { get; set; }
 
-        [JsonPropertyName("ClaimsUpdated")]
+        [JsonPropertyName("claimsUpdated")]
         public bool? ClaimsUpdated { get; set; }
 
 
