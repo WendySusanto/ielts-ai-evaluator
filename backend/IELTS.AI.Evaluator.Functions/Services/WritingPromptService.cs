@@ -73,6 +73,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 writingPrompt.TaskType = payload.TaskType;
                 writingPrompt.Level = payload.Level;
                 writingPrompt.ImageUrl = payload.ImageUrl;
+                writingPrompt.ImageDescription = payload.ImageDescription;
 
                 await _dbContext.SaveChangesAsync();
 
@@ -171,6 +172,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 TaskType = writingPrompt.TaskType,
                 Level = writingPrompt.Level,
                 ImageUrl = writingPrompt.ImageUrl,
+                ImageDescription = writingPrompt.ImageDescription,
                 CreatedAt = writingPrompt.CreatedAt,
                 UpdatedAt = writingPrompt.UpdatedAt
             };

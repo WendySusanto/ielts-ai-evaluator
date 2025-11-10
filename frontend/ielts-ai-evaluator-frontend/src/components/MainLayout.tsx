@@ -26,8 +26,6 @@ function MainLayout({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const navigate = useNavigate();
 
-  console.log("User in MainLayout:", auth.user);
-
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="bg-sidebar px-4 sticky top-0 h-16 w-full flex items-center border-b border-sidebar-border flex-shrink-0 z-50">

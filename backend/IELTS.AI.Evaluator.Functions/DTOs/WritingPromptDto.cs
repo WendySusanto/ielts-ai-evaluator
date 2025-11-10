@@ -28,6 +28,8 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
         public string Level { get; set; } = "Academic";
         [JsonPropertyName("imageUrl")]
         public string? ImageUrl { get; set; }
+        [JsonPropertyName("imageDescription")]
+        public string? ImageDescription { get; set; }
     }
 
     public class WritingPromptResponseDto
@@ -88,6 +90,8 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
 
         [JsonPropertyName("imageUrl")]
         public string? ImageUrl { get; set; }
+        [JsonPropertyName("imageDescription")]
+        public string? ImageDescription { get; set; }
 
         [JsonPropertyName("createdAt")]
         public DateTime CreatedAt { get; set; }

@@ -308,7 +308,11 @@ const WritingPractice = () => {
               {/* Sample Chart Placeholder */}
               {writingPrompt?.imageUrl ? (
                 <div className="mt-4 p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border-2 border-dashed border-gray-300">
-                  <img src={writingPrompt.imageUrl} alt="Task Chart" />
+                  <img
+                    src={writingPrompt.imageUrl}
+                    alt="Task Chart"
+                    className="w-full object-center object-cover"
+                  />
                 </div>
               ) : (
                 ""

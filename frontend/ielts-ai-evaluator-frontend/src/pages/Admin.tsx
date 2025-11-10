@@ -270,6 +270,14 @@ const Admin = () => {
           />
         </div>
 
+        <div>
+          <Label htmlFor="imageDescription">Image Description (optional)</Label>
+          <Input
+            {...register("imageDescription")}
+            placeholder="Enter image description for Task 1"
+          />
+        </div>
+
         <div className="flex justify-end space-x-2">
           <DialogClose asChild>
             <Button type="button" variant="outline" onClick={() => onClose()}>
