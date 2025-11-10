@@ -10,6 +10,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
         Task<UserResponseDto> UpsertUserAsync(UserUpsertRequestDto payload);
         Task<UserResponseDto> GetUserAsync(Guid? userId);
         Task<UserListResponseDto> GetUsersAsync();
+        Task<User?> GetOrCreateUserAsync(string firebaseUid, string? email, string? fullName);
     }
 
     public class UserService : IUserService
@@ -154,7 +155,47 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
+        public async Task<User?> GetOrCreateUserAsync(string firebaseUid, string? email, string? fullName)
+        {
+            try
+            {
+                var user = await _dbContext.Users
+                    .FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid && !u.IsDeleted);
 
+                if (user != null)
+                {
+                    user.LastLogin = DateTimeOffset.UtcNow;
+                    if (string.IsNullOrEmpty(user.FullName) && !string.IsNullOrEmpty(fullName))
+                        user.FullName = fullName;
+                    if (string.IsNullOrEmpty(user.Email) && !string.IsNullOrEmpty(email))
+                        user.Email = email;
+
+                    await _dbContext.SaveChangesAsync();
+                    return user;
+                }
+
+                user = new User
+                {
+                    UserId = Guid.NewGuid(),
+                    FirebaseUid = firebaseUid,
+                    Email = email ?? string.Empty,
+                    FullName = fullName ?? string.Empty,
+                    AuthProvider = "Firebase",
+                    Plan = "Free",
+                    CreatedAt = DateTime.UtcNow,
+                    LastLogin = DateTimeOffset.UtcNow
+                };
+
+                _dbContext.Users.Add(user);
+                await _dbContext.SaveChangesAsync();
+                return user;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting or creating user for FirebaseUid: {FirebaseUid}", firebaseUid);
+                return null;
+            }
+        }
 
         private static UserDto MapToDto(User user)
         {
