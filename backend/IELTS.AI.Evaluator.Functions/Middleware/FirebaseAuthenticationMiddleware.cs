@@ -1,22 +1,27 @@
 ﻿using FirebaseAdmin.Auth;
-using IELTS.AI.Evaluator.Functions.Services;
+using IELTS.AI.Evaluator.Data.Models;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Azure.Functions.Worker.Middleware;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Net;
 using System.Security.Claims;
+
 
 namespace IELTS.AI.Evaluator.Functions.Middleware;
 
 public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
 {
     private readonly ILogger<FirebaseAuthenticationMiddleware> _logger;
+    private readonly EvaluatorDbContext _dbContext;
 
-    public FirebaseAuthenticationMiddleware(ILogger<FirebaseAuthenticationMiddleware> logger)
+    public FirebaseAuthenticationMiddleware(
+        ILogger<FirebaseAuthenticationMiddleware> logger,
+        EvaluatorDbContext dbContext)
     {
         _logger = logger;
+        _dbContext = dbContext;
     }
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
@@ -45,9 +50,6 @@ public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
         try
         {
-            // Resolve the scoped user service per request
-            var userService = context.InstanceServices.GetRequiredService<IUserService>();
-
             var decodedToken = await FirebaseAuth.DefaultInstance.VerifyIdTokenAsync(idToken, true);
             var firebaseUid = decodedToken.Uid;
             var email = GetClaimValue(decodedToken, "email");
@@ -56,8 +58,8 @@ public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
 
             bool claimsUpdated = false;
 
-            // Get or create user using the service
-            var user = await userService.GetOrCreateUserAsync(firebaseUid, email, fullName);
+            // Get or create user
+            var user = await GetOrCreateUserAsync(firebaseUid, email, fullName);
             if (user == null)
             {
                 await WriteUnauthorized(context, req, "User creation failed");
@@ -135,6 +137,40 @@ public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
         var r = req.CreateResponse(HttpStatusCode.Unauthorized);
         await r.WriteStringAsync(message);
         context.GetInvocationResult().Value = r;
+    }
+
+    private async Task<User?> GetOrCreateUserAsync(string firebaseUid, string? email, string? fullName)
+    {
+        var user = await _dbContext.Users
+                    .FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid && !u.IsDeleted);
+
+        if (user != null)
+        {
+            user.LastLogin = DateTimeOffset.UtcNow;
+            if (string.IsNullOrEmpty(user.FullName) && !string.IsNullOrEmpty(fullName))
+                user.FullName = fullName;
+            if (string.IsNullOrEmpty(user.Email) && !string.IsNullOrEmpty(email))
+                user.Email = email;
+
+            await _dbContext.SaveChangesAsync();
+            return user;
+        }
+
+        user = new User
+        {
+            UserId = Guid.NewGuid(),
+            FirebaseUid = firebaseUid,
+            Email = email ?? string.Empty,
+            FullName = fullName ?? string.Empty,
+            AuthProvider = "Firebase",
+            Plan = "Free",
+            CreatedAt = DateTime.UtcNow,
+            LastLogin = DateTimeOffset.UtcNow
+        };
+
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync();
+        return user;
     }
 
     private string? GetClaimValue(FirebaseToken token, string claimName) =>
