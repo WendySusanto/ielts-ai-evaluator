@@ -16,6 +16,8 @@ namespace IELTS.AI.Evaluator.Functions.Services
 
     public class SpeakingEvaluationService : ISpeakingEvaluationService
     {
+        private const int MaxTranscriptLength = 20_000;
+
         private readonly IGeminiApiClient _geminiApiClient;
         private readonly EvaluatorDbContext _dbContext;
         private readonly ILogger<SpeakingEvaluationService> _logger;
@@ -44,6 +46,11 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 };
             }
 
+            if (payload.Transcript.Length > MaxTranscriptLength)
+            {
+                return new SpeakingEvaluationResponseDto { Success = false, Message = "Transcript exceeds the maximum length of 20,000 characters." };
+            }
+
             var geminiApiKey = _configuration["GeminiApiKey"];
             if (string.IsNullOrWhiteSpace(geminiApiKey))
             {
@@ -68,6 +75,23 @@ namespace IELTS.AI.Evaluator.Functions.Services
                         Success = false,
                         Message = "User or SpeakingPrompt not found."
                     };
+                }
+
+                var isUnlimitedPlan = user.Plan?.ToLowerInvariant() is "premium" or "admin";
+                if (!isUnlimitedPlan)
+                {
+                    var dailyLimit = int.TryParse(_configuration["DailySpeakingQuota"], out var l) ? l : 10;
+                    var todayUtc = DateTime.UtcNow.Date;
+                    var usedToday = await _dbContext.SpeakingEvaluations
+                        .CountAsync(e => e.User.UserId == userId && e.CreatedAt >= todayUtc);
+                    if (usedToday >= dailyLimit)
+                    {
+                        return new SpeakingEvaluationResponseDto
+                        {
+                            Success = false,
+                            Message = "Daily speaking evaluation quota reached. Upgrade to Premium for unlimited evaluations."
+                        };
+                    }
                 }
 
                 var aiResponseJson = await _geminiApiClient.EvaluateSpeakingAsync(

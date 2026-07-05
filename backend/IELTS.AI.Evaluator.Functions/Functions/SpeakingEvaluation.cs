@@ -45,9 +45,12 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
                 if (!result.Success)
                 {
+                    if (result.Message == "Daily speaking evaluation quota reached. Upgrade to Premium for unlimited evaluations.")
+                        return new ObjectResult(result) { StatusCode = StatusCodes.Status429TooManyRequests };
                     if (result.Message == "Invalid request payload." ||
                         result.Message == "User or SpeakingPrompt not found." ||
-                        result.Message == "Invalid JSON format.")
+                        result.Message == "Invalid JSON format." ||
+                        result.Message == "Transcript exceeds the maximum length of 20,000 characters.")
                         return new BadRequestObjectResult(result);
                     return new StatusCodeResult(StatusCodes.Status500InternalServerError);
                 }
