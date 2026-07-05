@@ -256,5 +256,96 @@ namespace IELTS.AI.Evaluator.Functions.Constants
         }";
 
         public static JsonNode IeltsEvaluationSchema => JsonNode.Parse(IeltsEvaluationSchemaJson)!;
+
+        private const string IeltsSpeakingSchemaJson = @"{
+            ""type"": ""object"",
+            ""properties"": {
+                ""overallBand"": { ""type"": ""number"" },
+                ""criteria"": {
+                    ""type"": ""object"",
+                    ""properties"": {
+                        ""fluencyCoherence"": {
+                            ""type"": ""object"",
+                            ""properties"": {
+                                ""band"": { ""type"": ""number"" },
+                                ""generalFeedback"": { ""type"": ""string"" },
+                                ""subScores"": {
+                                    ""type"": ""object"",
+                                    ""properties"": {
+                                        ""speechRate"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""hesitationAndPauses"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""logicalDevelopment"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""cohesiveDevices"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] }
+                                    },
+                                    ""required"": [""speechRate"", ""hesitationAndPauses"", ""logicalDevelopment"", ""cohesiveDevices""]
+                                },
+                                ""issues"": { ""type"": ""array"", ""items"": { ""type"": ""object"", ""properties"": { ""text"": { ""type"": ""string"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""text"", ""comment""] } }
+                            },
+                            ""required"": [""band"", ""generalFeedback"", ""subScores"", ""issues""]
+                        },
+                        ""lexicalResource"": {
+                            ""type"": ""object"",
+                            ""properties"": {
+                                ""band"": { ""type"": ""number"" },
+                                ""generalFeedback"": { ""type"": ""string"" },
+                                ""subScores"": {
+                                    ""type"": ""object"",
+                                    ""properties"": {
+                                        ""vocabularyRange"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""wordChoiceAccuracy"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""idiomaticLanguage"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""paraphrasing"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] }
+                                    },
+                                    ""required"": [""vocabularyRange"", ""wordChoiceAccuracy"", ""idiomaticLanguage"", ""paraphrasing""]
+                                },
+                                ""issues"": { ""type"": ""array"", ""items"": { ""type"": ""object"", ""properties"": { ""text"": { ""type"": ""string"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""text"", ""comment""] } }
+                            },
+                            ""required"": [""band"", ""generalFeedback"", ""subScores"", ""issues""]
+                        },
+                        ""grammaticalRangeAccuracy"": {
+                            ""type"": ""object"",
+                            ""properties"": {
+                                ""band"": { ""type"": ""number"" },
+                                ""generalFeedback"": { ""type"": ""string"" },
+                                ""subScores"": {
+                                    ""type"": ""object"",
+                                    ""properties"": {
+                                        ""sentenceVariety"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""tenseAccuracy"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""subjectVerbAgreement"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""errorDensity"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] }
+                                    },
+                                    ""required"": [""sentenceVariety"", ""tenseAccuracy"", ""subjectVerbAgreement"", ""errorDensity""]
+                                },
+                                ""issues"": { ""type"": ""array"", ""items"": { ""type"": ""object"", ""properties"": { ""text"": { ""type"": ""string"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""text"", ""comment""] } }
+                            },
+                            ""required"": [""band"", ""generalFeedback"", ""subScores"", ""issues""]
+                        },
+                        ""pronunciation"": {
+                            ""type"": ""object"",
+                            ""properties"": {
+                                ""band"": { ""type"": ""number"" },
+                                ""generalFeedback"": { ""type"": ""string"" },
+                                ""subScores"": {
+                                    ""type"": ""object"",
+                                    ""properties"": {
+                                        ""clarity"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""intonation"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] },
+                                        ""wordStress"": { ""type"": ""object"", ""properties"": { ""score"": { ""type"": ""number"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""score"", ""comment""] }
+                                    },
+                                    ""required"": [""clarity"", ""intonation"", ""wordStress""]
+                                },
+                                ""issues"": { ""type"": ""array"", ""items"": { ""type"": ""object"", ""properties"": { ""text"": { ""type"": ""string"" }, ""comment"": { ""type"": ""string"" } }, ""required"": [""text"", ""comment""] } }
+                            },
+                            ""required"": [""band"", ""generalFeedback"", ""subScores"", ""issues""]
+                        }
+                    },
+                    ""required"": [""fluencyCoherence"", ""lexicalResource"", ""grammaticalRangeAccuracy"", ""pronunciation""]
+                }
+            },
+            ""required"": [""overallBand"", ""criteria""]
+        }";
+
+        public static JsonNode IeltsSpeakingSchema => JsonNode.Parse(IeltsSpeakingSchemaJson)!;
     }
 }

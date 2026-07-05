@@ -47,8 +47,10 @@ var host = new HostBuilder()
         services.AddHttpClient<IGeminiApiClient, GeminiApiClient>();
         services.AddScoped<IEssayEvaluationService, EssayEvaluationService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
+        services.AddScoped<ISpeakingPromptService, SpeakingPromptService>();
+        services.AddScoped<ISpeakingEvaluationService, SpeakingEvaluationService>();
         services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IDashboardService, DashboardService>(); // ? Register dashboard service
+        services.AddScoped<IDashboardService, DashboardService>();
 
         // initialize FirebaseApp once using JSON from env (or KeyVault)
         var firebaseJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON")
@@ -82,7 +84,7 @@ host.Run();
 
 //var config = new ConfigurationBuilder()
 //  .SetBasePath(Directory.GetCurrentDirectory()) // important for CLI
-//    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+//Â  Â  .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
 //  .AddEnvironmentVariables()
 //  .Build();
 
@@ -100,7 +102,7 @@ host.Run();
 
 //// Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4.
 //// builder.Services
-////     .AddApplicationInsightsTelemetryWorkerService()
-////     .ConfigureFunctionsApplicationInsights();
+////Â  Â  Â .AddApplicationInsightsTelemetryWorkerService()
+////Â  Â  Â .ConfigureFunctionsApplicationInsights();
 
 //builder.Build().Run();

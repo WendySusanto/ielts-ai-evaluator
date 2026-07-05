@@ -28,23 +28,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
         {
             try
             {
-                // Get only top 5 recent evaluations without feedback details
-                var evaluations = await _dbContext.EssayEvaluations
-                    .Include(e => e.WritingPrompt)
-                    .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                    .OrderByDescending(e => e.CreatedAt)
-                    .Take(5) // ? Only top 5 recent evaluations
-                    .Select(e => new DashboardEvaluationItemDto
-                    {
-                        EssayEvaluationId = e.EssayEvaluationId,
-                        TaskType = e.WritingPrompt != null ? e.WritingPrompt.TaskType : string.Empty,
-                        Topic = e.WritingPrompt != null ? e.WritingPrompt.Topic : string.Empty,
-                        OverallBand = e.OverallBand,
-                        CreatedAt = e.CreatedAt,
-                        EvaluationType = "Writing"
-                        // ? No Feedback property - simplified for dashboard
-                    })
-                    .ToListAsync();
+                var evaluations = await GetRecentEvaluationsAsync(userId, 5);
 
                 return new DashboardEvaluationHistoryResponseDto
                 {
@@ -81,28 +65,21 @@ namespace IELTS.AI.Evaluator.Functions.Services
                     };
                 }
 
-                // Get recent evaluations (top 5, no feedback)
-                var recentEvaluations = await _dbContext.EssayEvaluations
-                    .Include(e => e.WritingPrompt)
-                    .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                    .OrderByDescending(e => e.CreatedAt)
-                    .Take(5)
-                    .Select(e => new DashboardEvaluationItemDto
-                    {
-                        EssayEvaluationId = e.EssayEvaluationId,
-                        TaskType = e.WritingPrompt != null ? e.WritingPrompt.TaskType : string.Empty,
-                        Topic = e.WritingPrompt != null ? e.WritingPrompt.Topic : string.Empty,
-                        OverallBand = e.OverallBand,
-                        CreatedAt = e.CreatedAt,
-                        EvaluationType = "Writing"
-                    })
-                    .ToListAsync();
+                // Get recent evaluations (top 5, no feedback) combining writing + speaking
+                var recentEvaluations = await GetRecentEvaluationsAsync(userId, 5);
 
-                // Calculate quick stats
-                var allEvaluations = await _dbContext.EssayEvaluations
+                // Calculate quick stats across both writing and speaking evaluations
+                var writingStats = await _dbContext.EssayEvaluations
                     .Where(e => e.User.UserId == userId && !e.IsDeleted)
                     .Select(e => new { e.OverallBand, e.CreatedAt })
                     .ToListAsync();
+
+                var speakingStats = await _dbContext.SpeakingEvaluations
+                    .Where(e => e.User.UserId == userId && !e.IsDeleted)
+                    .Select(e => new { e.OverallBand, e.CreatedAt })
+                    .ToListAsync();
+
+                var allEvaluations = writingStats.Concat(speakingStats).ToList();
 
                 var daysStreak = CalculateDaysStreak(allEvaluations.Select(e => e.CreatedAt).ToList());
 
@@ -154,11 +131,56 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
+        /// <summary>
+        /// Returns the most recent evaluations for a user, merging Writing and Speaking
+        /// evaluations and ordering by recency.
+        /// </summary>
+        private async Task<List<DashboardEvaluationItemDto>> GetRecentEvaluationsAsync(Guid userId, int take)
+        {
+            var writing = await _dbContext.EssayEvaluations
+                .Include(e => e.WritingPrompt)
+                .Where(e => e.User.UserId == userId && !e.IsDeleted)
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(take)
+                .Select(e => new DashboardEvaluationItemDto
+                {
+                    EssayEvaluationId = e.EssayEvaluationId,
+                    TaskType = e.WritingPrompt != null ? e.WritingPrompt.TaskType : string.Empty,
+                    Topic = e.WritingPrompt != null ? e.WritingPrompt.Topic : string.Empty,
+                    OverallBand = e.OverallBand,
+                    CreatedAt = e.CreatedAt,
+                    EvaluationType = "Writing"
+                })
+                .ToListAsync();
+
+            var speaking = await _dbContext.SpeakingEvaluations
+                .Include(e => e.SpeakingPrompt)
+                .Where(e => e.User.UserId == userId && !e.IsDeleted)
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(take)
+                .Select(e => new DashboardEvaluationItemDto
+                {
+                    EssayEvaluationId = e.SpeakingEvaluationId,
+                    TaskType = e.SpeakingPrompt != null ? e.SpeakingPrompt.Part : string.Empty,
+                    Topic = e.SpeakingPrompt != null ? e.SpeakingPrompt.Topic : string.Empty,
+                    OverallBand = e.OverallBand,
+                    CreatedAt = e.CreatedAt,
+                    EvaluationType = "Speaking"
+                })
+                .ToListAsync();
+
+            return writing
+                .Concat(speaking)
+                .OrderByDescending(e => e.CreatedAt)
+                .Take(take)
+                .ToList();
+        }
+
         private static decimal CalculateProgressToTarget(decimal currentAverage, decimal targetScore)
         {
             if (targetScore <= 0) return 0;
             if (currentAverage >= targetScore) return 100;
-            
+
             // Calculate percentage of progress towards target
             var progress = (currentAverage / targetScore) * 100;
             return Math.Round(progress, 1);

@@ -1,21 +1,21 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
+import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { useFetch } from "@/hooks/use-fetch";
+import { GRADIENT_INDIGO } from "@/styles/gradients";
+import { DashboardData } from "@/types/dashboard";
 import {
+  BarChart3,
   BookOpen,
-  Target,
   Clock,
   Mic,
   PenTool,
-  BarChart3,
   Star,
+  Target,
   User,
 } from "lucide-react";
-import { useFetch } from "@/hooks/use-fetch";
-import { DashboardData } from "@/types/dashboard";
-import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
@@ -187,10 +187,17 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <p className="font-medium text-card-foreground">
-                          {evaluation.evaluationType === "Writing" &&
-                          evaluation.taskType == "Task1"
-                            ? "Task 1"
-                            : "Task 2"}
+                          {evaluation.evaluationType === "Speaking"
+                            ? `Speaking ${
+                                evaluation.taskType === "Part1"
+                                  ? "Part 1"
+                                  : evaluation.taskType === "Part2"
+                                    ? "Part 2"
+                                    : "Part 3"
+                              }`
+                            : evaluation.taskType === "Task1"
+                              ? "Writing Task 1"
+                              : "Writing Task 2"}
                         </p>
                         <p className="text-sm text-muted-foreground-bold">
                           {evaluation.topic}

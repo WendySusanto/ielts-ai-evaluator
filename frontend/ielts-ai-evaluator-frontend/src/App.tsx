@@ -1,23 +1,25 @@
 import { BrowserRouter, Route, Routes } from "react-router";
+import { Toaster } from "sonner";
 import "./App.css";
-import { SidebarProvider } from "./components/ui/sidebar";
 import { AppSidebar } from "./components/AppSidebar";
-import Dashboard from "./pages/Dashboard";
-import { ThemeProvider } from "./contexts/ThemeContext";
 import MainLayout from "./components/MainLayout";
+import { PrivateRoute } from "./components/PrivateRoute";
+import { SidebarProvider } from "./components/ui/sidebar";
+import { AuthProvider } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import Admin from "./pages/Admin";
+import Dashboard from "./pages/Dashboard";
+import DetailedFeedback from "./pages/DetailedFeedback";
+import FeedbackHistory from "./pages/FeedbackHistory";
+import Login from "./pages/Login";
+import Premium from "./pages/Premium";
+import Profile from "./pages/Profile";
+import Register from "./pages/Register";
+import Speaking from "./pages/Speaking";
+import SpeakingFeedback from "./pages/SpeakingFeedback";
+import SpeakingPractice from "./pages/SpeakingPractice";
 import Writing from "./pages/Writing";
 import WritingPractice from "./pages/WritingPractice";
-import FeedbackHistory from "./pages/FeedbackHistory";
-import DetailedFeedback from "./pages/DetailedFeedback";
-import Admin from "./pages/Admin";
-import { Toaster } from "sonner";
-import { AuthProvider } from "./contexts/AuthContext";
-import { PrivateRoute } from "./components/PrivateRoute";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Profile from "./pages/Profile";
-import ComingSoon from "./pages/ComingSoon";
-import Premium from "./pages/Premium";
 
 function App() {
   return (
@@ -59,12 +61,23 @@ function App() {
                           path="/speaking"
                           element={
                             <PrivateRoute>
-                              <ComingSoon
-                                title="Speaking Practice"
-                                feature="AI-Powered Speaking Analysis"
-                                description="Our advanced AI will analyze your pronunciation, fluency, and speaking patterns to provide detailed feedback for IELTS preparation."
-                                estimatedDate="Q1 2025"
-                              />
+                              <Speaking />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/speaking/:part/:taskId"
+                          element={
+                            <PrivateRoute>
+                              <SpeakingPractice />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/speaking-feedback/:speakingId"
+                          element={
+                            <PrivateRoute>
+                              <SpeakingFeedback />
                             </PrivateRoute>
                           }
                         />
