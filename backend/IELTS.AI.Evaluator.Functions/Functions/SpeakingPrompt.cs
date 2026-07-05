@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,10 +25,17 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("UpsertSpeakingPrompt")]
         public async Task<IActionResult> UpsertSpeakingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking-prompt")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking-prompt")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
+                if (!context.IsAdmin())
+                {
+                    return new ObjectResult(new { success = false, message = "Administrator access required." })
+                    { StatusCode = StatusCodes.Status403Forbidden };
+                }
+
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var payload = JsonSerializer.Deserialize<SpeakingPromptUpsertRequestDto>(requestBody);
                 var result = await _speakingPromptService.UpsertSpeakingPromptAsync(payload);

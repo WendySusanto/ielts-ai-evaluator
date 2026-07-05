@@ -1,4 +1,5 @@
 ﻿using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,10 +28,17 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("UpsertWritingPrompt")]
         public async Task<IActionResult> UpsertWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing-prompt")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing-prompt")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
+                if (!context.IsAdmin())
+                {
+                    return new ObjectResult(new { success = false, message = "Administrator access required." })
+                    { StatusCode = StatusCodes.Status403Forbidden };
+                }
+
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var payload = JsonSerializer.Deserialize<WritingPromptUpsertRequestDto>(requestBody);
                 var result = await _writingPromptService.UpsertWritingPromptAsync(payload);
