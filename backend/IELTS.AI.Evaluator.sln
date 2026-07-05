@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IELTS.AI.Evaluator.Data", "
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IELTS.AI.Evaluator.Functions", "IELTS.AI.Evaluator.Functions\IELTS.AI.Evaluator.Functions.csproj", "{22595805-CF58-48A4-8A8C-480A8C57A7B7}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IELTS.AI.Evaluator.Tests", "IELTS.AI.Evaluator.Tests\IELTS.AI.Evaluator.Tests.csproj", "{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,18 @@ Global
 		{22595805-CF58-48A4-8A8C-480A8C57A7B7}.Release|x64.Build.0 = Release|Any CPU
 		{22595805-CF58-48A4-8A8C-480A8C57A7B7}.Release|x86.ActiveCfg = Release|Any CPU
 		{22595805-CF58-48A4-8A8C-480A8C57A7B7}.Release|x86.Build.0 = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|x64.Build.0 = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Debug|x86.Build.0 = Debug|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|x64.ActiveCfg = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|x64.Build.0 = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|x86.ActiveCfg = Release|Any CPU
+		{5205DBE6-BE9F-4451-B557-F8FCD8AC05B4}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

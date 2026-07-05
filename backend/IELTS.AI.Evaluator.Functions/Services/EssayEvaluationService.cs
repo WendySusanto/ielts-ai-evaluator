@@ -21,6 +21,8 @@ namespace IELTS.AI.Evaluator.Functions.Services
 
     public class EssayEvaluationService : IEssayEvaluationService
     {
+        private const int MaxEssayLength = 10_000;
+
         private readonly IGeminiApiClient _geminiApiClient;
         private readonly EvaluatorDbContext _dbContext;
         private readonly ILogger<EssayEvaluationService> _logger;
@@ -50,6 +52,15 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 };
             }
 
+            if (payload.UserAnswer.Length > MaxEssayLength)
+            {
+                return new EssayEvaluationResponseDto
+                {
+                    Success = false,
+                    Message = "Essay exceeds the maximum length of 10,000 characters."
+                };
+            }
+
             var geminiApiKey = _configuration["GeminiApiKey"];
             if (string.IsNullOrWhiteSpace(geminiApiKey))
             {
@@ -63,6 +74,34 @@ namespace IELTS.AI.Evaluator.Functions.Services
 
             try
             {
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+                var writingPrompt = await _dbContext.WritingPrompts.FirstOrDefaultAsync(wp => wp.WritingPromptId == payload.WritingPromptId);
+                if (user == null || writingPrompt == null)
+                {
+                    return new EssayEvaluationResponseDto
+                    {
+                        Success = false,
+                        Message = "User or WritingPrompt not found."
+                    };
+                }
+
+                var isUnlimitedPlan = user.Plan?.ToLowerInvariant() is "premium" or "admin";
+                if (!isUnlimitedPlan)
+                {
+                    var dailyLimit = int.TryParse(_configuration["DailyWritingQuota"], out var configuredLimit) ? configuredLimit : 10;
+                    var todayUtc = DateTime.UtcNow.Date;
+                    var usedToday = await _dbContext.EssayEvaluations
+                        .CountAsync(e => e.User.UserId == userId && e.CreatedAt >= todayUtc);
+                    if (usedToday >= dailyLimit)
+                    {
+                        return new EssayEvaluationResponseDto
+                        {
+                            Success = false,
+                            Message = "Daily writing evaluation quota reached. Upgrade to Premium for unlimited evaluations."
+                        };
+                    }
+                }
+
                 // Read sample AI response from file for development
                 //string aiResponseJson;
                 //try
@@ -88,17 +127,6 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 var aiModel = aiResponse.RootElement.GetProperty("modelVersion").GetString();
                 var promptTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "promptTokenCount");
                 var candidatesTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "candidatesTokenCount");
-
-                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId);
-                var writingPrompt = await _dbContext.WritingPrompts.FirstOrDefaultAsync(wp => wp.WritingPromptId == payload.WritingPromptId);
-                if (user == null || writingPrompt == null)
-                {
-                    return new EssayEvaluationResponseDto
-                    {
-                        Success = false,
-                        Message = "User or WritingPrompt not found."
-                    };
-                }
 
                 var essayEvaluationId = Guid.NewGuid();
                 var essayEvaluation = new EssayEvaluation

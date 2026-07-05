@@ -42,10 +42,13 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
                 if (!result.Success)
                 {
-                    if (result.Message == "Invalid request payload." || result.Message == "User or WritingPrompt not found." || result.Message == "Invalid JSON format.")
+                    if (result.Message == "Daily writing evaluation quota reached. Upgrade to Premium for unlimited evaluations.")
+                        return new ObjectResult(result) { StatusCode = StatusCodes.Status429TooManyRequests };
+                    if (result.Message == "Invalid request payload." ||
+                        result.Message == "User or WritingPrompt not found." ||
+                        result.Message == "Invalid JSON format." ||
+                        result.Message == "Essay exceeds the maximum length of 10,000 characters.")
                         return new BadRequestObjectResult(result);
-                    if (result.Message == "Gemini API key is missing.")
-                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
                     return new StatusCodeResult(StatusCodes.Status500InternalServerError);
                 }
 
