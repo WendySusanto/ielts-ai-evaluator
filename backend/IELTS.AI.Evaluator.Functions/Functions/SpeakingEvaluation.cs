@@ -94,7 +94,8 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetSpeakingDetail")]
         public async Task<IActionResult> GetSpeakingDetailAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speaking-detail")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speaking-detail")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
@@ -108,7 +109,17 @@ namespace IELTS.AI.Evaluator.Functions.Functions
                     });
                 }
 
-                var result = await _speakingEvaluationService.GetSpeakingDetailAsync(evalId);
+                var userId = context.GetUserId();
+                if (userId == null)
+                {
+                    return new UnauthorizedObjectResult(new SpeakingDetailResponseDto
+                    {
+                        Success = false,
+                        Message = "User not authenticated"
+                    });
+                }
+
+                var result = await _speakingEvaluationService.GetSpeakingDetailAsync(userId.Value, evalId);
                 if (!result.Success)
                 {
                     if (result.Message == "Evaluation not found.")

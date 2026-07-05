@@ -14,9 +14,9 @@ namespace IELTS.AI.Evaluator.Functions.Services
 {
     public interface IEssayEvaluationService
     {
-        Task<EssayEvaluationResponseDto> EvaluateEssayAsync(EssayEvaluationRequestDto payload);
+        Task<EssayEvaluationResponseDto> EvaluateEssayAsync(Guid userId, EssayEvaluationRequestDto payload);
         Task<EvaluationHistoryResponseDto> GetEvaluationHistoryAsync(Guid userId);
-        Task<EvaluationDetailResponseDto> GetEvaluationDetailAsync(Guid essayEvaluationId);
+        Task<EvaluationDetailResponseDto> GetEvaluationDetailAsync(Guid userId, Guid essayEvaluationId);
     }
 
     public class EssayEvaluationService : IEssayEvaluationService
@@ -39,7 +39,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
             _configuration = configuration;
         }
 
-        public async Task<EssayEvaluationResponseDto> EvaluateEssayAsync(EssayEvaluationRequestDto payload)
+        public async Task<EssayEvaluationResponseDto> EvaluateEssayAsync(Guid userId, EssayEvaluationRequestDto payload)
         {
             if (payload == null || string.IsNullOrWhiteSpace(payload.UserAnswer) || payload.WritingPromptId == Guid.Empty)
             {
@@ -89,7 +89,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 var promptTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "promptTokenCount");
                 var candidatesTokenCount = GetSafeTokenCount(aiResponse, "usageMetadata", "candidatesTokenCount");
 
-                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == payload.UserId);
+                var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.UserId == userId);
                 var writingPrompt = await _dbContext.WritingPrompts.FirstOrDefaultAsync(wp => wp.WritingPromptId == payload.WritingPromptId);
                 if (user == null || writingPrompt == null)
                 {
@@ -217,13 +217,13 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
-        public async Task<EvaluationDetailResponseDto> GetEvaluationDetailAsync(Guid essayEvaluationId)
+        public async Task<EvaluationDetailResponseDto> GetEvaluationDetailAsync(Guid userId, Guid essayEvaluationId)
         {
             try
             {
                 var eval = await _dbContext.EssayEvaluations
                     .Include(e => e.WritingPrompt)
-                    .Where(e => e.EssayEvaluationId == essayEvaluationId)
+                    .Where(e => e.EssayEvaluationId == essayEvaluationId && e.User.UserId == userId)
                     .Select(e => new { e.RawJson, e.WritingPrompt.TaskType, e.WritingPrompt.Topic, e.UserAnswer })
                     .FirstOrDefaultAsync();
                 if (eval == null)

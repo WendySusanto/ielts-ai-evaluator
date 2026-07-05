@@ -11,7 +11,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
     {
         Task<SpeakingEvaluationResponseDto> EvaluateSpeakingAsync(Guid userId, SpeakingEvaluationRequestDto payload);
         Task<SpeakingHistoryResponseDto> GetSpeakingHistoryAsync(Guid userId);
-        Task<SpeakingDetailResponseDto> GetSpeakingDetailAsync(Guid speakingEvaluationId);
+        Task<SpeakingDetailResponseDto> GetSpeakingDetailAsync(Guid userId, Guid speakingEvaluationId);
     }
 
     public class SpeakingEvaluationService : ISpeakingEvaluationService
@@ -177,13 +177,13 @@ namespace IELTS.AI.Evaluator.Functions.Services
             }
         }
 
-        public async Task<SpeakingDetailResponseDto> GetSpeakingDetailAsync(Guid speakingEvaluationId)
+        public async Task<SpeakingDetailResponseDto> GetSpeakingDetailAsync(Guid userId, Guid speakingEvaluationId)
         {
             try
             {
                 var eval = await _dbContext.SpeakingEvaluations
                     .Include(e => e.SpeakingPrompt)
-                    .Where(e => e.SpeakingEvaluationId == speakingEvaluationId)
+                    .Where(e => e.SpeakingEvaluationId == speakingEvaluationId && e.User.UserId == userId)
                     .Select(e => new { e.RawJson, e.SpeakingPrompt.Part, e.SpeakingPrompt.Topic, e.Transcript })
                     .FirstOrDefaultAsync();
 

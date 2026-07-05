@@ -1,5 +1,6 @@
 using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -22,13 +23,22 @@ namespace IELTS.AI.Evaluator.Functions.Functions
         }
 
         [Function("EvaluateEssay")]
-        public async Task<IActionResult> EvaluateEssayAsync([HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing/evaluate")] HttpRequest req)
+        public async Task<IActionResult> EvaluateEssayAsync(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing/evaluate")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
+                var userId = context.GetUserId();
+                if (userId == null)
+                {
+                    return new UnauthorizedObjectResult(new EssayEvaluationResponseDto
+                    { Success = false, Message = "User not authenticated" });
+                }
+
                 var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
                 var payload = JsonSerializer.Deserialize<EssayEvaluationRequestDto>(requestBody);
-                var result = await _essayEvaluationService.EvaluateEssayAsync(payload);
+                var result = await _essayEvaluationService.EvaluateEssayAsync(userId.Value, payload);
 
                 if (!result.Success)
                 {
@@ -50,20 +60,21 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetEvaluationHistory")]
         public async Task<IActionResult> GetEvaluationHistoryAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-history")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-history")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
-                var userIdParam = req.Query["userId"].ToString();
-                if (!Guid.TryParse(userIdParam, out Guid userId))
+                var userId = context.GetUserId();
+                if (userId == null)
                 {
-                    return new BadRequestObjectResult(new EvaluationHistoryResponseDto
+                    return new UnauthorizedObjectResult(new EvaluationHistoryResponseDto
                     {
                         Success = false,
-                        Message = "Invalid userId format."
+                        Message = "User not authenticated"
                     });
                 }
-                var result = await _essayEvaluationService.GetEvaluationHistoryAsync(userId);
+                var result = await _essayEvaluationService.GetEvaluationHistoryAsync(userId.Value);
                 if (!result.Success)
                 {
                     return new StatusCodeResult(StatusCodes.Status500InternalServerError);
@@ -79,7 +90,8 @@ namespace IELTS.AI.Evaluator.Functions.Functions
 
         [Function("GetEvaluationDetail")]
         public async Task<IActionResult> GetEvaluationDetailAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-detail")] HttpRequest req)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "evaluation-detail")] HttpRequest req,
+            FunctionContext context)
         {
             try
             {
@@ -92,7 +104,17 @@ namespace IELTS.AI.Evaluator.Functions.Functions
                         Message = "Invalid evaluation id format."
                     });
                 }
-                var result = await _essayEvaluationService.GetEvaluationDetailAsync(evalId);
+
+                var userId = context.GetUserId();
+                if (userId == null)
+                {
+                    return new UnauthorizedObjectResult(new EvaluationDetailResponseDto
+                    {
+                        Success = false,
+                        Message = "User not authenticated"
+                    });
+                }
+                var result = await _essayEvaluationService.GetEvaluationDetailAsync(userId.Value, evalId);
                 if (!result.Success)
                 {
                     if (result.Message == "Evaluation not found.")

@@ -14,9 +14,6 @@ namespace IELTS.AI.Evaluator.Functions.DTOs
         [JsonPropertyName("question")]
         public string Question { get; set; } = string.Empty;
 
-        [JsonPropertyName("userId")]
-        public Guid UserId { get; set; }
-
         [JsonPropertyName("taskType")]
         public string TaskType { get; set; } = string.Empty;
 
