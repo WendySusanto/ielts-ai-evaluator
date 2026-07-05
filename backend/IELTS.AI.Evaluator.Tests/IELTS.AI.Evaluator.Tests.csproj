@@ -10,6 +10,8 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.7" />
+    <!-- ponytail: pin explicitly, Npgsql (via ProjectReference) only requires >=9.0.1 and that low floor otherwise wins MSB3277 against the 9.0.7 used elsewhere -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.7" />
     <!-- ponytail: pin explicitly so it's copied locally instead of the net8.0 shared framework's older System.Text.Json, which EFCore 9.x needs -->
     <PackageReference Include="System.Text.Json" Version="9.0.7" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />

@@ -87,4 +87,30 @@ public class EssayEvaluationGuardTests
         Assert.Equal("Essay exceeds the maximum length of 10,000 characters.", result.Message);
         Assert.Equal(0, gemini.Calls);
     }
+
+    [Fact]
+    public async Task GetEvaluationDetail_NonOwner_ReturnsNotFound()
+    {
+        var (svc, db, _, owner, prompt) = Setup();
+        var essayEvaluationId = Guid.NewGuid();
+        db.EssayEvaluations.Add(new EssayEvaluation
+        {
+            EssayEvaluationId = essayEvaluationId,
+            RawJson = "{}",
+            UserAnswer = "a",
+            User = owner,
+            WritingPrompt = prompt,
+            AiModel = "m",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var otherUserId = Guid.NewGuid();
+        var result = await svc.GetEvaluationDetailAsync(otherUserId, essayEvaluationId);
+        Assert.False(result.Success);
+        Assert.Equal("Evaluation not found.", result.Message);
+
+        var ownerResult = await svc.GetEvaluationDetailAsync(owner.UserId, essayEvaluationId);
+        Assert.True(ownerResult.Success);
+    }
 }

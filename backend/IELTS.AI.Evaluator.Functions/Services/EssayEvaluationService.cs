@@ -90,6 +90,7 @@ namespace IELTS.AI.Evaluator.Functions.Services
                 {
                     var dailyLimit = int.TryParse(_configuration["DailyWritingQuota"], out var configuredLimit) ? configuredLimit : 10;
                     var todayUtc = DateTime.UtcNow.Date;
+                    // ponytail: COUNT-then-proceed is racy under concurrency; acceptable at this scale — move to a per-user lock or unique-per-day constraint if abuse appears.
                     var usedToday = await _dbContext.EssayEvaluations
                         .CountAsync(e => e.User.UserId == userId && e.CreatedAt >= todayUtc);
                     if (usedToday >= dailyLimit)

@@ -87,4 +87,30 @@ public class SpeakingEvaluationGuardTests
         Assert.Equal("Transcript exceeds the maximum length of 20,000 characters.", result.Message);
         Assert.Equal(0, gemini.Calls);
     }
+
+    [Fact]
+    public async Task GetSpeakingDetail_NonOwner_ReturnsNotFound()
+    {
+        var (svc, db, _, owner, prompt) = Setup();
+        var speakingEvaluationId = Guid.NewGuid();
+        db.SpeakingEvaluations.Add(new SpeakingEvaluation
+        {
+            SpeakingEvaluationId = speakingEvaluationId,
+            RawJson = "{}",
+            Transcript = "a",
+            User = owner,
+            SpeakingPrompt = prompt,
+            AiModel = "m",
+            CreatedAt = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var otherUserId = Guid.NewGuid();
+        var result = await svc.GetSpeakingDetailAsync(otherUserId, speakingEvaluationId);
+        Assert.False(result.Success);
+        Assert.Equal("Evaluation not found.", result.Message);
+
+        var ownerResult = await svc.GetSpeakingDetailAsync(owner.UserId, speakingEvaluationId);
+        Assert.True(ownerResult.Success);
+    }
 }
