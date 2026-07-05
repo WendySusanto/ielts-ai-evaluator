@@ -23,17 +23,16 @@ var host = new HostBuilder()
         // --- Step 1: Add CORS services and define the policy ---
         services.AddCors(options =>
         {
-            // We'll define a "default" policy. This is simplest to apply.
-            // When using ConfigureFunctionsWebApplication, the CORS middleware is
-            // automatically discovered and used. You do not need to call "UseCors()".
+            // Comma-separated allowlist; add the production URL to Azure App Settings at deploy time,
+            // e.g. "http://localhost:5173,https://your-production-domain.example"
+            var allowedOrigins = (Environment.GetEnvironmentVariable("AllowedOrigins") ?? "http://localhost:5173")
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
             options.AddDefaultPolicy(policy =>
             {
-                // Define the allowed origins. For production, you should be
-                // more specific than using a wildcard.
-                policy.AllowAnyOrigin()
-                      .AllowAnyHeader() // Allows all request headers.
-                      .AllowAnyMethod() // Allows all HTTP methods (GET, POST, etc.)
-                      .AllowCredentials(); // Important for front-ends sending credentials.
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
             });
         });
 
