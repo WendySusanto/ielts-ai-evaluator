@@ -15,6 +15,7 @@ var host = new HostBuilder()
     // This configures the function's application pipeline to use ASP.NET Core integration.
     .ConfigureFunctionsWebApplication(builder =>
     {
+        builder.UseMiddleware<ExceptionHandlingMiddleware>();
         builder.UseMiddleware<FirebaseAuthenticationMiddleware>();
     })
     // This is where you register all your services for dependency injection.
