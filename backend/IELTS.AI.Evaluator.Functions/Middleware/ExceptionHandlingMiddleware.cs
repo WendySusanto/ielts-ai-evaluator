@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -32,8 +31,8 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             if (domain is null) _logger.LogError(ex, "Unhandled exception");
 
             var res = req.CreateResponse((HttpStatusCode)status);
-            var json = JsonSerializer.Serialize(new { message });
-            await res.WriteStringAsync(json);
+            await res.WriteAsJsonAsync(new { message });
+            res.StatusCode = (HttpStatusCode)status; // WriteAsJsonAsync resets to 200
             context.GetInvocationResult().Value = res;
         }
     }
