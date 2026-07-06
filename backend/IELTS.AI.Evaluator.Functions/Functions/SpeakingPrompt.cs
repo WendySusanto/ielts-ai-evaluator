@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Extensions;
@@ -63,9 +62,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
         {
             try
             {
-                var user = executionContext.Items.TryGetValue("User", out var u) ? u as ClaimsPrincipal : null;
-
-                if (user == null)
+                if (executionContext.GetUserId() == null)
                 {
                     return new StatusCodeResult(StatusCodes.Status401Unauthorized);
                 }
