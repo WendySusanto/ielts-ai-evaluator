@@ -52,6 +52,7 @@ var host = new HostBuilder()
         services.AddScoped<ISpeakingEvaluationService, SpeakingEvaluationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IDashboardService, DashboardService>();
+        services.AddScoped<IAuthSyncService, AuthSyncService>();
 
         // initialize FirebaseApp once using JSON from env (or KeyVault)
         var firebaseJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON")

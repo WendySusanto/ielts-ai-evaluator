@@ -106,9 +106,7 @@ namespace IELTS.AI.Evaluator.Functions.Functions
                     {
                         return new UnauthorizedObjectResult("No user found");
                     }
-          
-                    user.Data.ClaimsUpdated = context.WereClaimsUpdated();
-                    
+
                     if (!user.Success)
                     {
                         return new StatusCodeResult(StatusCodes.Status500InternalServerError);
