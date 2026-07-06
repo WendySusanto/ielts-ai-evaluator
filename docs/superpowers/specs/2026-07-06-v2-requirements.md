@@ -86,6 +86,11 @@ Applies ui-ux-pro-max rules throughout. Reference mockups define the vibe; not p
 - Shape: ~1rem card radius, pill buttons, soft 1px borders, one subtle elevation level. Type: Plus Jakarta Sans via `@fontsource` (self-hosted), weights 400/500/600/700; tabular numerals for band scores.
 - Accessibility: 4.5:1 body text both modes, visible focus rings, 44px touch targets, labels on all inputs, `prefers-reduced-motion` respected. Micro-interactions 150–300ms, transform/opacity only.
 - **Every screen restyled**, with special attention to: **Dashboard** (stat tiles with SVG icons, band-progress toward `ielts_target_score`, recent activity — no gradient hero) and **Admin** (proper data table: sortable columns, prompt CRUD forms with validation and empty states — currently the worst screen). Skeletons mirror the new layouts.
+- **Feedback screens rebuilt around the new structured feedback, differentiated by task type:**
+  - **Feedback History** shows both types in one list with unmistakable type identity (icon + label + part/task-type badge), filterable by Writing/Speaking, band and date visible per row.
+  - **Writing feedback detail** — layout purpose-built for the writing schema: overall band hero, four criterion cards (band + justification + quoted essay examples + actions), the essay with inline-referenced errors (quote → correction → rule), improved-version excerpt, vocabulary upgrades.
+  - **Speaking feedback detail** — a different layout purpose-built for the speaking schema: overall band hero, four criterion cards where Pronunciation is driven by Azure PA data (accuracy/fluency/prosody meters, mispronounced-word list with per-word scores), the conversation transcript rendered as examiner/candidate turns with problem phrases highlighted.
+  - The Gemini prompts (writing evaluation, speaking evaluation, examiner-turn) are rewritten from scratch alongside their `responseSchema`s — prompt and schema are designed together so the feedback depth matches what these screens display.
 
 ## 9. Security & monetization posture (carry-forward)
 
