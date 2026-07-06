@@ -29,5 +29,6 @@ namespace IELTS.AI.Evaluator.Data.Models
         public int Duration { get; set; }
 
         public string Level { get; set; } = "Academic"; // or "General"
+        public bool IsActive { get; set; } = true;
     }
 }

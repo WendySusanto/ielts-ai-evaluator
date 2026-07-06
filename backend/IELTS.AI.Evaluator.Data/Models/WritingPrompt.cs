@@ -20,6 +20,7 @@ namespace IELTS.AI.Evaluator.Data.Models
         public string Level { get; set; } = "Academic"; // or "General"
         public string? ImageUrl { get; set; } // For Task 1 prompts that require an image
         public string? ImageDescription { get; set; }
+        public bool IsActive { get; set; } = true;
     }
 
 }
