@@ -40,7 +40,7 @@ public class User
 
     [Function("Admin_ListUsers")]
     public async Task<IActionResult> ListUsersAsync(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/users")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "manage/users")] HttpRequest req,
         FunctionContext context)
     {
         if (!context.IsAdmin())

@@ -28,7 +28,7 @@ public class Dashboard
 
     [Function("Admin_RecentEvaluations")]
     public async Task<IActionResult> AdminRecentEvaluationsAsync(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/recent-evaluations")] HttpRequest req,
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "manage/recent-evaluations")] HttpRequest req,
         FunctionContext context)
     {
         if (!context.IsAdmin())
