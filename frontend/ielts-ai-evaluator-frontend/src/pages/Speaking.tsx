@@ -1,9 +1,8 @@
-import { WritingSkeleton } from "@/components/skeleton/WritingSkeleton";
+﻿import { WritingSkeleton } from "@/components/skeleton/WritingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useApi } from "@/hooks/use-api";
-import { GRADIENT_INDIGO, GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
 import type { SpeakingPart, SpeakingPrompt } from "@/types/Speaking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Clock, MessageCircle, MessagesSquare, Mic, User } from "lucide-react";
@@ -56,12 +55,10 @@ const Speaking = () => {
     <div className="space-y-6">
       {/* Header */}
       <div className="mb-8">
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
-          Speaking Practice 🎤
+        <h1 className="text-3xl font-bold text-primary mb-2">
+          Speaking Practice
         </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <p className="text-foreground font-medium text-lg">
           Practice each part of the IELTS Speaking test and get instant
           AI-powered feedback on fluency, vocabulary, grammar and pronunciation.
         </p>
@@ -90,11 +87,11 @@ const Speaking = () => {
 
         {(Object.keys(PART_META) as SpeakingPart[]).map((part) => (
           <TabsContent key={part} value={part} className="mt-6">
-            <div className="mb-6 p-4 rounded-lg border bg-card-purple-light dark:bg-card-purple-light/30 border-card-purple-light-border">
-              <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+            <div className="mb-6 p-4 rounded-lg border bg-secondary border-border">
+              <h3 className="font-semibold text-secondary-foreground mb-2">
                 {PART_META[part].label} — {PART_META[part].title}
               </h3>
-              <p className="text-purple-700 dark:text-purple-300 text-sm">
+              <p className="text-secondary-foreground text-sm">
                 {PART_META[part].blurb}
               </p>
             </div>
@@ -107,7 +104,7 @@ const Speaking = () => {
         <Card className="border-0 shadow-lg bg-card">
           <CardContent className="py-12 text-center">
             <Mic className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground-bold">
+            <p className="text-foreground font-medium">
               No {PART_META[selectedPart].label} topics available yet. Check
               back soon!
             </p>
@@ -125,11 +122,11 @@ const Speaking = () => {
                   <CardTitle className="text-lg font-semibold text-card-foreground">
                     {topic.topic}
                   </CardTitle>
-                  <Badge className="text-xs font-medium bg-secondary text-white rounded-full px-2 py-1">
+                  <Badge className="text-xs font-medium bg-secondary text-secondary-foreground rounded-full px-2 py-1">
                     {topic.level}
                   </Badge>
                 </div>
-                <p className="text-muted-foreground-bold text-sm">
+                <p className="text-foreground font-medium text-sm">
                   {topic.description}
                 </p>
               </CardHeader>
@@ -145,7 +142,7 @@ const Speaking = () => {
                   </div>
                 </div>
 
-                <div className="p-3 bg-card-background-light rounded-lg border border-card-border">
+                <div className="p-3 bg-muted rounded-lg border border-border">
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                     Preview:
                   </p>
@@ -160,7 +157,7 @@ const Speaking = () => {
                       `/speaking/${topic.part}/${topic.speakingPromptId}`,
                     )
                   }
-                  className={`w-full ${GRADIENT_INDIGO_BUTTON}`}
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                 >
                   <Mic className="h-4 w-4 mr-2" />
                   Start Speaking

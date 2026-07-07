@@ -1,4 +1,4 @@
-import {
+﻿import {
   Card,
   CardContent,
   CardDescription,
@@ -21,7 +21,6 @@ import {
   Loader2,
   CheckCircle,
 } from "lucide-react";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useEffect, useState } from "react";
 import { User } from "@/types/User";
 import { Label } from "@/components/ui/label";
@@ -124,12 +123,8 @@ const Profile = () => {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
-          My Profile
-        </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <h1 className="text-3xl font-bold text-primary mb-2">My Profile</h1>
+        <p className="text-foreground font-medium text-lg">
           Manage your account settings and IELTS goals
         </p>
       </div>
@@ -171,7 +166,7 @@ const Profile = () => {
                     <Button
                       onClick={handleSubmit(handleSaveProfile)}
                       disabled={isSaving || !isDirty}
-                      className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
                     >
                       {isSaving ? (
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -318,7 +313,7 @@ const Profile = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
                     <BookOpen className="h-4 w-4" />
@@ -327,20 +322,19 @@ const Profile = () => {
                     <p className="font-medium text-card-foreground">
                       Writing Tasks
                     </p>
-                    <p className="text-sm text-muted-foreground-bold">
+                    <p className="text-sm text-foreground font-medium">
                       Completed
                     </p>
                   </div>
                 </div>
                 <Badge
                   variant="secondary"
-                  className="bg-badge-indigo text-badge-indigo-foreground"
                 >
                   {userProfile?.writingQuotaUsed || 0}
                 </Badge>
               </div>
 
-              <div className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border">
+              <div className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
                     <UserIcon className="h-4 w-4" />
@@ -349,14 +343,13 @@ const Profile = () => {
                     <p className="font-medium text-card-foreground">
                       Speaking Tasks
                     </p>
-                    <p className="text-sm text-muted-foreground-bold">
+                    <p className="text-sm text-foreground font-medium">
                       Completed
                     </p>
                   </div>
                 </div>
                 <Badge
                   variant="secondary"
-                  className="bg-badge-indigo text-badge-indigo-foreground"
                 >
                   {userProfile?.speakingQuotaUsed || 0}
                 </Badge>
@@ -374,19 +367,18 @@ const Profile = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground-bold">Plan</span>
+                <span className="text-sm text-foreground font-medium">Plan</span>
                 <Badge
                   variant={
                     userProfile?.plan === "Free" ? "secondary" : "default"
                   }
-                  className="bg-badge-indigo text-badge-indigo-foreground"
                 >
                   {userProfile?.plan || "Free"}
                 </Badge>
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground-bold">
+                <span className="text-sm text-foreground font-medium">
                   Target Score
                 </span>
                 <span className="text-sm font-medium text-card-foreground">
@@ -395,7 +387,7 @@ const Profile = () => {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground-bold">
+                <span className="text-sm text-foreground font-medium">
                   Target Date
                 </span>
                 <span className="text-sm font-medium text-card-foreground">
@@ -406,7 +398,7 @@ const Profile = () => {
               </div>
 
               <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground-bold">
+                <span className="text-sm text-foreground font-medium">
                   Auth Provider
                 </span>
                 <span className="text-sm font-medium text-card-foreground">

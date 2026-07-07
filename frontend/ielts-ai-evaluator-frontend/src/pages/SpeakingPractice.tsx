@@ -1,4 +1,4 @@
-import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
+﻿import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +20,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { formatText } from "@/lib/utils";
-import { GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
 import type {
   SpeakingEvaluateRequest,
   SpeakingEvaluateResponse,
@@ -171,7 +170,7 @@ const SpeakingPractice = () => {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Speaking {partLabel}</h1>
-        <p className="text-muted-foreground-bold">{prompt!.topic}</p>
+        <p className="text-foreground font-medium">{prompt!.topic}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -186,12 +185,12 @@ const SpeakingPractice = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-card-purple-light rounded-lg border-l-4 border-card-purple-light-border">
-                <p className="text-purple-900 dark:text-purple-100 whitespace-pre-wrap font-medium">
+              <div className="p-4 bg-secondary rounded-lg border-l-4 border-border">
+                <p className="text-secondary-foreground whitespace-pre-wrap font-medium">
                   {formatText(prompt!.questionText)}
                 </p>
                 {cuePoints.length > 0 && (
-                  <ul className="mt-3 space-y-1 list-disc list-inside text-purple-800 dark:text-purple-200 text-sm">
+                  <ul className="mt-3 space-y-1 list-disc list-inside text-secondary-foreground text-sm">
                     {cuePoints.map((point, i) => (
                       <li key={i}>{point}</li>
                     ))}
@@ -209,7 +208,7 @@ const SpeakingPractice = () => {
                   <Mic className="h-5 w-5 text-primary" />
                   Your Response
                 </CardTitle>
-                <CardDescription className="text-muted-foreground-bold">
+                <CardDescription className="text-foreground font-medium">
                   Record your spoken answer. We transcribe it live and send the
                   transcript for AI evaluation.
                 </CardDescription>
@@ -220,7 +219,7 @@ const SpeakingPractice = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               {!speech.isSupported && (
-                <div className="p-3 rounded-lg bg-card-orange-light border border-card-orange-light-border text-sm text-orange-700 dark:text-orange-300">
+                <div className="p-3 rounded-lg bg-tip/10 border border-tip/30 text-sm text-tip">
                   Your browser doesn't support live speech recognition. You can
                   type or paste your spoken answer below instead.
                 </div>
@@ -237,7 +236,7 @@ const SpeakingPractice = () => {
                   className={`relative flex items-center justify-center h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-40 ${
                     speech.isListening
                       ? "bg-red-500 hover:bg-red-600 animate-pulse"
-                      : "bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                      : "bg-primary hover:bg-primary/90"
                   }`}
                 >
                   {speech.isListening ? (
@@ -246,7 +245,7 @@ const SpeakingPractice = () => {
                     <Mic className="h-8 w-8 text-white" />
                   )}
                 </button>
-                <p className="text-sm text-muted-foreground-bold">
+                <p className="text-sm text-foreground font-medium">
                   {speech.isListening
                     ? "Listening... tap to stop"
                     : "Tap the mic to start recording"}
@@ -294,7 +293,7 @@ const SpeakingPractice = () => {
                 <Button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing || isSubmitted}
-                  className={`min-w-[140px] ${GRADIENT_INDIGO_BUTTON}`}
+                  className="min-w-[140px] bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                 >
                   {isAnalyzing ? "Analyzing..." : "Get AI Feedback"}
                 </Button>
@@ -316,7 +315,7 @@ const SpeakingPractice = () => {
               {tips.map((tip, i) => (
                 <div
                   key={i}
-                  className="p-3 bg-card-background-light rounded-lg border border-card-border text-sm text-card-foreground"
+                  className="p-3 bg-muted rounded-lg border border-border text-sm text-card-foreground"
                 >
                   {tip}
                 </div>

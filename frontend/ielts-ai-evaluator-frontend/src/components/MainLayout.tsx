@@ -1,10 +1,9 @@
-import { useThemeContext } from "@/contexts/ThemeContext";
+﻿import { useThemeContext } from "@/contexts/ThemeContext";
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Bell, LogOutIcon, Moon, Sun, User } from "lucide-react";
 import { useDropdown } from "@/hooks/use-trigger-dropdown";
 import { useNavigate } from "react-router";
-import { GRADIENT_BACKGROUND } from "@/styles/gradients";
 import { signOut } from "firebase/auth";
 import { auth as authFirebase } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -77,7 +76,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
                     >
                       <b>{auth.user?.displayName}</b>
                       <div className="h-3"></div>
-                      <span className="text-muted-foreground-bold">
+                      <span className="text-foreground font-medium">
                         {auth.user?.email}
                       </span>
                     </li>
@@ -112,7 +111,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <div className={`p-12 h-screen flex-1 ${GRADIENT_BACKGROUND}`}>
+      <div className="p-12 h-screen flex-1 bg-background">
         {children}
       </div>
     </div>

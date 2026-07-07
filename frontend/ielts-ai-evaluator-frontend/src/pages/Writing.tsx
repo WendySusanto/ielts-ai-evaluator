@@ -1,8 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Target, Clock, PenTool, BarChart3, FileText } from "lucide-react";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
@@ -37,12 +36,10 @@ const Writing = () => {
     <div className={`space-y-6`}>
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
-          Writing Practice ✍️
+        <h1 className="text-3xl font-bold text-primary mb-2">
+          Writing Practice
         </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <p className="text-foreground font-medium text-lg">
           Improve your IELTS writing skills with structured practice sessions
         </p>
       </div>
@@ -70,11 +67,11 @@ const Writing = () => {
         </TabsList>
 
         <TabsContent value="task1" className="mt-6">
-          <div className="mb-6 p-4 rounded-lg border bg-card-blue-light dark:bg-card-blue-light/30 border-card-blue-light-border">
-            <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">
+          <div className="mb-6 p-4 rounded-lg border bg-secondary border-border">
+            <h3 className="font-semibold text-secondary-foreground mb-2">
               Task 1 - Academic Writing
             </h3>
-            <p className="text-blue-700 dark:text-blue-300 text-sm">
+            <p className="text-secondary-foreground text-sm">
               Describe, summarize or explain information presented in graphs,
               charts, tables or diagrams. Minimum 150 words, recommended time:
               20 minutes.
@@ -83,11 +80,11 @@ const Writing = () => {
         </TabsContent>
 
         <TabsContent value="task2" className="mt-6">
-          <div className="mb-6 p-4 bg-card-purple-light rounded-lg border border-card-purple-light-border">
-            <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-2">
+          <div className="mb-6 p-4 bg-secondary rounded-lg border border-border">
+            <h3 className="font-semibold text-secondary-foreground mb-2">
               Task 2 - Essay Writing
             </h3>
-            <p className="text-purple-700 dark:text-purple-300 text-sm">
+            <p className="text-secondary-foreground text-sm">
               Write an essay responding to a point of view, argument or problem.
               Minimum 250 words, recommended time: 40 minutes.
             </p>
@@ -107,14 +104,12 @@ const Writing = () => {
                   {topic.topic}
                 </CardTitle>
                 <div>
-                  <Badge
-                    className={`text-xs font-medium bg-secondary text-white rounded-full px-2 py-1 mr-2`}
-                  >
+                  <Badge className="text-xs font-medium bg-secondary text-secondary-foreground rounded-full px-2 py-1 mr-2">
                     {topic.level}
                   </Badge>
                 </div>
               </div>
-              <p className="text-muted-foreground-bold text-sm">
+              <p className="text-foreground font-medium text-sm">
                 {topic.description}
               </p>
             </CardHeader>
@@ -130,7 +125,7 @@ const Writing = () => {
                 </div>
               </div>
 
-              <div className="p-3 bg-card-background-light rounded-lg border border-card-border">
+              <div className="p-3 bg-muted rounded-lg border border-border">
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
                   Preview:
                 </p>
@@ -145,7 +140,7 @@ const Writing = () => {
                     `/writing/${topic.taskType}/${topic.writingPromptId}`
                   )
                 }
-                className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               >
                 <PenTool className="h-4 w-4 mr-2" />
                 Start Writing

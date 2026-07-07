@@ -213,9 +213,9 @@ const DetailedFeedback = () => {
       </Card>
 
       {/* Overall Score Card */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
+      <Card className="bg-secondary border-border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
+          <CardTitle className="flex items-center gap-2 text-secondary-foreground">
             <TrendingUp className="h-5 w-5" />
             Overall Performance
           </CardTitle>
@@ -354,7 +354,7 @@ const DetailedFeedback = () => {
               Back to History
             </Button>
             <Button
-              className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               onClick={() => navigate("/writing")}
             >
               Practice More Writing

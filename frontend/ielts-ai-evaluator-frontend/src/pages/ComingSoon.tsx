@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+﻿import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,7 +10,6 @@ import {
   BookOpen,
   Zap,
 } from "lucide-react";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useNavigate } from "react-router-dom";
 
 interface ComingSoonProps {
@@ -63,12 +62,8 @@ const ComingSoon = ({
           </Button>
         </div>
 
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
-          {title}
-        </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <h1 className="text-3xl font-bold text-primary mb-2">{title}</h1>
+        <p className="text-foreground font-medium text-lg">
           {feature} is on its way to enhance your IELTS preparation journey
         </p>
       </div>
@@ -79,8 +74,8 @@ const ComingSoon = ({
           <CardContent className="p-12 text-center">
             <div className="mb-8">
               <div className="relative inline-block">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-600/20 flex items-center justify-center mb-6 mx-auto">
-                  <Rocket className="h-12 w-12 text-indigo-600 dark:text-indigo-400" />
+                <div className="w-24 h-24 rounded-full bg-secondary flex items-center justify-center mb-6 mx-auto">
+                  <Rocket className="h-12 w-12 text-secondary-foreground" />
                 </div>
                 <div className="absolute -top-2 -right-2">
                   <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
@@ -91,13 +86,13 @@ const ComingSoon = ({
                 Something Amazing is Coming!
               </h2>
 
-              <p className="text-muted-foreground-bold text-lg mb-6 leading-relaxed">
+              <p className="text-foreground font-medium text-lg mb-6 leading-relaxed">
                 {description}
               </p>
 
               <Button
                 onClick={() => navigate("/")}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 px-8 py-2"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0 px-8 py-2"
               >
                 <Star className="h-4 w-4 mr-2" />
                 Explore Current Features
@@ -122,7 +117,7 @@ const ComingSoon = ({
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400">
+                    <div className="p-2 rounded-lg bg-secondary text-secondary-foreground">
                       <feature.icon className="h-5 w-5" />
                     </div>
                     <CardTitle className="text-lg text-card-foreground">
@@ -132,7 +127,7 @@ const ComingSoon = ({
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground-bold text-sm mb-4">
+                <p className="text-foreground font-medium text-sm mb-4">
                   {feature.description}
                 </p>
                 <Badge
@@ -159,7 +154,7 @@ const ComingSoon = ({
           <h4 className="text-lg font-semibold text-card-foreground mb-3">
             Stay Updated
           </h4>
-          <p className="text-muted-foreground-bold mb-6">
+          <p className="text-foreground font-medium mb-6">
             Want to be the first to know when new features are available?
             Continue using the app and you'll automatically get access to new
             features as they're released.

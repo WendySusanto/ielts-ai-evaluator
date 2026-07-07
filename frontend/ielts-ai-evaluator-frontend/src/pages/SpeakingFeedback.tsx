@@ -1,4 +1,4 @@
-import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
+﻿import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
-import { GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
 import type { SpeakingDetail } from "@/types/Speaking";
 import {
   AlertCircle,
@@ -106,9 +105,9 @@ const SpeakingFeedback = () => {
       </div>
 
       {/* Overall performance */}
-      <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/20 dark:to-indigo-950/20 border-purple-200 dark:border-purple-800">
+      <Card className="bg-secondary border-border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-purple-900 dark:text-purple-100">
+          <CardTitle className="flex items-center gap-2 text-secondary-foreground">
             <TrendingUp className="h-5 w-5" />
             Overall Performance
           </CardTitle>
@@ -208,12 +207,12 @@ const SpeakingFeedback = () => {
                     {criteria.issues.map((issue, index) => (
                       <div
                         key={index}
-                        className="border rounded-lg p-3 bg-card-background-light border-card-border"
+                        className="border rounded-lg p-3 bg-muted border-border"
                       >
                         <p className="text-sm font-medium mb-1">
                           "{issue.text}"
                         </p>
-                        <p className="text-xs text-muted-foreground-bold">
+                        <p className="text-xs text-foreground font-medium">
                           {issue.comment}
                         </p>
                       </div>
@@ -234,7 +233,7 @@ const SpeakingFeedback = () => {
               Back to History
             </Button>
             <Button
-              className={GRADIENT_INDIGO_BUTTON}
+              className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               onClick={() => navigate("/speaking")}
             >
               Practice More Speaking

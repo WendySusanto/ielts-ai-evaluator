@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import { ArrowLeft, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
@@ -11,9 +11,7 @@ const NotFound = () => {
         <div className="p-8 text-center space-y-6">
           {/* 404 Header */}
           <div className="space-y-2">
-            <h1 className="text-6xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              404
-            </h1>
+            <h1 className="text-6xl font-bold text-primary">404</h1>
             <p className="text-2xl font-semibold text-card-foreground">
               Page Not Found
             </p>
@@ -21,14 +19,14 @@ const NotFound = () => {
 
           {/* Icon */}
           <div className="p-6 mx-auto w-fit">
-            <div className="p-8 rounded-full bg-muted dark:bg-muted/50 text-purple-600 dark:text-purple-400">
+            <div className="p-8 rounded-full bg-secondary text-secondary-foreground">
               <Search className="h-12 w-12" />
             </div>
           </div>
 
           {/* Message */}
           <div className="space-y-3 max-w-md mx-auto">
-            <p className="text-muted-foreground-bold">
+            <p className="text-foreground font-medium">
               The page you're looking for doesn't exist or has been moved.
             </p>
             <p className="text-sm text-muted-foreground">

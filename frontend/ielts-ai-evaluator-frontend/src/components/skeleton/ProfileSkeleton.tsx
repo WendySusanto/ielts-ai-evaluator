@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+﻿import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const ProfileSkeleton = () => {
@@ -77,7 +77,7 @@ export const ProfileSkeleton = () => {
               {Array.from({ length: 2 }).map((_, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border"
+                  className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border"
                 >
                   <div className="flex items-center gap-3">
                     <Skeleton className="h-8 w-8 rounded-lg" />

@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+﻿import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertTriangle, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -33,7 +33,7 @@ const ErrorPage = ({
               {title}
             </h2>
 
-            <p className="text-muted-foreground-bold text-sm leading-relaxed">
+            <p className="text-foreground font-medium text-sm leading-relaxed">
               {message}
             </p>
           </div>
@@ -53,7 +53,7 @@ const ErrorPage = ({
             {showRetryButton && onRetry && (
               <Button
                 onClick={onRetry}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Again
@@ -65,7 +65,7 @@ const ErrorPage = ({
             <div className="mt-4">
               <Button
                 onClick={() => window.location.reload()}
-                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reload Page

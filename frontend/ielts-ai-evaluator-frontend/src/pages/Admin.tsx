@@ -1,4 +1,4 @@
-import {
+﻿import {
   Card,
   CardContent,
   CardDescription,
@@ -10,7 +10,6 @@ import { useForm } from "react-hook-form";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { FileText, Users2, Edit, Plus } from "lucide-react";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
@@ -421,12 +420,10 @@ const Admin = () => {
     <div className={`space-y-6`}>
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
+        <h1 className="text-3xl font-bold text-primary mb-2">
           Admin Dashboard
         </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <p className="text-foreground font-medium text-lg">
           Manage writing tasks, speaking topics, and users
         </p>
       </div>

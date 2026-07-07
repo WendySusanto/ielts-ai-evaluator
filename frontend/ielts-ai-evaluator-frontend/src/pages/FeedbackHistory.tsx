@@ -1,4 +1,4 @@
-import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
+﻿import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -179,10 +179,10 @@ const FeedbackHistory = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          <h1 className="text-3xl font-bold text-primary mb-2">
             Feedback History
           </h1>
-          <p className="text-muted-foreground-bold text-lg">
+          <p className="text-foreground font-medium text-lg">
             Track your progress and review detailed AI feedback
           </p>
         </div>
@@ -197,7 +197,7 @@ const FeedbackHistory = () => {
                 <p className="text-2xl font-bold text-card-foreground">
                   {averageScore.toFixed(1)}
                 </p>
-                <p className="text-sm text-muted-foreground-bold">
+                <p className="text-sm text-foreground font-medium">
                   Average Score
                 </p>
               </div>
@@ -213,7 +213,7 @@ const FeedbackHistory = () => {
                 <p className="text-2xl font-bold text-card-foreground">
                   {feedbackHistory.length}
                 </p>
-                <p className="text-sm text-muted-foreground-bold">
+                <p className="text-sm text-foreground font-medium">
                   Total Sessions
                 </p>
               </div>
@@ -233,7 +233,7 @@ const FeedbackHistory = () => {
                       )
                     : 0}
                 </p>
-                <p className="text-sm text-muted-foreground-bold">
+                <p className="text-sm text-foreground font-medium">
                   Highest Score
                 </p>
               </div>
@@ -256,7 +256,7 @@ const FeedbackHistory = () => {
                     return uniqueDates.size;
                   })()}
                 </p>
-                <p className="text-sm text-muted-foreground-bold">
+                <p className="text-sm text-foreground font-medium">
                   Days Active
                 </p>
               </div>
@@ -279,7 +279,7 @@ const FeedbackHistory = () => {
             <p className="text-muted-foreground">No feedback available</p>
           )}
           {feedbackHistory.length > 0 && (
-            <div className="h-64 flex items-end justify-between bg-gradient-to-br from-primary/5 to-secondary/5 rounded-lg p-6">
+            <div className="h-64 flex items-end justify-between bg-muted rounded-lg p-6">
               {feedbackHistory
                 .slice()
                 .reverse()
@@ -288,19 +288,19 @@ const FeedbackHistory = () => {
                     key={session.id}
                     className="flex flex-col items-center gap-2"
                   >
-                    <div className="text-xs text-muted-foreground-bold text-center">
+                    <div className="text-xs text-foreground font-medium text-center">
                       {new Date(session.createdAt).toLocaleDateString("en-US", {
                         month: "2-digit",
                         day: "2-digit",
                       })}
                     </div>
                     <div
-                      className="bg-gradient-to-t from-indigo-500 to-purple-600 rounded-t-lg w-8 flex items-end justify-center text-white text-xs font-medium"
+                      className="bg-primary rounded-t-lg w-8 flex items-end justify-center text-primary-foreground text-xs font-medium"
                       style={{ height: `${(session.overallBand / 9) * 200}px` }}
                     >
                       {session.overallBand}
                     </div>
-                    <div className="text-xs text-muted-foreground-bold text-center">
+                    <div className="text-xs text-foreground font-medium text-center">
                       {session.evaluationType === "Speaking"
                         ? "S"
                         : session.taskType === "Task1"
@@ -361,15 +361,15 @@ const FeedbackHistory = () => {
                   {filteredHistory.map((session) => (
                     <div
                       key={session.id}
-                      className="border border-card-border rounded-lg p-6 bg-card-background-light/50 transition-colors hover:bg-card-background-light/80"
+                      className="border border-border rounded-lg p-6 bg-muted/50 transition-colors hover:bg-muted/80"
                     >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-gradient-to-br from-indigo-500/10 to-purple-600/10 rounded-full flex items-center justify-center">
+                          <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center">
                             {session.evaluationType === "Speaking" ? (
-                              <Mic className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                              <Mic className="h-6 w-6 text-secondary-foreground" />
                             ) : (
-                              <PenTool className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                              <PenTool className="h-6 w-6 text-secondary-foreground" />
                             )}
                           </div>
                           <div>
@@ -382,7 +382,7 @@ const FeedbackHistory = () => {
                                       : "Task 2"
                                   }`}
                             </h3>
-                            <p className="text-muted-foreground-bold">
+                            <p className="text-foreground font-medium">
                               {session.topic}
                             </p>
                           </div>
@@ -394,16 +394,16 @@ const FeedbackHistory = () => {
                               variant={getScoreBadgeVariant(
                                 session.overallBand,
                               )}
-                              className="text-sm font-medium bg-badge-indigo text-badge-indigo-foreground"
+                              className="text-sm font-medium"
                             >
                               Band {session.overallBand}
                             </Badge>
 
-                            <span className="text-sm font-medium text-muted-foreground-bold">
+                            <span className="text-sm font-medium text-foreground font-medium">
                               {/* No improvement calculation available yet */}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground-bold">
+                          <div className="flex items-center gap-3 text-xs text-foreground font-medium">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
                               {new Date(session.createdAt).toLocaleDateString()}
@@ -426,7 +426,7 @@ const FeedbackHistory = () => {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                         {session.criteria.map((c) => (
                           <div key={c.label} className="text-center">
-                            <p className="text-xs text-muted-foreground-bold mb-1">
+                            <p className="text-xs text-foreground font-medium mb-1">
                               {c.label}
                             </p>
                             <p className="font-semibold text-indigo-600 dark:text-indigo-400 text-lg">
@@ -441,11 +441,11 @@ const FeedbackHistory = () => {
                       </div>
 
                       {/* AI Feedback */}
-                      <div className="bg-muted/50 rounded-lg p-4 mb-4 border-card-border">
+                      <div className="bg-muted/50 rounded-lg p-4 mb-4 border-border">
                         <h4 className="font-medium text-card-foreground mb-2">
                           AI Feedback
                         </h4>
-                        <p className="text-sm text-muted-foreground-bold">
+                        <p className="text-sm text-foreground font-medium">
                           {session.summary}
                         </p>
                       </div>
@@ -455,7 +455,7 @@ const FeedbackHistory = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-2 border-card-border text-card-foreground hover:bg-card-background-light"
+                          className="flex items-center gap-2 border-border text-card-foreground hover:bg-muted"
                           onClick={() => navigate(session.detailPath)}
                         >
                           <Eye className="h-4 w-4" />
@@ -464,7 +464,7 @@ const FeedbackHistory = () => {
                         <Button
                           variant="outline"
                           size="sm"
-                          className="flex items-center gap-2 border-card-border text-card-foreground hover:bg-card-background-light"
+                          className="flex items-center gap-2 border-border text-card-foreground hover:bg-muted"
                         >
                           <Download className="h-4 w-4" />
                           Export Report

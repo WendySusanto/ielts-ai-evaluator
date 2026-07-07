@@ -1,10 +1,9 @@
-import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
+﻿import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
-import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { DashboardData } from "@/types/dashboard";
 import {
   BarChart3,
@@ -109,12 +108,10 @@ const Dashboard = () => {
     <div className="space-y-6 min-h-full">
       {/* Welcome Section */}
       <div className="mb-8">
-        <h1
-          className={`text-3xl font-bold ${GRADIENT_INDIGO} bg-clip-text text-transparent mb-2`}
-        >
-          Welcome back, {userStats.fullName || "Student"}! 👋
+        <h1 className="text-3xl font-bold text-primary mb-2">
+          Welcome back, {userStats.fullName || "Student"}!
         </h1>
-        <p className="text-muted-foreground-bold text-lg">
+        <p className="text-foreground font-medium text-lg">
           Ready to continue your IELTS journey? You're targeting a{" "}
           <span className="font-semibold text-card-foreground">
             {userStats.ieltsTargetScore}
@@ -133,7 +130,7 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground-bold mb-1">
+                  <p className="text-sm font-medium text-foreground font-medium mb-1">
                     {stat.title}
                   </p>
                   <p className="text-2xl font-bold text-card-foreground">
@@ -169,7 +166,7 @@ const Dashboard = () => {
                 recentEvaluations.map((evaluation) => (
                   <div
                     key={evaluation.essayEvaluationId}
-                    className="flex items-center justify-between p-4 rounded-xl bg-card-background-light border border-card-border"
+                    className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border"
                   >
                     <div className="flex items-center gap-4">
                       <div
@@ -199,16 +196,13 @@ const Dashboard = () => {
                               ? "Writing Task 1"
                               : "Writing Task 2"}
                         </p>
-                        <p className="text-sm text-muted-foreground-bold">
+                        <p className="text-sm text-foreground font-medium">
                           {evaluation.topic}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge
-                        variant="secondary"
-                        className="mb-1 bg-badge-indigo text-badge-indigo-foreground"
-                      >
+                      <Badge variant="secondary" className="mb-1">
                         {evaluation.overallBand.toFixed(1)}
                       </Badge>
                       <p className="text-xs text-muted-foreground">
@@ -220,7 +214,7 @@ const Dashboard = () => {
               ) : (
                 <div className="text-center py-8">
                   <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground-bold">
+                  <p className="text-foreground font-medium">
                     No evaluations yet. Start your first practice!
                   </p>
                 </div>
@@ -242,21 +236,20 @@ const Dashboard = () => {
             <CardContent className="space-y-4">
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground-bold">
+                  <span className="text-sm text-foreground font-medium">
                     Plan
                   </span>
                   <Badge
                     variant={
                       userStats.plan === "Free" ? "secondary" : "default"
                     }
-                    className="bg-badge-indigo text-badge-indigo-foreground"
                   >
                     {userStats.plan}
                   </Badge>
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground-bold">
+                  <span className="text-sm text-foreground font-medium">
                     Target Score
                   </span>
                   <span className="text-sm font-medium text-card-foreground">
@@ -265,7 +258,7 @@ const Dashboard = () => {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground-bold">
+                  <span className="text-sm text-foreground font-medium">
                     Target Type
                   </span>
                   <span className="text-sm font-medium text-card-foreground">
@@ -274,7 +267,7 @@ const Dashboard = () => {
                 </div>
 
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground-bold">
+                  <span className="text-sm text-foreground font-medium">
                     Member Since
                   </span>
                   <span className="text-sm font-medium text-card-foreground">
@@ -284,7 +277,7 @@ const Dashboard = () => {
 
                 {userStats.targetTestDate && (
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground-bold">
+                    <span className="text-sm text-foreground font-medium">
                       Target Date
                     </span>
                     <span className="text-sm font-medium text-card-foreground">
@@ -354,7 +347,7 @@ const Dashboard = () => {
             <CardContent className="space-y-3">
               <Button
                 onClick={() => navigate("/speaking")}
-                className="w-full justify-start bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+                className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground border-0"
               >
                 <Mic className="h-4 w-4 mr-2" />
                 Start Speaking Practice

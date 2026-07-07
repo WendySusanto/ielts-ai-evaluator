@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -155,25 +155,25 @@ const WritingPractice = () => {
 
   const Task1Tips = () => (
     <>
-      <div className="p-3 bg-blue-100/50 dark:bg-card-blue-light rounded-lg">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Structure:</strong> Introduction → Overview → Body paragraphs
           with details
         </p>
       </div>
-      <div className="p-3 bg-orange-100/50 dark:bg-card-orange-light rounded-lg">
-        <p className="text-sm text-orange-700 dark:text-orange-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Language:</strong> Use varied vocabulary for trends (increase,
           rise, peak, decline)
         </p>
       </div>
-      <div className="p-3 bg-purple-100/50 dark:bg-card-purple-light rounded-lg">
-        <p className="text-sm text-purple-700 dark:text-purple-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Time:</strong> Spend about 20 minutes on Task 1
         </p>
       </div>
-      <div className="p-3 bg-red-100/50 dark:bg-card-red-light rounded-lg">
-        <p className="text-sm text-red-700 dark:text-red-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Focus:</strong> Describe data objectively, don't give opinions
         </p>
       </div>
@@ -182,25 +182,25 @@ const WritingPractice = () => {
 
   const Task2Tips = () => (
     <>
-      <div className="p-3 bg-blue-100/50 dark:bg-card-blue-light rounded-lg">
-        <p className="text-sm text-blue-700 dark:text-blue-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Structure:</strong> Introduction → Clear position → Supporting
           paragraphs → Conclusion
         </p>
       </div>
-      <div className="p-3 bg-orange-100/50 dark:bg-card-orange-light rounded-lg">
-        <p className="text-sm text-orange-700 dark:text-orange-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Language:</strong> Use academic vocabulary, linking words, and
           complex sentences
         </p>
       </div>
-      <div className="p-3 bg-purple-100/50 dark:bg-card-purple-light rounded-lg">
-        <p className="text-sm text-purple-700 dark:text-purple-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Time:</strong> Spend about 40 minutes on Task 2
         </p>
       </div>
-      <div className="p-3 bg-red-100/50 dark:bg-card-red-light rounded-lg">
-        <p className="text-sm text-red-700 dark:text-red-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Focus:</strong> Present clear arguments with specific examples
         </p>
       </div>
@@ -281,7 +281,7 @@ const WritingPractice = () => {
       {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Writing {taskTypeDesc}</h1>
-        <p className="text-muted-foreground-bold">
+        <p className="text-foreground font-medium">
           Academic Writing - Describe visual information in at least {minWords}{" "}
           words
         </p>
@@ -299,15 +299,15 @@ const WritingPractice = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 bg-card-blue-light rounded-lg border-l-4 border-card-blue-light-border">
-                <p className="text-blue-900 dark:text-blue-100 mb-4 whitespace-pre-wrap">
+              <div className="p-4 bg-secondary rounded-lg border-l-4 border-border">
+                <p className="text-secondary-foreground mb-4 whitespace-pre-wrap">
                   <strong>{formatText(writingPrompt?.questionText)}</strong>
                 </p>
               </div>
 
               {/* Sample Chart Placeholder */}
               {writingPrompt?.imageUrl ? (
-                <div className="mt-4 p-8 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border-2 border-dashed border-gray-300">
+                <div className="mt-4 p-8 bg-muted rounded-lg border-2 border-dashed border-border">
                   <img
                     src={writingPrompt.imageUrl}
                     alt="Task Chart"
@@ -328,7 +328,7 @@ const WritingPractice = () => {
                   <PenTool className="h-5 w-5 text-primary" />
                   Your Response
                 </CardTitle>
-                <CardDescription className="text-muted-foreground-bold">
+                <CardDescription className="text-foreground font-medium">
                   Write your response here. Aim for at least {minWords} words.
                 </CardDescription>
               </div>
@@ -349,7 +349,7 @@ const WritingPractice = () => {
                   </Badge>
                 </div>
                 <Progress value={wordProgress} className="h-2" />
-                <p className="text-xs text-muted-foreground-bold">
+                <p className="text-xs text-foreground font-medium">
                   {wordCount < minWords
                     ? `${
                         minWords - wordCount
@@ -379,7 +379,7 @@ const WritingPractice = () => {
                 <Button
                   onClick={handleAnalyze}
                   disabled={isAnalyzing}
-                  className={`min-w-[120px] bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white`}
+                  className="min-w-[120px] bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
                   {isAnalyzing ? "Analyzing..." : "Get AI Feedback"}
                 </Button>

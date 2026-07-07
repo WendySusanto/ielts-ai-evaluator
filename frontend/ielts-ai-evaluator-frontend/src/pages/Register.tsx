@@ -1,4 +1,4 @@
-// src/pages/Register.tsx
+﻿// src/pages/Register.tsx
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -256,10 +256,10 @@ export default function Register() {
     <div className="min-h-screen flex flex-col justify-center mx-auto p-6 w-md">
       <Card className="w-full max-w-md border-0 shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-center text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+          <CardTitle className="text-center text-3xl font-bold text-primary">
             Create Account
           </CardTitle>
-          <p className="text-center text-muted-foreground-bold">
+          <p className="text-center text-foreground font-medium">
             Join us to start your IELTS journey
           </p>
         </CardHeader>
@@ -470,7 +470,7 @@ export default function Register() {
                   onChange={(e) => setAcceptTerms(e.target.checked)}
                   id="terms"
                 />
-                <span className="text-muted-foreground-bold leading-relaxed">
+                <span className="text-foreground font-medium leading-relaxed">
                   I agree to the{" "}
                   <Link
                     to="/terms"
@@ -495,7 +495,7 @@ export default function Register() {
                     onChange={(e) => setRemember(e.target.checked)}
                     id="remember"
                   />
-                  <span className="text-muted-foreground-bold">
+                  <span className="text-foreground font-medium">
                     Remember me
                   </span>
                 </div>
@@ -521,7 +521,7 @@ export default function Register() {
             <Button
               type="submit"
               disabled={submitting}
-              className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold"
+              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
