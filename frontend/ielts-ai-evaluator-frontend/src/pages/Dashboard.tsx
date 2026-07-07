@@ -1,4 +1,4 @@
-﻿import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
+import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -130,7 +130,7 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-foreground font-medium mb-1">
+                  <p className="text-sm font-medium text-foreground mb-1">
                     {stat.title}
                   </p>
                   <p className="text-2xl font-bold text-card-foreground">

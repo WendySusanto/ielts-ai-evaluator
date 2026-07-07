@@ -1,4 +1,4 @@
-﻿import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
+import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -399,7 +399,7 @@ const FeedbackHistory = () => {
                               Band {session.overallBand}
                             </Badge>
 
-                            <span className="text-sm font-medium text-foreground font-medium">
+                            <span className="text-sm font-medium text-foreground">
                               {/* No improvement calculation available yet */}
                             </span>
                           </div>

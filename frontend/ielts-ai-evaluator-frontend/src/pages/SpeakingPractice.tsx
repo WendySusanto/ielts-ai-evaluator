@@ -1,4 +1,4 @@
-﻿import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
+import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {

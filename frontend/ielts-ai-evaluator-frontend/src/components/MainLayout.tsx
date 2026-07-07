@@ -1,4 +1,4 @@
-﻿import { useThemeContext } from "@/contexts/ThemeContext";
+import { useThemeContext } from "@/contexts/ThemeContext";
 import { Button } from "./ui/button";
 import { SidebarTrigger } from "./ui/sidebar";
 import { Bell, LogOutIcon, Moon, Sun, User } from "lucide-react";
