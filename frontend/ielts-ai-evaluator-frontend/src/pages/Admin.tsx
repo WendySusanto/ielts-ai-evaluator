@@ -42,8 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useFetch } from "@/hooks/use-fetch";
-import ApiResponse from "@/types/ApiResponse";
+import { useApi } from "@/hooks/use-api";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/skeleton/TableSkeleton";
 import ErrorPage from "./ErrorPage";
@@ -59,14 +58,14 @@ const Admin = () => {
     error: promptsError,
     refetch: refetchPrompts,
     mutate: mutatePrompts,
-  } = useFetch<ApiResponse<WritingPrompt>>("/api/writing-prompt");
+  } = useApi<WritingPrompt[]>("/api/writing-prompt");
 
   const {
     data: users = [],
     isLoading: isLoadingUsers,
     error: usersError,
     refetch: refetchUsers,
-  } = useFetch<User[]>("/api/user");
+  } = useApi<User[]>("/api/user");
 
   const handleUpsertPrompt = async (data: WritingPrompt) => {
     await mutatePrompts({

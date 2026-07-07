@@ -2,9 +2,8 @@ import { WritingSkeleton } from "@/components/skeleton/WritingSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { GRADIENT_INDIGO, GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
-import ApiResponse from "@/types/ApiResponse";
 import type { SpeakingPart, SpeakingPrompt } from "@/types/Speaking";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import { Clock, MessageCircle, MessagesSquare, Mic, User } from "lucide-react";
@@ -42,8 +41,8 @@ const Speaking = () => {
   const [selectedPart, setSelectedPart] = useState<SpeakingPart>("Part1");
   const navigate = useNavigate();
 
-  const { data: speakingPrompts = [], isLoading } = useFetch<
-    ApiResponse<SpeakingPrompt>
+  const { data: speakingPrompts = [], isLoading } = useApi<
+    SpeakingPrompt[]
   >("/api/speaking-prompt");
 
   if (isLoading) {

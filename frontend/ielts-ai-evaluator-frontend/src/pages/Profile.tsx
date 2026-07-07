@@ -33,7 +33,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { ProfileSkeleton } from "@/components/skeleton/ProfileSkeleton";
 import ErrorPage from "./ErrorPage";
@@ -50,7 +50,7 @@ const Profile = () => {
     error,
     refetch,
     mutate,
-  } = useFetch<User>("/api/GetUserProfile");
+  } = useApi<User>("/api/GetUserProfile");
 
   const {
     register,

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { PenTool, BarChart3, ArrowLeft, AlertTriangle } from "lucide-react";
 import WritingPrompt from "@/types/WritingPrompt";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { useNavigate, useParams } from "react-router";
 import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
 import NotFound from "./NotFound";
@@ -38,7 +38,7 @@ const WritingPractice = () => {
   const { user } = useAuth();
 
   const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
-    useFetch<WritingPrompt>(`/api/writing-prompt?id=${taskId}`);
+    useApi<WritingPrompt>(`/api/writing-prompt?id=${taskId}`);
 
   const initialTimeValue = writingPrompt?.duration
     ? writingPrompt.duration
@@ -74,7 +74,7 @@ const WritingPractice = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showWordCountDialog, setShowWordCountDialog] = useState(false);
 
-  const { mutate } = useFetch<EssayEvaluate>("/api/writing/evaluate", {
+  const { mutate } = useApi<EssayEvaluate>("/api/writing/evaluate", {
     skipInitialFetch: true,
   });
 

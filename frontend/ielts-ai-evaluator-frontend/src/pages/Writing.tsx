@@ -6,8 +6,7 @@ import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
 import WritingPrompt from "@/types/WritingPrompt";
-import ApiResponse from "@/types/ApiResponse";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { WritingSkeleton } from "@/components/skeleton/WritingSkeleton";
 import { useNavigate } from "react-router";
 
@@ -16,8 +15,8 @@ const Writing = () => {
 
   const navigate = useNavigate();
 
-  const { data: writingPrompts = [], isLoading: isLoadingPrompts } = useFetch<
-    ApiResponse<WritingPrompt>
+  const { data: writingPrompts = [], isLoading: isLoadingPrompts } = useApi<
+    WritingPrompt[]
   >("/api/writing-prompt");
 
   if (isLoadingPrompts) {

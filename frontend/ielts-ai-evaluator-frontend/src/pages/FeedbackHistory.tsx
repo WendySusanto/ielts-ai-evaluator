@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import type {
   EvaluationHistoryItem,
   EvaluationType,
@@ -51,11 +51,11 @@ const FeedbackHistory = () => {
     data: writingResponse,
     isLoading: writingLoading,
     error: writingError,
-  } = useFetch<EvaluationHistoryItem[]>(
+  } = useApi<EvaluationHistoryItem[]>(
     `/api/evaluation-history?userId=${user?.userId}`,
   );
 
-  const { data: speakingResponse, isLoading: speakingLoading } = useFetch<
+  const { data: speakingResponse, isLoading: speakingLoading } = useApi<
     SpeakingHistoryItem[]
   >(`/api/speaking-history`);
 

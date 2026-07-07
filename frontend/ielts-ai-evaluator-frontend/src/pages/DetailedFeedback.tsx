@@ -20,7 +20,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
 import type { EvaluationDetail } from "@/types/evaluation";
 import ErrorPage from "./ErrorPage";
@@ -35,7 +35,7 @@ const DetailedFeedback = () => {
     data: evaluationData,
     isLoading,
     error,
-  } = useFetch<EvaluationDetail>(`/api/evaluation-detail?id=${essayId}`);
+  } = useApi<EvaluationDetail>(`/api/evaluation-detail?id=${essayId}`);
 
   // Show loading state
   if (isLoading) {

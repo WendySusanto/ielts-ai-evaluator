@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { GRADIENT_INDIGO } from "@/styles/gradients";
 import { DashboardData } from "@/types/dashboard";
 import {
@@ -26,7 +26,7 @@ const Dashboard = () => {
     isLoading,
     error,
     refetch,
-  } = useFetch<DashboardData>("/api/dashboard");
+  } = useApi<DashboardData>("/api/dashboard");
 
   const navigate = useNavigate();
 

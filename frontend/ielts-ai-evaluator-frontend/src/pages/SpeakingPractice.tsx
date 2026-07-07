@@ -17,7 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { formatText } from "@/lib/utils";
 import { GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
@@ -45,12 +45,12 @@ const SpeakingPractice = () => {
   const { taskId } = useParams<{ part: string; taskId: string }>();
   const navigate = useNavigate();
 
-  const { data: prompt = null, isLoading } = useFetch<SpeakingPrompt>(
+  const { data: prompt = null, isLoading } = useApi<SpeakingPrompt>(
     `/api/speaking-prompt?id=${taskId}`,
   );
 
   const speech = useSpeechRecognition("en-US");
-  const { mutate } = useFetch<SpeakingEvaluateResponse>(
+  const { mutate } = useApi<SpeakingEvaluateResponse>(
     "/api/speaking/evaluate",
     { skipInitialFetch: true },
   );

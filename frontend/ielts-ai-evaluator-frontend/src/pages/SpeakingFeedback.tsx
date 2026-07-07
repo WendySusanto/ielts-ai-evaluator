@@ -9,7 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { useFetch } from "@/hooks/use-fetch";
+import { useApi } from "@/hooks/use-api";
 import { GRADIENT_INDIGO_BUTTON } from "@/styles/gradients";
 import type { SpeakingDetail } from "@/types/Speaking";
 import {
@@ -51,7 +51,7 @@ const SpeakingFeedback = () => {
     data: detail,
     isLoading,
     error,
-  } = useFetch<SpeakingDetail>(`/api/speaking-detail?id=${speakingId}`);
+  } = useApi<SpeakingDetail>(`/api/speaking-detail?id=${speakingId}`);
 
   if (isLoading) {
     return <DetailedFeedbackSkeleton />;
