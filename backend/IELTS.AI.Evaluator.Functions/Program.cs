@@ -48,6 +48,7 @@ var host = new HostBuilder()
         services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>();
         services.AddScoped<IEssayEvaluationService, EssayEvaluationService>();
         services.AddScoped<IWritingService, WritingService>();
+        services.AddScoped<ISpeakingService, SpeakingService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
         services.AddScoped<ISpeakingPromptService, SpeakingPromptService>();
         services.AddScoped<ISpeakingEvaluationService, SpeakingEvaluationService>();
