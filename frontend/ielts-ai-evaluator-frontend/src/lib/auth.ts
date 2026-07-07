@@ -9,6 +9,7 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { auth, googleProvider } from "./firebase";
+import { api } from "./api";
 
 export const signUpWithEmail = async (
   email: string,
@@ -27,8 +28,7 @@ export const signUpWithEmail = async (
     displayName: fullName,
   });
 
-  await refreshToken();
-  console.log("User registered with full name in Firebase!");
+  await syncProfile();
 };
 
 export const signInWithEmail = async (email: string, password: string) => {
@@ -48,11 +48,21 @@ export const sendResetPassword = async (email: string) => {
 
 export const sendVerificationEmail = (user: any) => sendEmailVerification(user);
 
-let isRefreshing = false;
-let refreshPromise: Promise<void> | null = null;
+export interface AuthProfile {
+  userId: string;
+  email: string;
+  fullName: string;
+  plan: string;
+  ieltsTargetScore: number | null;
+  targetTestDate: string | null;
+  claimsRefreshRequired: boolean;
+}
 
-export const refreshToken = async (): Promise<void> => {
-  // Prevent concurrent refresh calls
+let isRefreshing = false;
+let refreshPromise: Promise<AuthProfile> | null = null;
+
+export const syncProfile = async (): Promise<AuthProfile> => {
+  // Prevent concurrent sync calls
   if (isRefreshing && refreshPromise) {
     return refreshPromise;
   }
@@ -65,33 +75,14 @@ export const refreshToken = async (): Promise<void> => {
 
   refreshPromise = (async () => {
     try {
-      const idToken = await auth.currentUser!.getIdToken(false);
+      const profile = await api.post<AuthProfile>("/api/auth/sync");
 
-      const response = await fetch(
-        import.meta.env.VITE_API_BASE_URL + "/api/GetUserProfile",
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      // Only force token refresh if backend just (re)set custom claims
+      if (profile.claimsRefreshRequired) {
+        await auth.currentUser!.getIdToken(true);
       }
 
-      const responseJson = await response.json();
-
-      // Only force token refresh if backend indicates claims were updated
-      if (responseJson.data.claimsUpdated) {
-        await auth.currentUser!.getIdTokenResult(true);
-        console.log("Custom claims updated");
-      }
-    } catch (error) {
-      console.error("Error refreshing token:", error);
-      throw error;
+      return profile;
     } finally {
       isRefreshing = false;
       refreshPromise = null;
