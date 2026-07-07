@@ -44,14 +44,11 @@ var host = new HostBuilder()
         services.AddDbContext<EvaluatorDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddHttpClient<IGeminiApiClient, GeminiApiClient>();
         services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>();
-        services.AddScoped<IEssayEvaluationService, EssayEvaluationService>();
         services.AddScoped<IWritingService, WritingService>();
         services.AddScoped<ISpeakingService, SpeakingService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
         services.AddScoped<ISpeakingPromptService, SpeakingPromptService>();
-        services.AddScoped<ISpeakingEvaluationService, SpeakingEvaluationService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAuthSyncService, AuthSyncService>();

@@ -21,7 +21,6 @@ public class UserServiceTests
             FirebaseUid = "fake-uid",
             Email = "t@t.t",
             FullName = "Old Name",
-            AuthProvider = "Firebase",
             Plan = "Premium",
             IELTSTargetScore = 6.5m,
             TargetTestDate = DateTimeOffset.UtcNow.AddMonths(3),

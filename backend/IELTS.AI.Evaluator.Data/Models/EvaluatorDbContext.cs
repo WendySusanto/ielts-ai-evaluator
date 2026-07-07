@@ -13,8 +13,6 @@ namespace IELTS.AI.Evaluator.Data.Models
         public EvaluatorDbContext(DbContextOptions<EvaluatorDbContext> options) : base(options) { }
 
         public DbSet<User> Users => Set<User>();
-        public DbSet<EssayEvaluation> EssayEvaluations => Set<EssayEvaluation>();
-        public DbSet<SpeakingEvaluation> SpeakingEvaluations => Set<SpeakingEvaluation>();
         public DbSet<WritingPrompt> WritingPrompts => Set<WritingPrompt>();
         public DbSet<SpeakingPrompt> SpeakingPrompts => Set<SpeakingPrompt>();
         public DbSet<WritingEvaluation> WritingEvaluations => Set<WritingEvaluation>();
@@ -32,30 +30,9 @@ namespace IELTS.AI.Evaluator.Data.Models
             }
 
             modelBuilder.Entity<User>().HasKey(u => u.UserId);
-            modelBuilder.Entity<EssayEvaluation>().HasKey(e => e.EssayEvaluationId);
+            modelBuilder.Entity<User>().HasIndex(u => u.FirebaseUid).IsUnique();
             modelBuilder.Entity<WritingPrompt>().HasKey(p => p.WritingPromptId);
-            modelBuilder.Entity<SpeakingEvaluation>().HasKey(e => e.SpeakingEvaluationId);
             modelBuilder.Entity<SpeakingPrompt>().HasKey(p => p.SpeakingPromptId);
-
-            modelBuilder.Entity<EssayEvaluation>()
-                .HasOne(e => e.User)
-                .WithMany(u => u.Essays)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<EssayEvaluation>()
-                .HasOne(e => e.WritingPrompt)
-                .WithMany() // You can create a `ICollection<EssayEvaluation>` in `WritingPrompt` if needed
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<SpeakingEvaluation>()
-                .HasOne(e => e.User)
-                .WithMany(u => u.SpeakingEvaluations)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            modelBuilder.Entity<SpeakingEvaluation>()
-                .HasOne(e => e.SpeakingPrompt)
-                .WithMany()
-                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<WritingEvaluation>(e =>
             {

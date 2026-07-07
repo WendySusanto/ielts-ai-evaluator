@@ -22,116 +22,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.EssayEvaluation", b =>
-                {
-                    b.Property<Guid>("EssayEvaluationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AiModel")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("CandidatesTokenCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("OverallBand")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("PromptTokenCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RawJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<string>("UserAnswer")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("WritingPromptId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("EssayEvaluationId");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("WritingPromptId");
-
-                    b.ToTable("EssayEvaluations");
-                });
-
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingEvaluation", b =>
-                {
-                    b.Property<Guid>("SpeakingEvaluationId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AiModel")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("CandidatesTokenCount")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<decimal>("OverallBand")
-                        .HasColumnType("numeric");
-
-                    b.Property<int>("PromptTokenCount")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("RawJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("SpeakingPromptId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Transcript")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("SpeakingEvaluationId");
-
-                    b.HasIndex("SpeakingPromptId");
-
-                    b.HasIndex("UserId");
-
-                    b.ToTable("SpeakingEvaluations");
-                });
-
             modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingPrompt", b =>
                 {
                     b.Property<Guid>("SpeakingPromptId")
@@ -152,6 +42,9 @@ namespace IELTS.AI.Evaluator.Data.Migrations
 
                     b.Property<int>("Duration")
                         .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -186,15 +79,73 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.ToTable("SpeakingPrompts");
                 });
 
+            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingSession", b =>
+                {
+                    b.Property<Guid>("SpeakingSessionId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AiModel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("Feedback")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("OverallBand")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Part")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Pronunciation")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("SpeakingPromptId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Turns")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SpeakingSessionId");
+
+                    b.HasIndex("SpeakingPromptId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("SpeakingSessions");
+                });
+
             modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.User", b =>
                 {
                     b.Property<Guid>("UserId")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<string>("AuthProvider")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -216,10 +167,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.Property<decimal>("IELTSTargetScore")
                         .HasColumnType("numeric");
 
-                    b.Property<string>("IELTSTargetType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
@@ -230,9 +177,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("SpeakingQuotaUsed")
-                        .HasColumnType("integer");
-
                     b.Property<DateTimeOffset>("TargetTestDate")
                         .HasColumnType("timestamp with time zone");
 
@@ -241,12 +185,70 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW()");
 
-                    b.Property<int>("WritingQuotaUsed")
-                        .HasColumnType("integer");
-
                     b.HasKey("UserId");
 
+                    b.HasIndex("FirebaseUid")
+                        .IsUnique();
+
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.WritingEvaluation", b =>
+                {
+                    b.Property<Guid>("WritingEvaluationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AiModel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("CompletionTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<string>("EssayText")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Feedback")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("OverallBand")
+                        .HasColumnType("numeric");
+
+                    b.Property<int>("PromptTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("WordCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("WritingPromptId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("WritingEvaluationId");
+
+                    b.HasIndex("WritingPromptId");
+
+                    b.HasIndex("UserId", "CreatedAt");
+
+                    b.ToTable("WritingEvaluations");
                 });
 
             modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.WritingPrompt", b =>
@@ -272,6 +274,9 @@ namespace IELTS.AI.Evaluator.Data.Migrations
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -313,35 +318,16 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.ToTable("WritingPrompts");
                 });
 
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.EssayEvaluation", b =>
-                {
-                    b.HasOne("IELTS.AI.Evaluator.Data.Models.User", "User")
-                        .WithMany("Essays")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("IELTS.AI.Evaluator.Data.Models.WritingPrompt", "WritingPrompt")
-                        .WithMany()
-                        .HasForeignKey("WritingPromptId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
-
-                    b.Navigation("WritingPrompt");
-                });
-
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingEvaluation", b =>
+            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingSession", b =>
                 {
                     b.HasOne("IELTS.AI.Evaluator.Data.Models.SpeakingPrompt", "SpeakingPrompt")
                         .WithMany()
                         .HasForeignKey("SpeakingPromptId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("IELTS.AI.Evaluator.Data.Models.User", "User")
-                        .WithMany("SpeakingEvaluations")
+                        .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -351,11 +337,23 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.User", b =>
+            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.WritingEvaluation", b =>
                 {
-                    b.Navigation("Essays");
+                    b.HasOne("IELTS.AI.Evaluator.Data.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Navigation("SpeakingEvaluations");
+                    b.HasOne("IELTS.AI.Evaluator.Data.Models.WritingPrompt", "WritingPrompt")
+                        .WithMany()
+                        .HasForeignKey("WritingPromptId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
+
+                    b.Navigation("WritingPrompt");
                 });
 #pragma warning restore 612, 618
         }

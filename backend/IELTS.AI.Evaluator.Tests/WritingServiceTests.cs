@@ -74,7 +74,7 @@ public class WritingServiceTests
         Setup(string role = "Free", int evaluationsToday = 0)
     {
         var db = NewDb();
-        var user = new User { UserId = Guid.NewGuid(), FirebaseUid = "fake-uid", Email = "t@t.t", FullName = "T", AuthProvider = "Firebase", Plan = role };
+        var user = new User { UserId = Guid.NewGuid(), FirebaseUid = "fake-uid", Email = "t@t.t", FullName = "T", Plan = role };
         var prompt = new WritingPrompt
         {
             WritingPromptId = Guid.NewGuid(),
