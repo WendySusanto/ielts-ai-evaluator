@@ -54,7 +54,7 @@ public class GeminiStructuredClient : IGeminiStructuredClient
         };
         request.Headers.Add("x-goog-api-key", apiKey);
 
-        var response = await _http.SendAsync(request);
+        using var response = await _http.SendAsync(request);
         var body = await response.Content.ReadAsStringAsync();
         if (!response.IsSuccessStatusCode)
         {

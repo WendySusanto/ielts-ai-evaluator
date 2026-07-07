@@ -24,6 +24,7 @@ public interface ISpeakingService
 public class SpeakingService : ISpeakingService
 {
     private const int MaxTranscriptLength = 20_000;
+    private const int MaxConversationLength = 30_000;
     private static readonly JsonSerializerOptions CamelCase = new(JsonSerializerDefaults.Web);
 
     private readonly IGeminiStructuredClient _gemini;
@@ -49,6 +50,12 @@ public class SpeakingService : ISpeakingService
         var transcriptLength = candidateTurns.Sum(t => t.Text?.Length ?? 0);
         if (transcriptLength > MaxTranscriptLength)
             throw new ValidationException("Transcript exceeds the maximum length of 20,000 characters.");
+
+        // All turns (including examiner) are client-controlled and get rendered verbatim into the paid
+        // Gemini call by BuildUserContent, so the candidate-only cap above isn't enough on its own.
+        var conversationLength = request.Turns.Sum(t => t.Text?.Length ?? 0);
+        if (conversationLength > MaxConversationLength)
+            throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
 
         var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId)
             ?? throw new NotFoundException("Speaking prompt not found.");

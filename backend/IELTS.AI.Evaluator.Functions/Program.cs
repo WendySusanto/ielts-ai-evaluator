@@ -9,8 +9,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
-//For.NET 8 isolated functions, using IHostBuilder gives you the flexibility
-// to configure middleware like CORS.
 var host = new HostBuilder()
     // This configures the function's application pipeline to use ASP.NET Core integration.
     .ConfigureFunctionsWebApplication(builder =>
@@ -21,24 +19,9 @@ var host = new HostBuilder()
     // This is where you register all your services for dependency injection.
     .ConfigureServices((context, services) =>
     {
-        // --- Step 1: Add CORS services and define the policy ---
-        services.AddCors(options =>
-        {
-            // Comma-separated allowlist; add the production URL to Azure App Settings at deploy time,
-            // e.g. "http://localhost:5173,https://your-production-domain.example"
-            var allowedOrigins = (Environment.GetEnvironmentVariable("AllowedOrigins") ?? "http://localhost:5173")
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        // CORS is enforced by the Functions host, not the worker: Host.CORS in local.settings.json
+        // for dev; portal CORS settings in production. An in-worker AddCors policy is never applied.
 
-            options.AddDefaultPolicy(policy =>
-            {
-                policy.WithOrigins(allowedOrigins)
-                      .AllowAnyHeader()
-                      .AllowAnyMethod();
-            });
-        });
-
-        // --- Step 2: Register your other application services ---
-        //var connectionString = context.Configuration["DbConnectionString"];
         var connectionString = Environment.GetEnvironmentVariable("DbConnectionString");
 
         services.AddDbContext<EvaluatorDbContext>(options =>
@@ -69,41 +52,3 @@ var host = new HostBuilder()
     .Build();
 
 host.Run();
-
-
-
-//with this below program.cs we can run the migrations
-//using IELTS.AI.Evaluator.Data.Models;
-//using IELTS.AI.Evaluator.Functions.Services;
-//using Microsoft.Azure.Functions.Worker.Builder;
-//using Microsoft.EntityFrameworkCore;
-//using Microsoft.Extensions.Configuration;
-//using Microsoft.Extensions.DependencyInjection;
-//using Microsoft.Extensions.Hosting;
-//using Microsoft.Extensions.Options;
-
-
-//var config = new ConfigurationBuilder()
-//  .SetBasePath(Directory.GetCurrentDirectory()) // important for CLI
-//    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-//  .AddEnvironmentVariables()
-//  .Build();
-
-//var builder = FunctionsApplication.CreateBuilder(args);
-
-//var connectionString = builder.Configuration.GetValue<string>("DbConnectionString");
-
-
-//builder.Services.AddDbContext<EvaluatorDbContext>(options => options.UseNpgsql(connectionString));
-//builder.Services.AddHttpClient<IGeminiApiClient, GeminiApiClient>();
-//builder.Services.AddScoped<IEssayEvaluationService, EssayEvaluationService>();
-//builder.Services.AddScoped<IWritingPromptService, WritingPromptService>();
-
-
-
-//// Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4.
-//// builder.Services
-////     .AddApplicationInsightsTelemetryWorkerService()
-////     .ConfigureFunctionsApplicationInsights();
-
-//builder.Build().Run();

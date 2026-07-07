@@ -1,10 +1,8 @@
 namespace IELTS.AI.Evaluator.Functions.DTOs;
 
 /// <summary>One of the three Gemini-scored IELTS speaking criteria for a single session.
-/// Pronunciation is Azure PA's job (Phase 4) and is not part of this shape.
-/// Named SpeakingFeedbackCriterion (not SpeakingCriterion) to avoid colliding with the
-/// v1 DTOs/SpeakingDto.cs class of that name, left untouched in this namespace.</summary>
-public record SpeakingFeedbackCriterion(
+/// Pronunciation is Azure PA's job (Phase 4) and is not part of this shape.</summary>
+public record SpeakingCriterion(
     string Name,
     decimal Band,
     string Justification,
@@ -21,7 +19,7 @@ public record SpeakingTurn(string Role, string Text);
 public record SpeakingFeedback(
     decimal OverallBand,
     string Summary,
-    List<SpeakingFeedbackCriterion> Criteria); // exactly 3 from Gemini: FluencyCoherence, LexicalResource, GrammaticalRangeAccuracy
+    List<SpeakingCriterion> Criteria); // exactly 3 from Gemini: FluencyCoherence, LexicalResource, GrammaticalRangeAccuracy
 
 /// <summary>Gemini responseSchema + system prompt for SpeakingFeedback. Designed together
 /// (spec §8), same discipline as Task 5's WritingFeedbackPrompts.</summary>

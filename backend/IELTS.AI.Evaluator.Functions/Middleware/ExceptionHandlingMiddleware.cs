@@ -25,15 +25,23 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             var req = await context.GetHttpRequestDataAsync();
             if (req is null) throw; // non-HTTP trigger: let the host handle it
 
-            var domain = (ex as DomainException) ?? (ex.InnerException as DomainException);
-            var status = domain?.StatusCode ?? 500;
-            var message = domain?.Message ?? "Internal server error";
-            if (domain is null) _logger.LogError(ex, "Unhandled exception");
+            var (status, message, isDomain) = Map(ex);
+            if (!isDomain) _logger.LogError(ex, "Unhandled exception");
 
             var res = req.CreateResponse((HttpStatusCode)status);
             await res.WriteAsJsonAsync(new { message });
             res.StatusCode = (HttpStatusCode)status; // WriteAsJsonAsync resets to 200
             context.GetInvocationResult().Value = res;
         }
+    }
+
+    /// <summary>Exception → (status, message). DomainException (possibly wrapped one level deep,
+    /// e.g. by the worker's invocation pipeline) maps to its own status/message; anything else
+    /// is a bare 500 with no detail leaked. Extracted so the wire mapping is unit-testable
+    /// without faking the isolated-worker HTTP types.</summary>
+    internal static (int Status, string Message, bool IsDomain) Map(Exception ex)
+    {
+        var domain = (ex as DomainException) ?? (ex.InnerException as DomainException);
+        return (domain?.StatusCode ?? 500, domain?.Message ?? "Internal server error", domain is not null);
     }
 }

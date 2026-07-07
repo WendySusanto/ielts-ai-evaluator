@@ -39,10 +39,24 @@ public class UserServiceTests
         var updated = await svc.UpdateProfileAsync(user.UserId, new UpdateProfileRequest("New Name", 7.5m, newTargetDate));
 
         Assert.Equal("New Name", updated.FullName);
-        Assert.Equal(7.5m, updated.IELTSTargetScore);
+        Assert.Equal(7.5m, updated.IeltsTargetScore);
         Assert.Equal(newTargetDate, updated.TargetTestDate);
         // Plan is never part of UpdateProfileRequest — the signature itself makes this impossible to regress.
         Assert.Equal("Premium", updated.Plan);
+    }
+
+    [Fact]
+    public async Task GetProfile_UnsetTargets_ReturnNull_MatchingAuthSyncContract()
+    {
+        var db = NewDb();
+        var user = new User { UserId = Guid.NewGuid(), FirebaseUid = "u", Email = "t@t.t", FullName = "T", Plan = "Free" };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var profile = await new UserService(db).GetProfileAsync(user.UserId);
+
+        Assert.Null(profile.IeltsTargetScore);
+        Assert.Null(profile.TargetTestDate);
     }
 
     [Fact]

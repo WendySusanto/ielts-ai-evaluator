@@ -8,8 +8,10 @@ namespace IELTS.AI.Evaluator.Functions.Services;
 /// change through the profile-update endpoint.</summary>
 public record UpdateProfileRequest(string FullName, decimal IELTSTargetScore, DateTimeOffset TargetTestDate);
 
+/// <summary>Same nullability contract as /api/auth/sync's AuthProfileDto: target score and
+/// test date are null until the user sets them (stored as 0 / default in the DB).</summary>
 public record UserProfileDto(Guid UserId, string Email, string FullName, string Plan,
-    decimal IELTSTargetScore, DateTimeOffset TargetTestDate, DateTime CreatedAt);
+    decimal? IeltsTargetScore, DateTimeOffset? TargetTestDate, DateTime CreatedAt);
 
 public interface IUserService
 {
@@ -26,12 +28,11 @@ public class UserService : IUserService
 
     public async Task<UserProfileDto> GetProfileAsync(Guid userId)
     {
-        return await _db.Users
+        var user = await _db.Users
             .Where(u => u.UserId == userId && !u.IsDeleted)
-            .Select(u => new UserProfileDto(u.UserId, u.Email, u.FullName, u.Plan,
-                u.IELTSTargetScore, u.TargetTestDate, u.CreatedAt))
             .FirstOrDefaultAsync()
             ?? throw new NotFoundException("User not found.");
+        return ToDto(user);
     }
 
     public async Task<UserProfileDto> UpdateProfileAsync(Guid userId, UpdateProfileRequest request)
@@ -45,17 +46,20 @@ public class UserService : IUserService
 
         await _db.SaveChangesAsync();
 
-        return new UserProfileDto(user.UserId, user.Email, user.FullName, user.Plan,
-            user.IELTSTargetScore, user.TargetTestDate, user.CreatedAt);
+        return ToDto(user);
     }
 
     public async Task<List<UserProfileDto>> ListUsersAsync()
     {
-        return await _db.Users
+        var users = await _db.Users
             .Where(u => !u.IsDeleted)
             .OrderByDescending(u => u.CreatedAt)
-            .Select(u => new UserProfileDto(u.UserId, u.Email, u.FullName, u.Plan,
-                u.IELTSTargetScore, u.TargetTestDate, u.CreatedAt))
             .ToListAsync();
+        return users.Select(ToDto).ToList();
     }
+
+    private static UserProfileDto ToDto(User u) => new(u.UserId, u.Email, u.FullName, u.Plan,
+        u.IELTSTargetScore == 0 ? null : u.IELTSTargetScore,
+        u.TargetTestDate == default ? null : u.TargetTestDate,
+        u.CreatedAt);
 }

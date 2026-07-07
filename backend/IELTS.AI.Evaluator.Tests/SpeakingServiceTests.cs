@@ -27,7 +27,7 @@ public class SpeakingServiceTests
     private static SpeakingFeedback CannedFeedback() => new(
         OverallBand: 5.0m,
         Summary: "Generally fluent with natural pacing, though some grammar slips limit the score.",
-        Criteria: new List<SpeakingFeedbackCriterion>
+        Criteria: new List<SpeakingCriterion>
         {
             new("FluencyCoherence", 6.0m, "Speaks with reasonable flow but hesitates when developing complex ideas.",
                 new() { "\"Well... I think, um, technology is good for us.\"" },
@@ -125,6 +125,21 @@ public class SpeakingServiceTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() =>
             svc.EvaluateAsync(user.UserId, "Free", Request(prompt, turns)));
         Assert.Equal("Transcript exceeds the maximum length of 20,000 characters.", ex.Message);
+        Assert.Equal(0, gemini.Calls);
+    }
+
+    [Fact]
+    public async Task ConversationCap_OversizedExaminerTurns_ThrowsValidation_NoGeminiCall()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        var turns = new List<SpeakingTurn>
+        {
+            new("candidate", "short answer"), // well under the candidate cap
+            new("examiner", new string('x', 30_001)), // but all turns hit the paid Gemini prompt
+        };
+        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, turns)));
+        Assert.Equal("Conversation exceeds the maximum length of 30,000 characters.", ex.Message);
         Assert.Equal(0, gemini.Calls);
     }
 
