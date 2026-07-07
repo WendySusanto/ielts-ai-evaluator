@@ -1,112 +1,57 @@
-﻿using IELTS.AI.Evaluator.Functions.DTOs;
+using System.Text.Json;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Net;
-using System.Text.Json;
-using System.Threading;
 
-namespace IELTS.AI.Evaluator.Functions.Functions
+namespace IELTS.AI.Evaluator.Functions.Functions;
+
+/// <summary>v2 writing prompt endpoints. Thin: no try/catch — the exception middleware
+/// maps domain exceptions to their status codes.</summary>
+public class WritingPrompt
 {
-    public class WritingPrompt
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    private readonly IWritingPromptService _service;
+
+    public WritingPrompt(IWritingPromptService service) => _service = service;
+
+    [Function("WritingPrompt_List")]
+    public async Task<IActionResult> ListAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "writing-prompts")] HttpRequest req,
+        FunctionContext context)
     {
-        private readonly ILogger<WritingPrompt> _logger;
-        private readonly IWritingPromptService _writingPromptService;
+        var includeInactive = req.Query["includeInactive"] == "true";
+        if (includeInactive && !context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
 
-        public WritingPrompt(
-            ILogger<WritingPrompt> logger,
-            IWritingPromptService writingPromptService)
-        {
-            _logger = logger;
-            _writingPromptService = writingPromptService;
-        }
+        var prompts = await _service.ListAsync(includeInactive);
+        return new OkObjectResult(prompts);
+    }
 
-        [Function("UpsertWritingPrompt")]
-        public async Task<IActionResult> UpsertWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing-prompt")] HttpRequest req,
-            FunctionContext context)
-        {
-            try
-            {
-                if (!context.IsAdmin())
-                {
-                    return new ObjectResult(new { success = false, message = "Administrator access required." })
-                    { StatusCode = StatusCodes.Status403Forbidden };
-                }
+    [Function("WritingPrompt_Get")]
+    public async Task<IActionResult> GetAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "writing-prompts/{id:guid}")] HttpRequest req,
+        FunctionContext context,
+        Guid id)
+    {
+        var prompt = await _service.GetAsync(id);
+        return new OkObjectResult(prompt);
+    }
 
-                var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                var payload = JsonSerializer.Deserialize<WritingPromptUpsertRequestDto>(requestBody);
-                var result = await _writingPromptService.UpsertWritingPromptAsync(payload);
+    [Function("WritingPrompt_Upsert")]
+    public async Task<IActionResult> UpsertAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "writing-prompts")] HttpRequest req,
+        FunctionContext context)
+    {
+        if (!context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
 
-                if (!result.Success)
-                {
-                    if (result.Message == "Invalid request payload." || result.Message == "Writing prompt not found.")
-                        return new BadRequestObjectResult(result);
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-
-                return new OkObjectResult(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in UpsertWritingPrompt function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        [Function("GetWritingPrompt")]
-        public async Task<IActionResult> GetWritingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "writing-prompt")] HttpRequest req, FunctionContext executionContext)
-        {
-            try
-            {
-                if (executionContext.GetUserId() == null)
-                {
-                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-                }
-
-                var idParam = req.Query["id"].ToString();
-                
-                if (string.IsNullOrEmpty(idParam))
-                {
-                    // If no ID is provided, return all writing prompts
-                    var listResult = await _writingPromptService.GetWritingPromptsAsync();
-                    if (!listResult.Success)
-                    {
-                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                    }
-                    return new OkObjectResult(listResult);
-                }
-
-                // If ID is provided, return specific writing prompt
-                if (!Guid.TryParse(idParam, out Guid writingPromptId))
-                {
-                    return new BadRequestObjectResult(new WritingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Invalid writing prompt ID format."
-                    });
-                }
-
-                var result = await _writingPromptService.GetWritingPromptAsync(writingPromptId);
-                if (!result.Success)
-                {
-                    if (result.Message == "Writing prompt not found.")
-                        return new NotFoundObjectResult(result);
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-
-                return new OkObjectResult(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetWritingPrompt function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
+        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var request = JsonSerializer.Deserialize<WritingPromptUpsertRequest>(body, Web)!;
+        var prompt = await _service.UpsertAsync(request);
+        return new OkObjectResult(prompt);
     }
 }

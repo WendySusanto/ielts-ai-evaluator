@@ -1,230 +1,78 @@
 using IELTS.AI.Evaluator.Data.Models;
-using IELTS.AI.Evaluator.Functions.DTOs;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
-namespace IELTS.AI.Evaluator.Functions.Services
+namespace IELTS.AI.Evaluator.Functions.Services;
+
+public record DashboardRecentItemDto(Guid Id, string Type, string Topic, string TaskType, decimal OverallBand, DateTime CreatedAt);
+public record DashboardBandPointDto(DateTime CreatedAt, decimal OverallBand, string Type);
+public record DashboardDto(int WritingCount, int SpeakingCount, decimal? AverageBand,
+    List<DashboardBandPointDto> BandTrend, List<DashboardRecentItemDto> RecentItems);
+
+public interface IDashboardService
 {
-    public interface IDashboardService
+    Task<DashboardDto> GetDashboardAsync(Guid userId);
+    Task<List<DashboardRecentItemDto>> GetRecentAsync(Guid userId, int take);
+}
+
+public class DashboardService : IDashboardService
+{
+    private const int TrendPoints = 20;
+    private const int RecentDefault = 5;
+
+    private readonly EvaluatorDbContext _db;
+
+    public DashboardService(EvaluatorDbContext db) => _db = db;
+
+    public async Task<DashboardDto> GetDashboardAsync(Guid userId)
     {
-        Task<DashboardEvaluationHistoryResponseDto> GetRecentEvaluationHistoryAsync(Guid userId);
-        Task<DashboardDataResponseDto> GetDashboardDataAsync(Guid userId);
+        var writing = await WritingItemsAsync(userId, take: null);
+        var speaking = await SpeakingItemsAsync(userId, take: null);
+        var all = writing.Concat(speaking).OrderByDescending(e => e.CreatedAt).ToList();
+
+        var bandTrend = all
+            .OrderBy(e => e.CreatedAt)
+            .TakeLast(TrendPoints)
+            .Select(e => new DashboardBandPointDto(e.CreatedAt, e.OverallBand, e.Type))
+            .ToList();
+
+        return new DashboardDto(
+            WritingCount: writing.Count,
+            SpeakingCount: speaking.Count,
+            AverageBand: all.Count > 0 ? Math.Round(all.Average(e => e.OverallBand), 1) : null,
+            BandTrend: bandTrend,
+            RecentItems: all.Take(RecentDefault).ToList());
     }
 
-    public class DashboardService : IDashboardService
+    public async Task<List<DashboardRecentItemDto>> GetRecentAsync(Guid userId, int take)
     {
-        private readonly EvaluatorDbContext _dbContext;
-        private readonly ILogger<DashboardService> _logger;
+        var writing = await WritingItemsAsync(userId, take);
+        var speaking = await SpeakingItemsAsync(userId, take);
+        return writing.Concat(speaking).OrderByDescending(e => e.CreatedAt).Take(take).ToList();
+    }
 
-        public DashboardService(
-            EvaluatorDbContext dbContext,
-            ILogger<DashboardService> logger)
-        {
-            _dbContext = dbContext;
-            _logger = logger;
-        }
+    private async Task<List<DashboardRecentItemDto>> WritingItemsAsync(Guid userId, int? take)
+    {
+        var query = _db.WritingEvaluations
+            .Include(e => e.WritingPrompt)
+            .Where(e => e.UserId == userId)
+            .OrderByDescending(e => e.CreatedAt)
+            .Select(e => new DashboardRecentItemDto(
+                e.WritingEvaluationId, "writing", e.WritingPrompt.Topic, e.WritingPrompt.TaskType, e.OverallBand, e.CreatedAt));
 
-        public async Task<DashboardEvaluationHistoryResponseDto> GetRecentEvaluationHistoryAsync(Guid userId)
-        {
-            try
-            {
-                var evaluations = await GetRecentEvaluationsAsync(userId, 5);
+        if (take is { } n) query = query.Take(n);
+        return await query.ToListAsync();
+    }
 
-                return new DashboardEvaluationHistoryResponseDto
-                {
-                    Success = true,
-                    Message = "Recent evaluation history retrieved successfully.",
-                    Data = evaluations
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving recent evaluation history for user {UserId}", userId);
-                return new DashboardEvaluationHistoryResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
+    private async Task<List<DashboardRecentItemDto>> SpeakingItemsAsync(Guid userId, int? take)
+    {
+        var query = _db.SpeakingSessions
+            .Include(e => e.SpeakingPrompt)
+            .Where(e => e.UserId == userId)
+            .OrderByDescending(e => e.CreatedAt)
+            .Select(e => new DashboardRecentItemDto(
+                e.SpeakingSessionId, "speaking", e.SpeakingPrompt.Topic, e.Part, e.OverallBand, e.CreatedAt));
 
-        public async Task<DashboardDataResponseDto> GetDashboardDataAsync(Guid userId)
-        {
-            try
-            {
-                // Get user data
-                var user = await _dbContext.Users
-                    .FirstOrDefaultAsync(u => u.UserId == userId && !u.IsDeleted);
-
-                if (user == null)
-                {
-                    return new DashboardDataResponseDto
-                    {
-                        Success = false,
-                        Message = "User not found."
-                    };
-                }
-
-                // Get recent evaluations (top 5, no feedback) combining writing + speaking
-                var recentEvaluations = await GetRecentEvaluationsAsync(userId, 5);
-
-                // Calculate quick stats across both writing and speaking evaluations
-                var writingStats = await _dbContext.EssayEvaluations
-                    .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                    .Select(e => new { e.OverallBand, e.CreatedAt })
-                    .ToListAsync();
-
-                var speakingStats = await _dbContext.SpeakingEvaluations
-                    .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                    .Select(e => new { e.OverallBand, e.CreatedAt })
-                    .ToListAsync();
-
-                var allEvaluations = writingStats.Concat(speakingStats).ToList();
-
-                var daysStreak = CalculateDaysStreak(allEvaluations.Select(e => e.CreatedAt).ToList());
-
-                var quickStats = new DashboardQuickStatsDto
-                {
-                    TotalEvaluations = allEvaluations.Count,
-                    WritingQuotaUsed = user.WritingQuotaUsed,
-                    SpeakingQuotaUsed = user.SpeakingQuotaUsed,
-                    AverageBand = allEvaluations.Count > 0 ? allEvaluations.Average(e => e.OverallBand) : 0,
-                    LastEvaluationDate = allEvaluations.Count > 0 ? allEvaluations.Max(e => e.CreatedAt) : null,
-                    ProgressToTarget = CalculateProgressToTarget(allEvaluations.Count > 0 ? allEvaluations.Average(e => e.OverallBand) : 0, user.IELTSTargetScore),
-                    DaysStreak = daysStreak
-                };
-
-                var userStats = new DashboardUserStatsDto
-                {
-                    UserId = user.UserId,
-                    FullName = user.FullName,
-                    Email = user.Email,
-                    Plan = user.Plan,
-                    IeltsTargetScore = user.IELTSTargetScore,
-                    IeltsTargetType = user.IELTSTargetType,
-                    TargetTestDate = user.TargetTestDate,
-                    MemberSince = user.CreatedAt
-                };
-
-                var dashboardData = new DashboardDataDto
-                {
-                    UserStats = userStats,
-                    RecentEvaluations = recentEvaluations,
-                    QuickStats = quickStats
-                };
-
-                return new DashboardDataResponseDto
-                {
-                    Success = true,
-                    Message = "Dashboard data retrieved successfully.",
-                    Data = dashboardData
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving dashboard data for user {UserId}", userId);
-                return new DashboardDataResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        /// <summary>
-        /// Returns the most recent evaluations for a user, merging Writing and Speaking
-        /// evaluations and ordering by recency.
-        /// </summary>
-        private async Task<List<DashboardEvaluationItemDto>> GetRecentEvaluationsAsync(Guid userId, int take)
-        {
-            var writing = await _dbContext.EssayEvaluations
-                .Include(e => e.WritingPrompt)
-                .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(take)
-                .Select(e => new DashboardEvaluationItemDto
-                {
-                    EssayEvaluationId = e.EssayEvaluationId,
-                    TaskType = e.WritingPrompt != null ? e.WritingPrompt.TaskType : string.Empty,
-                    Topic = e.WritingPrompt != null ? e.WritingPrompt.Topic : string.Empty,
-                    OverallBand = e.OverallBand,
-                    CreatedAt = e.CreatedAt,
-                    EvaluationType = "Writing"
-                })
-                .ToListAsync();
-
-            var speaking = await _dbContext.SpeakingEvaluations
-                .Include(e => e.SpeakingPrompt)
-                .Where(e => e.User.UserId == userId && !e.IsDeleted)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(take)
-                .Select(e => new DashboardEvaluationItemDto
-                {
-                    EssayEvaluationId = e.SpeakingEvaluationId,
-                    TaskType = e.SpeakingPrompt != null ? e.SpeakingPrompt.Part : string.Empty,
-                    Topic = e.SpeakingPrompt != null ? e.SpeakingPrompt.Topic : string.Empty,
-                    OverallBand = e.OverallBand,
-                    CreatedAt = e.CreatedAt,
-                    EvaluationType = "Speaking"
-                })
-                .ToListAsync();
-
-            return writing
-                .Concat(speaking)
-                .OrderByDescending(e => e.CreatedAt)
-                .Take(take)
-                .ToList();
-        }
-
-        private static decimal CalculateProgressToTarget(decimal currentAverage, decimal targetScore)
-        {
-            if (targetScore <= 0) return 0;
-            if (currentAverage >= targetScore) return 100;
-
-            // Calculate percentage of progress towards target
-            var progress = (currentAverage / targetScore) * 100;
-            return Math.Round(progress, 1);
-        }
-
-        private static int CalculateDaysStreak(List<DateTime> evaluationDates)
-        {
-            if (!evaluationDates.Any()) return 0;
-
-            // Group evaluations by date (ignore time) and get unique dates
-            var distinctDates = evaluationDates
-                .Select(d => d.Date)              // Convert to date only
-                .Distinct()                       // Remove duplicates
-                .OrderByDescending(d => d)        // Most recent first
-                .ToList();
-
-            if (!distinctDates.Any()) return 0;
-
-            var today = DateTime.UtcNow.Date;
-            var streak = 0;
-
-            // Check if there's recent activity (today or yesterday)
-            var mostRecentDate = distinctDates[0];
-            if (mostRecentDate != today && mostRecentDate != today.AddDays(-1))
-            {
-                // No recent activity - streak is broken
-                return 0;
-            }
-
-            var expectedDate = mostRecentDate;
-            foreach (var evalDate in distinctDates)
-            {
-                if (evalDate == expectedDate)
-                {
-                    streak++;
-                    expectedDate = expectedDate.AddDays(-1);
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            return streak;
-        }
+        if (take is { } n) query = query.Take(n);
+        return await query.ToListAsync();
     }
 }

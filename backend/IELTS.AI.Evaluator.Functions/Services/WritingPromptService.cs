@@ -1,181 +1,85 @@
 using IELTS.AI.Evaluator.Data.Models;
-using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
-namespace IELTS.AI.Evaluator.Functions.Services
+namespace IELTS.AI.Evaluator.Functions.Services;
+
+public record WritingPromptUpsertRequest(Guid? WritingPromptId, string Topic, string Description, string Preview,
+    string QuestionType, string QuestionText, int Duration, int MinimumWords, string TaskType, string Level,
+    string? ImageUrl, string? ImageDescription, bool IsActive);
+
+public record WritingPromptDto(Guid WritingPromptId, string Topic, string Description, string Preview,
+    string QuestionType, string QuestionText, int Duration, int MinimumWords, string TaskType, string Level,
+    string? ImageUrl, string? ImageDescription, bool IsActive, DateTime CreatedAt, DateTime UpdatedAt);
+
+public interface IWritingPromptService
 {
-    public interface IWritingPromptService
+    Task<WritingPromptDto> UpsertAsync(WritingPromptUpsertRequest request);
+    Task<WritingPromptDto> GetAsync(Guid id);
+    Task<List<WritingPromptDto>> ListAsync(bool includeInactive);
+}
+
+public class WritingPromptService : IWritingPromptService
+{
+    private readonly EvaluatorDbContext _db;
+
+    public WritingPromptService(EvaluatorDbContext db) => _db = db;
+
+    public async Task<WritingPromptDto> UpsertAsync(WritingPromptUpsertRequest request)
     {
-        Task<WritingPromptResponseDto> UpsertWritingPromptAsync(WritingPromptUpsertRequestDto payload);
-        Task<WritingPromptResponseDto> GetWritingPromptAsync(Guid writingPromptId);
-        Task<WritingPromptListResponseDto> GetWritingPromptsAsync();
+        WritingPrompt prompt;
+        if (request.WritingPromptId is { } id)
+        {
+            prompt = await _db.WritingPrompts.FirstOrDefaultAsync(w => w.WritingPromptId == id)
+                ?? throw new NotFoundException("Writing prompt not found.");
+        }
+        else
+        {
+            prompt = new WritingPrompt { WritingPromptId = Guid.NewGuid() };
+            _db.WritingPrompts.Add(prompt);
+        }
+
+        prompt.Topic = request.Topic;
+        prompt.Description = request.Description;
+        prompt.Preview = request.Preview;
+        prompt.QuestionType = request.QuestionType;
+        prompt.QuestionText = request.QuestionText;
+        prompt.Duration = request.Duration;
+        prompt.MinimumWords = request.MinimumWords;
+        prompt.TaskType = request.TaskType;
+        prompt.Level = request.Level;
+        prompt.ImageUrl = request.ImageUrl;
+        prompt.ImageDescription = request.ImageDescription;
+        prompt.IsActive = request.IsActive;
+
+        await _db.SaveChangesAsync();
+
+        return new WritingPromptDto(prompt.WritingPromptId, prompt.Topic, prompt.Description, prompt.Preview,
+            prompt.QuestionType, prompt.QuestionText, prompt.Duration, prompt.MinimumWords, prompt.TaskType,
+            prompt.Level, prompt.ImageUrl, prompt.ImageDescription, prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt);
     }
 
-    public class WritingPromptService : IWritingPromptService
+    public async Task<WritingPromptDto> GetAsync(Guid id)
     {
-        private readonly EvaluatorDbContext _dbContext;
-        private readonly ILogger<WritingPromptService> _logger;
+        return await _db.WritingPrompts
+            .Where(w => w.WritingPromptId == id && !w.IsDeleted)
+            .Select(w => new WritingPromptDto(w.WritingPromptId, w.Topic, w.Description, w.Preview, w.QuestionType,
+                w.QuestionText, w.Duration, w.MinimumWords, w.TaskType, w.Level, w.ImageUrl, w.ImageDescription,
+                w.IsActive, w.CreatedAt, w.UpdatedAt))
+            .FirstOrDefaultAsync()
+            ?? throw new NotFoundException("Writing prompt not found.");
+    }
 
-        public WritingPromptService(
-            EvaluatorDbContext dbContext,
-            ILogger<WritingPromptService> logger)
-        {
-            _dbContext = dbContext;
-            _logger = logger;
-        }
+    public async Task<List<WritingPromptDto>> ListAsync(bool includeInactive)
+    {
+        var query = _db.WritingPrompts.Where(w => !w.IsDeleted);
+        if (!includeInactive) query = query.Where(w => w.IsActive);
 
-        public async Task<WritingPromptResponseDto> UpsertWritingPromptAsync(WritingPromptUpsertRequestDto payload)
-        {
-            try
-            {
-                if (payload == null)
-                {
-                    return new WritingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Invalid request payload."
-                    };
-                }
-
-                WritingPrompt writingPrompt;
-                if (payload.WritingPromptId.HasValue)
-                {
-                    writingPrompt = await _dbContext.WritingPrompts
-                        .FirstOrDefaultAsync(w => w.WritingPromptId == payload.WritingPromptId.Value);
-
-                    if (writingPrompt == null)
-                    {
-                        return new WritingPromptResponseDto
-                        {
-                            Success = false,
-                            Message = "Writing prompt not found."
-                        };
-                    }
-                }
-                else
-                {
-                    writingPrompt = new WritingPrompt
-                    {
-                        WritingPromptId = Guid.NewGuid()
-                    };
-                    _dbContext.WritingPrompts.Add(writingPrompt);
-                }
-
-                // Update properties
-                writingPrompt.Topic = payload.Topic;
-                writingPrompt.Description = payload.Description;
-                writingPrompt.Preview = payload.Preview;
-                writingPrompt.QuestionType = payload.QuestionType;
-                writingPrompt.QuestionText = payload.QuestionText;
-                writingPrompt.Duration = payload.Duration;
-                writingPrompt.MinimumWords = payload.MinimumWords;
-                writingPrompt.TaskType = payload.TaskType;
-                writingPrompt.Level = payload.Level;
-                writingPrompt.ImageUrl = payload.ImageUrl;
-                writingPrompt.ImageDescription = payload.ImageDescription;
-
-                await _dbContext.SaveChangesAsync();
-
-                return new WritingPromptResponseDto
-                {
-                    Success = true,
-                    Message = payload.WritingPromptId.HasValue ? "Writing prompt updated successfully." : "Writing prompt created successfully.",
-                    Data = MapToDto(writingPrompt)
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing writing prompt upsert.");
-                return new WritingPromptResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        public async Task<WritingPromptResponseDto> GetWritingPromptAsync(Guid writingPromptId)
-        {
-            try
-            {
-                var writingPrompt = await _dbContext.WritingPrompts
-                    .FirstOrDefaultAsync(w => w.WritingPromptId == writingPromptId && !w.IsDeleted);
-
-                if (writingPrompt == null)
-                {
-                    return new WritingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Writing prompt not found."
-                    };
-                }
-
-                return new WritingPromptResponseDto
-                {
-                    Success = true,
-                    Message = "Writing prompt retrieved successfully.",
-                    Data = MapToDto(writingPrompt)
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving writing prompt.");
-                return new WritingPromptResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        public async Task<WritingPromptListResponseDto> GetWritingPromptsAsync()
-        {
-            try
-            {
-                var writingPrompts = await _dbContext.WritingPrompts
-                    .Where(w => !w.IsDeleted)
-                    .OrderByDescending(w => w.CreatedAt)
-                    .Select(w => MapToDto(w))
-                    .ToListAsync();
-
-                return new WritingPromptListResponseDto
-                {
-                    Success = true,
-                    Message = "Writing prompts retrieved successfully.",
-                    Data = writingPrompts
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving writing prompts.");
-                return new WritingPromptListResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        private static WritingPromptDto MapToDto(WritingPrompt writingPrompt)
-        {
-            return new WritingPromptDto
-            {
-                WritingPromptId = writingPrompt.WritingPromptId,
-                Topic = writingPrompt.Topic,
-                Description = writingPrompt.Description,
-                Preview = writingPrompt.Preview,
-                QuestionType = writingPrompt.QuestionType,
-                QuestionText = writingPrompt.QuestionText,
-                Duration = writingPrompt.Duration,
-                MinimumWords = writingPrompt.MinimumWords,
-                TaskType = writingPrompt.TaskType,
-                Level = writingPrompt.Level,
-                ImageUrl = writingPrompt.ImageUrl,
-                ImageDescription = writingPrompt.ImageDescription,
-                CreatedAt = writingPrompt.CreatedAt,
-                UpdatedAt = writingPrompt.UpdatedAt
-            };
-        }
+        return await query
+            .OrderByDescending(w => w.CreatedAt)
+            .Select(w => new WritingPromptDto(w.WritingPromptId, w.Topic, w.Description, w.Preview, w.QuestionType,
+                w.QuestionText, w.Duration, w.MinimumWords, w.TaskType, w.Level, w.ImageUrl, w.ImageDescription,
+                w.IsActive, w.CreatedAt, w.UpdatedAt))
+            .ToListAsync();
     }
 }

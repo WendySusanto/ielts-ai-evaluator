@@ -1,108 +1,57 @@
 using System.Text.Json;
-using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Extensions.Logging;
 
-namespace IELTS.AI.Evaluator.Functions.Functions
+namespace IELTS.AI.Evaluator.Functions.Functions;
+
+/// <summary>v2 speaking prompt endpoints. Thin: no try/catch — the exception middleware
+/// maps domain exceptions to their status codes.</summary>
+public class SpeakingPrompt
 {
-    public class SpeakingPrompt
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    private readonly ISpeakingPromptService _service;
+
+    public SpeakingPrompt(ISpeakingPromptService service) => _service = service;
+
+    [Function("SpeakingPrompt_List")]
+    public async Task<IActionResult> ListAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speaking-prompts")] HttpRequest req,
+        FunctionContext context)
     {
-        private readonly ILogger<SpeakingPrompt> _logger;
-        private readonly ISpeakingPromptService _speakingPromptService;
+        var includeInactive = req.Query["includeInactive"] == "true";
+        if (includeInactive && !context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
 
-        public SpeakingPrompt(
-            ILogger<SpeakingPrompt> logger,
-            ISpeakingPromptService speakingPromptService)
-        {
-            _logger = logger;
-            _speakingPromptService = speakingPromptService;
-        }
+        var prompts = await _service.ListAsync(includeInactive);
+        return new OkObjectResult(prompts);
+    }
 
-        [Function("UpsertSpeakingPrompt")]
-        public async Task<IActionResult> UpsertSpeakingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking-prompt")] HttpRequest req,
-            FunctionContext context)
-        {
-            try
-            {
-                if (!context.IsAdmin())
-                {
-                    return new ObjectResult(new { success = false, message = "Administrator access required." })
-                    { StatusCode = StatusCodes.Status403Forbidden };
-                }
+    [Function("SpeakingPrompt_Get")]
+    public async Task<IActionResult> GetAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speaking-prompts/{id:guid}")] HttpRequest req,
+        FunctionContext context,
+        Guid id)
+    {
+        var prompt = await _service.GetAsync(id);
+        return new OkObjectResult(prompt);
+    }
 
-                var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                var payload = JsonSerializer.Deserialize<SpeakingPromptUpsertRequestDto>(requestBody);
-                var result = await _speakingPromptService.UpsertSpeakingPromptAsync(payload);
+    [Function("SpeakingPrompt_Upsert")]
+    public async Task<IActionResult> UpsertAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking-prompts")] HttpRequest req,
+        FunctionContext context)
+    {
+        if (!context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
 
-                if (!result.Success)
-                {
-                    if (result.Message == "Invalid request payload." || result.Message == "Speaking prompt not found.")
-                        return new BadRequestObjectResult(result);
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-
-                return new OkObjectResult(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in UpsertSpeakingPrompt function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        [Function("GetSpeakingPrompt")]
-        public async Task<IActionResult> GetSpeakingPromptAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speaking-prompt")] HttpRequest req,
-            FunctionContext executionContext)
-        {
-            try
-            {
-                if (executionContext.GetUserId() == null)
-                {
-                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-                }
-
-                var idParam = req.Query["id"].ToString();
-
-                if (string.IsNullOrEmpty(idParam))
-                {
-                    var listResult = await _speakingPromptService.GetSpeakingPromptsAsync();
-                    if (!listResult.Success)
-                    {
-                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                    }
-                    return new OkObjectResult(listResult);
-                }
-
-                if (!Guid.TryParse(idParam, out Guid speakingPromptId))
-                {
-                    return new BadRequestObjectResult(new SpeakingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Invalid speaking prompt ID format."
-                    });
-                }
-
-                var result = await _speakingPromptService.GetSpeakingPromptAsync(speakingPromptId);
-                if (!result.Success)
-                {
-                    if (result.Message == "Speaking prompt not found.")
-                        return new NotFoundObjectResult(result);
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-
-                return new OkObjectResult(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetSpeakingPrompt function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
+        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var request = JsonSerializer.Deserialize<SpeakingPromptUpsertRequest>(body, Web)!;
+        var prompt = await _service.UpsertAsync(request);
+        return new OkObjectResult(prompt);
     }
 }

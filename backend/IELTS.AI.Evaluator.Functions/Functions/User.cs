@@ -1,127 +1,52 @@
-using IELTS.AI.Evaluator.Functions.DTOs;
-using IELTS.AI.Evaluator.Functions.Services;
+using System.Text.Json;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using IELTS.AI.Evaluator.Functions.Extensions;
+using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Http;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Net;
-using System.Security.Claims;
-using System.Text.Json;
-using System.Threading;
 
-namespace IELTS.AI.Evaluator.Functions.Functions
+namespace IELTS.AI.Evaluator.Functions.Functions;
+
+/// <summary>v2 profile + admin user-list endpoints. Thin: no try/catch — the exception
+/// middleware maps domain exceptions to their status codes.</summary>
+public class User
 {
-    public class User
+    private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
+
+    private readonly IUserService _service;
+
+    public User(IUserService service) => _service = service;
+
+    [Function("Me_Get")]
+    public async Task<IActionResult> GetMeAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "me")] HttpRequest req,
+        FunctionContext context)
     {
-        private readonly ILogger<User> _logger;
-        private readonly IUserService _userService;
+        var profile = await _service.GetProfileAsync(context.GetUserId()!.Value);
+        return new OkObjectResult(profile);
+    }
 
-        public User(
-            ILogger<User> logger,
-            IUserService userService)
-        {
-            _logger = logger;
-            _userService = userService;
-        }
+    [Function("Me_Update")]
+    public async Task<IActionResult> UpdateMeAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "me")] HttpRequest req,
+        FunctionContext context)
+    {
+        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var request = JsonSerializer.Deserialize<UpdateProfileRequest>(body, Web)!;
+        var profile = await _service.UpdateProfileAsync(context.GetUserId()!.Value, request);
+        return new OkObjectResult(profile);
+    }
 
-        [Function("UpsertUser")]
-        public async Task<IActionResult> UpsertUserAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "user")] HttpRequest req, FunctionContext context)
-        {
-            try
-            {
-                var userIdContext = context.GetUserId();
+    [Function("Admin_ListUsers")]
+    public async Task<IActionResult> ListUsersAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "admin/users")] HttpRequest req,
+        FunctionContext context)
+    {
+        if (!context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
 
-                var requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-                var payload = JsonSerializer.Deserialize<UserUpsertRequestDto>(requestBody);
-
-
-                if (userIdContext != payload?.UserId)
-                {
-                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-                }
-
-                var result = await _userService.UpsertUserAsync(payload);
-
-                if (!result.Success)
-                {
-                    if (result.Message == "Invalid request payload." || 
-                        result.Message == "User not found." ||
-                        result.Message == "Email already exists.")
-                        return new BadRequestObjectResult(result);
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-
-                return new OkObjectResult(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in UpsertUser function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        [Function("GetUser")]
-        public async Task<IActionResult> GetUserAsync(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "user")] HttpRequest req, FunctionContext context)
-        {
-            try
-            {
-
-                var isAdmin = context.IsAdmin();
-                
-                if (!isAdmin)
-                {
-                    return new StatusCodeResult(StatusCodes.Status401Unauthorized);
-                }
-
-                // If no ID is provided, return all users
-                var listResult = await _userService.GetUsersAsync();
-                if (!listResult.Success)
-                {
-                    return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                }
-                return new OkObjectResult(listResult);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetUser function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
-
-        [Function("GetUserProfile")]
-        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get")] HttpRequestData req, FunctionContext context)
-        {
-            try
-            {
-                if (!string.IsNullOrEmpty(context.GetUserId().ToString()))
-                {
-                    var user = await _userService.GetUserAsync(context.GetUserId());
-
-                    if (user == null)
-                    {
-                        return new UnauthorizedObjectResult("No user found");
-                    }
-
-                    if (!user.Success)
-                    {
-                        return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-                    }
-                    return new OkObjectResult(user);
-                } else
-                {
-                    return new UnauthorizedObjectResult("Id not available in the context");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetUserProfile function.");
-                return new StatusCodeResult(StatusCodes.Status500InternalServerError);
-            }
-        }
+        var users = await _service.ListUsersAsync();
+        return new OkObjectResult(users);
     }
 }

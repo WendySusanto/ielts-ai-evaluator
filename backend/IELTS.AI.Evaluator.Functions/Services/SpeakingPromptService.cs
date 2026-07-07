@@ -1,176 +1,79 @@
 using IELTS.AI.Evaluator.Data.Models;
-using IELTS.AI.Evaluator.Functions.DTOs;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
-namespace IELTS.AI.Evaluator.Functions.Services
+namespace IELTS.AI.Evaluator.Functions.Services;
+
+public record SpeakingPromptUpsertRequest(Guid? SpeakingPromptId, string Topic, string Description, string Preview,
+    string Part, string QuestionText, string? Cuepoints, int Duration, string Level, bool IsActive);
+
+public record SpeakingPromptDto(Guid SpeakingPromptId, string Topic, string Description, string Preview,
+    string Part, string QuestionText, string? Cuepoints, int Duration, string Level, bool IsActive,
+    DateTime CreatedAt, DateTime UpdatedAt);
+
+public interface ISpeakingPromptService
 {
-    public interface ISpeakingPromptService
+    Task<SpeakingPromptDto> UpsertAsync(SpeakingPromptUpsertRequest request);
+    Task<SpeakingPromptDto> GetAsync(Guid id);
+    Task<List<SpeakingPromptDto>> ListAsync(bool includeInactive);
+}
+
+public class SpeakingPromptService : ISpeakingPromptService
+{
+    private readonly EvaluatorDbContext _db;
+
+    public SpeakingPromptService(EvaluatorDbContext db) => _db = db;
+
+    public async Task<SpeakingPromptDto> UpsertAsync(SpeakingPromptUpsertRequest request)
     {
-        Task<SpeakingPromptResponseDto> UpsertSpeakingPromptAsync(SpeakingPromptUpsertRequestDto payload);
-        Task<SpeakingPromptResponseDto> GetSpeakingPromptAsync(Guid speakingPromptId);
-        Task<SpeakingPromptListResponseDto> GetSpeakingPromptsAsync();
+        SpeakingPrompt prompt;
+        if (request.SpeakingPromptId is { } id)
+        {
+            prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == id)
+                ?? throw new NotFoundException("Speaking prompt not found.");
+        }
+        else
+        {
+            prompt = new SpeakingPrompt { SpeakingPromptId = Guid.NewGuid() };
+            _db.SpeakingPrompts.Add(prompt);
+        }
+
+        prompt.Topic = request.Topic;
+        prompt.Description = request.Description;
+        prompt.Preview = request.Preview;
+        prompt.Part = request.Part;
+        prompt.QuestionText = request.QuestionText;
+        prompt.Cuepoints = request.Cuepoints;
+        prompt.Duration = request.Duration;
+        prompt.Level = request.Level;
+        prompt.IsActive = request.IsActive;
+
+        await _db.SaveChangesAsync();
+
+        return new SpeakingPromptDto(prompt.SpeakingPromptId, prompt.Topic, prompt.Description, prompt.Preview,
+            prompt.Part, prompt.QuestionText, prompt.Cuepoints, prompt.Duration, prompt.Level, prompt.IsActive,
+            prompt.CreatedAt, prompt.UpdatedAt);
     }
 
-    public class SpeakingPromptService : ISpeakingPromptService
+    public async Task<SpeakingPromptDto> GetAsync(Guid id)
     {
-        private readonly EvaluatorDbContext _dbContext;
-        private readonly ILogger<SpeakingPromptService> _logger;
+        return await _db.SpeakingPrompts
+            .Where(p => p.SpeakingPromptId == id && !p.IsDeleted)
+            .Select(p => new SpeakingPromptDto(p.SpeakingPromptId, p.Topic, p.Description, p.Preview, p.Part,
+                p.QuestionText, p.Cuepoints, p.Duration, p.Level, p.IsActive, p.CreatedAt, p.UpdatedAt))
+            .FirstOrDefaultAsync()
+            ?? throw new NotFoundException("Speaking prompt not found.");
+    }
 
-        public SpeakingPromptService(
-            EvaluatorDbContext dbContext,
-            ILogger<SpeakingPromptService> logger)
-        {
-            _dbContext = dbContext;
-            _logger = logger;
-        }
+    public async Task<List<SpeakingPromptDto>> ListAsync(bool includeInactive)
+    {
+        var query = _db.SpeakingPrompts.Where(p => !p.IsDeleted);
+        if (!includeInactive) query = query.Where(p => p.IsActive);
 
-        public async Task<SpeakingPromptResponseDto> UpsertSpeakingPromptAsync(SpeakingPromptUpsertRequestDto payload)
-        {
-            try
-            {
-                if (payload == null)
-                {
-                    return new SpeakingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Invalid request payload."
-                    };
-                }
-
-                SpeakingPrompt speakingPrompt;
-                if (payload.SpeakingPromptId.HasValue)
-                {
-                    speakingPrompt = await _dbContext.SpeakingPrompts
-                        .FirstOrDefaultAsync(p => p.SpeakingPromptId == payload.SpeakingPromptId.Value);
-
-                    if (speakingPrompt == null)
-                    {
-                        return new SpeakingPromptResponseDto
-                        {
-                            Success = false,
-                            Message = "Speaking prompt not found."
-                        };
-                    }
-                }
-                else
-                {
-                    speakingPrompt = new SpeakingPrompt
-                    {
-                        SpeakingPromptId = Guid.NewGuid()
-                    };
-                    _dbContext.SpeakingPrompts.Add(speakingPrompt);
-                }
-
-                speakingPrompt.Topic = payload.Topic;
-                speakingPrompt.Description = payload.Description;
-                speakingPrompt.Preview = payload.Preview;
-                speakingPrompt.Part = payload.Part;
-                speakingPrompt.QuestionText = payload.QuestionText;
-                speakingPrompt.Cuepoints = payload.Cuepoints;
-                speakingPrompt.Duration = payload.Duration;
-                speakingPrompt.Level = payload.Level;
-
-                await _dbContext.SaveChangesAsync();
-
-                return new SpeakingPromptResponseDto
-                {
-                    Success = true,
-                    Message = payload.SpeakingPromptId.HasValue
-                        ? "Speaking prompt updated successfully."
-                        : "Speaking prompt created successfully.",
-                    Data = MapToDto(speakingPrompt)
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error processing speaking prompt upsert.");
-                return new SpeakingPromptResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        public async Task<SpeakingPromptResponseDto> GetSpeakingPromptAsync(Guid speakingPromptId)
-        {
-            try
-            {
-                var speakingPrompt = await _dbContext.SpeakingPrompts
-                    .FirstOrDefaultAsync(p => p.SpeakingPromptId == speakingPromptId && !p.IsDeleted);
-
-                if (speakingPrompt == null)
-                {
-                    return new SpeakingPromptResponseDto
-                    {
-                        Success = false,
-                        Message = "Speaking prompt not found."
-                    };
-                }
-
-                return new SpeakingPromptResponseDto
-                {
-                    Success = true,
-                    Message = "Speaking prompt retrieved successfully.",
-                    Data = MapToDto(speakingPrompt)
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving speaking prompt.");
-                return new SpeakingPromptResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        public async Task<SpeakingPromptListResponseDto> GetSpeakingPromptsAsync()
-        {
-            try
-            {
-                var speakingPrompts = await _dbContext.SpeakingPrompts
-                    .Where(p => !p.IsDeleted)
-                    .OrderByDescending(p => p.CreatedAt)
-                    .Select(p => MapToDto(p))
-                    .ToListAsync();
-
-                return new SpeakingPromptListResponseDto
-                {
-                    Success = true,
-                    Message = "Speaking prompts retrieved successfully.",
-                    Data = speakingPrompts
-                };
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving speaking prompts.");
-                return new SpeakingPromptListResponseDto
-                {
-                    Success = false,
-                    Message = "Internal server error."
-                };
-            }
-        }
-
-        private static SpeakingPromptDto MapToDto(SpeakingPrompt prompt)
-        {
-            return new SpeakingPromptDto
-            {
-                SpeakingPromptId = prompt.SpeakingPromptId,
-                Topic = prompt.Topic,
-                Description = prompt.Description,
-                Preview = prompt.Preview,
-                Part = prompt.Part,
-                QuestionText = prompt.QuestionText,
-                Cuepoints = prompt.Cuepoints,
-                Duration = prompt.Duration,
-                Level = prompt.Level,
-                CreatedAt = prompt.CreatedAt,
-                UpdatedAt = prompt.UpdatedAt
-            };
-        }
+        return await query
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new SpeakingPromptDto(p.SpeakingPromptId, p.Topic, p.Description, p.Preview, p.Part,
+                p.QuestionText, p.Cuepoints, p.Duration, p.Level, p.IsActive, p.CreatedAt, p.UpdatedAt))
+            .ToListAsync();
     }
 }
