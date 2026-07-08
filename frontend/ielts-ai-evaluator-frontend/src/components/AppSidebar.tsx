@@ -1,12 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import {
-  LayoutDashboard,
-  Mic,
-  History,
-  Crown,
-  BookOpen,
-  Edit3,
-} from "lucide-react";
+import { LayoutDashboard, Mic, Edit3, History, Crown } from "lucide-react";
 
 import {
   Sidebar,
@@ -20,76 +13,114 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const items = [
+type NavItem = { title: string; url: string; icon: typeof LayoutDashboard };
+
+const practiceItems: NavItem[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Speaking", url: "/speaking", icon: Mic },
   { title: "Writing", url: "/writing", icon: Edit3 },
   { title: "Feedback History", url: "/feedback", icon: History },
-  { title: "Premium", url: "/premium", icon: Crown },
 ];
 
+const accountItems: NavItem[] = [{ title: "Premium", url: "/premium", icon: Crown }];
+
+export function LogoMark({ size = 32 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 64 64"
+      className="shrink-0"
+      aria-hidden="true"
+    >
+      <rect width="64" height="64" rx="16" className="fill-primary" />
+      <text
+        x="32"
+        y="44"
+        fontSize="34"
+        fontWeight="700"
+        textAnchor="middle"
+        className="fill-primary-foreground"
+      >
+        W
+      </text>
+    </svg>
+  );
+}
+
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile } = useSidebar();
   const location = useLocation();
   const currentPath = location.pathname;
-
-  const { isMobile } = useSidebar();
 
   const collapsed = !isMobile && state === "collapsed";
 
   const isActive = (path: string) => currentPath === path;
-  const getNavCls = (isActive: boolean) =>
-    isActive ? "bg-sidebar-accent text-sidebar-accent-foreground" : "";
+  const getNavCls = (active: boolean) =>
+    active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "";
+
+  const renderGroup = (label: string, items: NavItem[]) => (
+    <SidebarGroup key={label}>
+      <SidebarGroupLabel
+        className={
+          collapsed
+            ? "sr-only"
+            : "text-xs uppercase tracking-wider text-muted-foreground"
+        }
+      >
+        {label}
+      </SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {items.map((item) => (
+            <SidebarMenuItem key={item.title}>
+              <SidebarMenuButton asChild className="h-11">
+                <NavLink
+                  to={item.url}
+                  end
+                  className={`flex items-center gap-3 px-3 py-2 rounded-full transition-all duration-200 ${getNavCls(
+                    isActive(item.url)
+                  )}`}
+                >
+                  <item.icon className="size-4 flex-shrink-0" />
+                  {!collapsed && (
+                    <span className="font-medium">{item.title}</span>
+                  )}
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
+  );
 
   return (
     <Sidebar
       className={`${
         collapsed ? "w-16" : "w-64"
-      } border-r transition-all duration-300`}
+      } border-r border-sidebar-border transition-all duration-300`}
       collapsible="icon"
     >
       <SidebarContent className="pt-4">
         <div className="px-4 mb-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shadow-lg">
-              <BookOpen className="h-5 w-5" />
-            </div>
+          <div className="flex items-center gap-3">
+            <LogoMark />
             {!collapsed && (
-              <div>
-                <h2 className="font-bold text-lg">IELTS AI</h2>
-                <p className="text-xs">AI-Powered Learning</p>
+              <div className="min-w-0">
+                <h2 className="font-semibold text-lg leading-tight truncate">
+                  When IELTS?
+                </h2>
+                <p className="text-xs tracking-widest text-muted-foreground truncate">
+                  LEARN · SPEAK · WRITE
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className={collapsed ? "sr-only" : "font-medium"}>
-            Learning Modules
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="h-12">
-                    <NavLink
-                      to={item.url}
-                      end
-                      className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 ${getNavCls(
-                        isActive(item.url)
-                      )}`}
-                    >
-                      <item.icon className="h-5 w-5 flex-shrink-0" />
-                      {!collapsed && (
-                        <span className="font-medium">{item.title}</span>
-                      )}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {renderGroup("Practice", practiceItems)}
+        {renderGroup("Account", accountItems)}
       </SidebarContent>
     </Sidebar>
   );

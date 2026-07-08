@@ -30,8 +30,8 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       <header className="bg-sidebar px-4 sticky top-0 h-16 w-full flex items-center border-b border-sidebar-border flex-shrink-0 z-50">
         <div className="flex items-center w-full">
           <div className="flex items-center gap-2">
-            <SidebarTrigger className="mr-4" />
-            <h1 className="text-lg font-semibold">IELTS AI Evaluator</h1>
+            <SidebarTrigger className="mr-4 size-11" />
+            <h1 className="text-lg font-semibold">When IELTS?</h1>
           </div>
 
           <div className="flex items-center gap-3 ml-auto">
@@ -39,7 +39,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
               variant="ghost"
               size="icon"
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="hover:bg-sidebar-accent"
+              className="size-11 hover:bg-sidebar-accent"
             >
               {theme === "dark" ? (
                 <Sun className="h-5 w-5" />
@@ -50,7 +50,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="hover:bg-sidebar-accent"
+              className="size-11 hover:bg-sidebar-accent"
             >
               <Bell className="h-5 w-5" />
             </Button>
@@ -59,7 +59,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
                 variant="ghost"
                 size="icon"
                 onClick={toggleDropdown}
-                className="hover:bg-sidebar-accent"
+                className="size-11 hover:bg-sidebar-accent"
               >
                 <User className="h-5 w-5" />
               </Button>
@@ -111,7 +111,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </header>
-      <div className="p-12 h-screen flex-1 bg-background">
+      <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-8">
         {children}
       </div>
     </div>

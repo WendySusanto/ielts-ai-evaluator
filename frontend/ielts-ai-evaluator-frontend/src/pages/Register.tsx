@@ -29,6 +29,7 @@ import {
   CheckCircle,
   XCircle,
 } from "lucide-react";
+import { LogoMark } from "@/components/AppSidebar";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -229,7 +230,13 @@ export default function Register() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col justify-center mx-auto p-6 w-md">
+    <div className="min-h-screen flex flex-col items-center justify-center mx-auto p-6 w-md bg-background">
+      <div className="mb-6 flex flex-col items-center gap-2">
+        <LogoMark size={40} />
+        <span className="text-xl font-semibold text-foreground">
+          When IELTS?
+        </span>
+      </div>
       <Card className="w-full max-w-md border-0 shadow-xl bg-card/80 backdrop-blur-sm">
         <CardHeader className="space-y-1 pb-4">
           <CardTitle className="text-center text-3xl font-bold text-primary">
@@ -450,14 +457,14 @@ export default function Register() {
                   I agree to the{" "}
                   <Link
                     to="/terms"
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="text-tip hover:underline"
                   >
                     Terms of Service
                   </Link>{" "}
                   and{" "}
                   <Link
                     to="/privacy"
-                    className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                    className="text-tip hover:underline"
                   >
                     Privacy Policy
                   </Link>
@@ -477,7 +484,7 @@ export default function Register() {
                 </div>
                 <Link
                   to="/login"
-                  className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-xs font-medium text-tip hover:underline"
                 >
                   Have an account?
                 </Link>
