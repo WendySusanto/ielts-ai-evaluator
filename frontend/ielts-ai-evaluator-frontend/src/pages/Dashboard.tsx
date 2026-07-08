@@ -28,7 +28,12 @@ const Dashboard = () => {
     refetch,
   } = useApi<DashboardData>("/api/dashboard");
 
-  const { data: profile, isLoading: isLoadingProfile } = useApi<User>("/api/me");
+  const {
+    data: profile,
+    isLoading: isLoadingProfile,
+    error: profileError,
+    refetch: refetchProfile,
+  } = useApi<User>("/api/me");
 
   const navigate = useNavigate();
 
@@ -57,12 +62,15 @@ const Dashboard = () => {
     return <DashboardSkeleton />;
   }
 
-  if (error) {
+  if (error || profileError) {
     return (
       <ErrorPage
         title="Failed to load dashboard"
-        message={error.message}
-        onRetry={refetch}
+        message={(error ?? profileError)!.message}
+        onRetry={() => {
+          refetch();
+          refetchProfile();
+        }}
       />
     );
   }
@@ -73,6 +81,7 @@ const Dashboard = () => {
 
   const { writingCount, speakingCount, averageBand, recentItems } = dashboardData;
   const targetScore = profile.ieltsTargetScore;
+  const lastWriting = recentItems.find((i) => i.type === "writing");
 
   // Dynamic stats based on API data
   const stats = [
@@ -86,8 +95,8 @@ const Dashboard = () => {
     {
       title: "Writing Tasks",
       value: writingCount.toString(),
-      change: recentItems.find((i) => i.type === "writing")
-        ? `Last: ${getRelativeTime(recentItems.find((i) => i.type === "writing")!.createdAt)}`
+      change: lastWriting
+        ? `Last: ${getRelativeTime(lastWriting.createdAt)}`
         : "No recent activity",
       icon: PenTool,
       color: "text-green-600 dark:text-green-400",

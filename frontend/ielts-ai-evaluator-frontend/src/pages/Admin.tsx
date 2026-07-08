@@ -328,7 +328,7 @@ const Admin = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <TableSkeleton columns={6} rows={5} />
+                <TableSkeleton columns={7} rows={5} />
               </CardContent>
             </Card>
           ) : (
