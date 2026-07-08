@@ -1,45 +1,53 @@
-// Types for the evaluation API response
-export interface Issue {
-  text: string;
-  comment: string;
-}
+// Types matching backend DTOs/WritingFeedback.cs and Services/WritingService.cs
 
-export interface SubScore {
-  score: number;
-  comment: string;
-}
-
-export interface CriteriaData {
+/** One of the four official IELTS writing criteria for a single essay. */
+export interface WritingCriterion {
+  name: string;
   band: number;
-  generalFeedback: string;
-  subScores: {
-    [key: string]: SubScore;
-  };
-  issues: Issue[];
+  justification: string;
+  examples: string[];
+  improvements: string[];
 }
 
-export interface FeedbackData {
+/** A specific grammar/vocabulary/spelling mistake, quoted verbatim from the essay. */
+export interface WritingError {
+  quote: string;
+  correction: string;
+  rule: string;
+}
+
+/** A word/phrase from the essay paired with a stronger alternative. */
+export interface VocabularyUpgrade {
+  original: string;
+  upgrade: string;
+  context: string;
+}
+
+export interface WritingFeedback {
   overallBand: number;
-  criteria: {
-    taskResponse: CriteriaData;
-    coherenceCohesion: CriteriaData;
-    lexicalResource: CriteriaData;
-    grammaticalRangeAccuracy: CriteriaData;
-  };
+  summary: string;
+  criteria: WritingCriterion[];
+  errors: WritingError[];
+  vocabularyUpgrades: VocabularyUpgrade[];
+  improvedExcerpt: string;
 }
 
-export interface EvaluationDetail {
+// Response from POST /api/v2/writing/evaluations
+export interface WritingEvaluationDto {
+  writingEvaluationId: string;
+  overallBand: number;
+  feedback: WritingFeedback;
+}
+
+// Response from GET /api/v2/writing/evaluations/{id}
+export interface WritingEvaluationDetail {
+  writingEvaluationId: string;
   taskType: string;
   topic: string;
-  userAnswer: string;
-  feedback: FeedbackData;
-}
-
-export type CriteriaKeys = keyof FeedbackData["criteria"];
-
-export interface CriteriaLabels {
-  taskResponse: string;
-  coherenceCohesion: string;
-  lexicalResource: string;
-  grammaticalRangeAccuracy: string;
+  questionText: string;
+  essayText: string;
+  wordCount: number;
+  overallBand: number;
+  feedback: WritingFeedback;
+  createdAt: string;
 }

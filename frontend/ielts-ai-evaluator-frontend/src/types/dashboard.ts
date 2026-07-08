@@ -1,35 +1,23 @@
-export interface DashboardEvaluationItem {
-  essayEvaluationId: string;
-  taskType: string;
+// Types matching backend DashboardDto (Services/DashboardService.cs)
+export interface DashboardRecentItem {
+  id: string;
+  type: "writing" | "speaking";
   topic: string;
+  taskType: string; // Task1/Task2 for writing, Part1/Part2/Part3 for speaking
   overallBand: number;
   createdAt: string;
-  evaluationType: string;
 }
 
-export interface DashboardUserStats {
-  userId: string;
-  fullName: string;
-  email: string;
-  plan: string;
-  ieltsTargetScore: number;
-  ieltsTargetType: string;
-  targetTestDate?: string;
-  memberSince: string;
-}
-
-export interface DashboardQuickStats {
-  totalEvaluations: number;
-  writingQuotaUsed: number;
-  speakingQuotaUsed: number;
-  averageBand: number;
-  lastEvaluationDate?: string;
-  progressToTarget: number;
-  daysStreak: number;
+export interface DashboardBandPoint {
+  createdAt: string;
+  overallBand: number;
+  type: "writing" | "speaking";
 }
 
 export interface DashboardData {
-  userStats: DashboardUserStats;
-  recentEvaluations: DashboardEvaluationItem[];
-  quickStats: DashboardQuickStats;
+  writingCount: number;
+  speakingCount: number;
+  averageBand: number | null;
+  bandTrend: DashboardBandPoint[];
+  recentItems: DashboardRecentItem[];
 }

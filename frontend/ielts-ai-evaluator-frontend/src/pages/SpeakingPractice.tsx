@@ -22,7 +22,7 @@ import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { formatText } from "@/lib/utils";
 import type {
   SpeakingEvaluateRequest,
-  SpeakingEvaluateResponse,
+  SpeakingSessionDto,
   SpeakingPrompt,
 } from "@/types/Speaking";
 import {
@@ -45,12 +45,12 @@ const SpeakingPractice = () => {
   const navigate = useNavigate();
 
   const { data: prompt = null, isLoading } = useApi<SpeakingPrompt>(
-    `/api/speaking-prompt?id=${taskId}`,
+    `/api/speaking-prompts/${taskId}`,
   );
 
   const speech = useSpeechRecognition("en-US");
-  const { mutate } = useApi<SpeakingEvaluateResponse>(
-    "/api/speaking/evaluate",
+  const { mutate } = useApi<SpeakingSessionDto>(
+    "/api/v2/speaking/sessions",
     { skipInitialFetch: true },
   );
 
@@ -91,22 +91,20 @@ const SpeakingPractice = () => {
     setIsAnalyzing(true);
 
     const payload: SpeakingEvaluateRequest = {
-      transcript,
       speakingPromptId: prompt.speakingPromptId,
-      question: prompt.questionText,
       part: prompt.part,
-      cuepoints: prompt.cuepoints,
+      turns: [{ role: "candidate", text: transcript }],
     };
 
     await mutate({
-      url: "/api/speaking/evaluate",
+      url: "/api/v2/speaking/sessions",
       method: "POST",
       data: payload,
-      onSuccess: () => {
+      onSuccess: (result) => {
         setIsAnalyzing(false);
         setIsSubmitted(true);
         toast.success("Speaking response analyzed successfully!");
-        navigate("/feedback");
+        navigate(`/speaking-feedback/${result.speakingSessionId}`);
       },
       onError: (error) => {
         toast.error(`Error analyzing response: ${error.message}`);

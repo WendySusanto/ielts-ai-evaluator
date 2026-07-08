@@ -1,4 +1,5 @@
-// Types for the IELTS Speaking module
+// Types for the IELTS Speaking module, matching backend SpeakingPromptService.cs and
+// DTOs/SpeakingFeedback.cs / Services/SpeakingService.cs.
 
 export type SpeakingPart = "Part1" | "Part2" | "Part3";
 
@@ -12,67 +13,78 @@ export interface SpeakingPrompt {
   cuepoints?: string;
   duration: number;
   level: "Academic" | "General";
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export interface SpeakingEvaluateRequest {
-  transcript: string;
-  speakingPromptId: string;
-  question: string;
-  part: string;
+// Body for POST /api/speaking-prompts (admin upsert)
+export interface SpeakingPromptUpsertRequest {
+  speakingPromptId?: string;
+  topic: string;
+  description: string;
+  preview: string;
+  part: SpeakingPart;
+  questionText: string;
   cuepoints?: string;
+  duration: number;
+  level: "Academic" | "General";
+  isActive: boolean;
 }
 
-export interface SpeakingEvaluateResponse {
-  speakingEvaluationId: string;
-  overallBand: number;
-  rawJson: string;
-  aiModel: string;
-  promptTokenCount: number;
-  candidatesTokenCount: number;
-}
-
-// Feedback shape mirrors the writing evaluation feedback so we can reuse
-// the same rendering patterns. Speaking has its own four criteria.
-export interface SpeakingSubScore {
-  score: number;
-  comment: string;
-}
-
-export interface SpeakingIssue {
+/** One turn of the conversation. Role: "examiner" | "candidate". */
+export interface SpeakingTurn {
+  role: string;
   text: string;
-  comment: string;
 }
 
+/** One of the three Gemini-scored IELTS speaking criteria (pronunciation is separate). */
 export interface SpeakingCriterion {
+  name: string;
   band: number;
-  generalFeedback: string;
-  subScores: Record<string, SpeakingSubScore>;
-  issues: SpeakingIssue[];
+  justification: string;
+  examples: string[];
+  improvements: string[];
 }
 
 export interface SpeakingFeedback {
   overallBand: number;
-  criteria: {
-    fluencyCoherence: SpeakingCriterion;
-    lexicalResource: SpeakingCriterion;
-    grammaticalRangeAccuracy: SpeakingCriterion;
-    pronunciation: SpeakingCriterion;
-  };
+  summary: string;
+  criteria: SpeakingCriterion[];
 }
 
-export interface SpeakingHistoryItem {
-  speakingEvaluationId: string;
+// Body for POST /api/v2/speaking/sessions
+export interface SpeakingEvaluateRequest {
+  speakingPromptId: string;
+  part: string;
+  turns: SpeakingTurn[];
+}
+
+// Response from POST /api/v2/speaking/sessions
+export interface SpeakingSessionDto {
+  speakingSessionId: string;
+  overallBand: number;
+  feedback: SpeakingFeedback;
+}
+
+// GET /api/v2/speaking/sessions item
+export interface SpeakingSessionHistoryItem {
+  speakingSessionId: string;
   part: string;
   topic: string;
   overallBand: number;
   createdAt: string;
-  feedback: SpeakingFeedback | null;
-  evaluationType: "Speaking";
 }
 
-export interface SpeakingDetail {
+// GET /api/v2/speaking/sessions/{id}
+export interface SpeakingSessionDetail {
+  speakingSessionId: string;
   part: string;
   topic: string;
-  transcript: string;
+  questionText: string;
+  turns: SpeakingTurn[];
+  overallBand: number;
   feedback: SpeakingFeedback;
+  pronunciation: string | null;
+  createdAt: string;
 }

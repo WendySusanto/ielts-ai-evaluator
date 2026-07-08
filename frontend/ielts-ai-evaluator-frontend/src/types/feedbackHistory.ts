@@ -1,14 +1,11 @@
-// Types for the feedback history API response
-import type { FeedbackData } from "./evaluation";
-
-export interface EvaluationHistoryItem {
-  essayEvaluationId: string;
+// Types for the feedback history page. Matches backend WritingHistoryItemDto (WritingService.cs).
+export interface WritingHistoryItem {
+  writingEvaluationId: string;
   taskType: string;
   topic: string;
   overallBand: number;
+  wordCount: number;
   createdAt: string;
-  feedback: FeedbackData;
-  evaluationType: string;
 }
 
 export type EvaluationType = "Writing" | "Speaking" | "all";

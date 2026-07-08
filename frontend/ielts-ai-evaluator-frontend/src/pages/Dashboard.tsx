@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
 import { DashboardData } from "@/types/dashboard";
+import type { User } from "@/types/User";
 import {
   BarChart3,
   BookOpen,
@@ -13,19 +14,21 @@ import {
   PenTool,
   Star,
   Target,
-  User,
+  User as UserIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
 const Dashboard = () => {
-  // Fetch dashboard data from API
+  // Fetch dashboard stats + the profile fields the "welcome"/profile card needs.
   const {
     data: dashboardData,
     isLoading,
     error,
     refetch,
   } = useApi<DashboardData>("/api/dashboard");
+
+  const { data: profile, isLoading: isLoadingProfile } = useApi<User>("/api/me");
 
   const navigate = useNavigate();
 
@@ -50,7 +53,7 @@ const Dashboard = () => {
     return date.toLocaleDateString();
   };
 
-  if (isLoading) {
+  if (isLoading || isLoadingProfile) {
     return <DashboardSkeleton />;
   }
 
@@ -64,41 +67,42 @@ const Dashboard = () => {
     );
   }
 
-  if (!dashboardData) {
+  if (!dashboardData || !profile) {
     return null;
   }
 
-  const { userStats, recentEvaluations, quickStats } = dashboardData;
+  const { writingCount, speakingCount, averageBand, recentItems } = dashboardData;
+  const targetScore = profile.ieltsTargetScore;
 
   // Dynamic stats based on API data
   const stats = [
     {
       title: "Total Evaluations",
-      value: quickStats.totalEvaluations.toString(),
-      change: `Average: ${quickStats.averageBand.toFixed(1)}`,
+      value: (writingCount + speakingCount).toString(),
+      change: averageBand != null ? `Average: ${averageBand.toFixed(1)}` : "No evaluations yet",
       icon: BookOpen,
       color: "text-blue-600 dark:text-blue-400",
     },
     {
       title: "Writing Tasks",
-      value: quickStats.writingQuotaUsed.toString(),
-      change: quickStats.lastEvaluationDate
-        ? `Last: ${getRelativeTime(quickStats.lastEvaluationDate)}`
+      value: writingCount.toString(),
+      change: recentItems.find((i) => i.type === "writing")
+        ? `Last: ${getRelativeTime(recentItems.find((i) => i.type === "writing")!.createdAt)}`
         : "No recent activity",
       icon: PenTool,
       color: "text-green-600 dark:text-green-400",
     },
     {
       title: "Speaking Tasks",
-      value: quickStats.speakingQuotaUsed.toString(),
-      change: `Target: ${userStats.ieltsTargetScore}`,
+      value: speakingCount.toString(),
+      change: targetScore != null ? `Target: ${targetScore}` : "No target set",
       icon: Mic,
       color: "text-purple-600 dark:text-purple-400",
     },
     {
-      title: "Days Streak",
-      value: `${quickStats.daysStreak}`,
-      change: `Keep it up!`,
+      title: "Average Band",
+      value: averageBand != null ? averageBand.toFixed(1) : "N/A",
+      change: "Across all evaluations",
       icon: Target,
       color: "text-orange-600 dark:text-orange-400",
     },
@@ -109,14 +113,20 @@ const Dashboard = () => {
       {/* Welcome Section */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">
-          Welcome back, {userStats.fullName || "Student"}!
+          Welcome back, {profile.fullName || "Student"}!
         </h1>
         <p className="text-foreground font-medium text-lg">
-          Ready to continue your IELTS journey? You're targeting a{" "}
-          <span className="font-semibold text-card-foreground">
-            {userStats.ieltsTargetScore}
-          </span>{" "}
-          band score.
+          {targetScore != null ? (
+            <>
+              Ready to continue your IELTS journey? You're targeting a{" "}
+              <span className="font-semibold text-card-foreground">
+                {targetScore}
+              </span>{" "}
+              band score.
+            </>
+          ) : (
+            "Ready to continue your IELTS journey?"
+          )}
         </p>
       </div>
 
@@ -162,21 +172,28 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {recentEvaluations.length > 0 ? (
-                recentEvaluations.map((evaluation) => (
+              {recentItems.length > 0 ? (
+                recentItems.map((item) => (
                   <div
-                    key={evaluation.essayEvaluationId}
-                    className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border"
+                    key={item.id}
+                    className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() =>
+                      navigate(
+                        item.type === "speaking"
+                          ? `/speaking-feedback/${item.id}`
+                          : `/feedback/${item.id}`,
+                      )
+                    }
                   >
                     <div className="flex items-center gap-4">
                       <div
                         className={`p-2 rounded-lg ${
-                          evaluation.evaluationType === "Speaking"
+                          item.type === "speaking"
                             ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
                             : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
                         }`}
                       >
-                        {evaluation.evaluationType === "Speaking" ? (
+                        {item.type === "speaking" ? (
                           <Mic className="h-4 w-4" />
                         ) : (
                           <PenTool className="h-4 w-4" />
@@ -184,29 +201,29 @@ const Dashboard = () => {
                       </div>
                       <div>
                         <p className="font-medium text-card-foreground">
-                          {evaluation.evaluationType === "Speaking"
+                          {item.type === "speaking"
                             ? `Speaking ${
-                                evaluation.taskType === "Part1"
+                                item.taskType === "Part1"
                                   ? "Part 1"
-                                  : evaluation.taskType === "Part2"
+                                  : item.taskType === "Part2"
                                     ? "Part 2"
                                     : "Part 3"
                               }`
-                            : evaluation.taskType === "Task1"
+                            : item.taskType === "Task1"
                               ? "Writing Task 1"
                               : "Writing Task 2"}
                         </p>
                         <p className="text-sm text-foreground font-medium">
-                          {evaluation.topic}
+                          {item.topic}
                         </p>
                       </div>
                     </div>
                     <div className="text-right">
                       <Badge variant="secondary" className="mb-1">
-                        {evaluation.overallBand.toFixed(1)}
+                        {item.overallBand.toFixed(1)}
                       </Badge>
                       <p className="text-xs text-muted-foreground">
-                        {getRelativeTime(evaluation.createdAt)}
+                        {getRelativeTime(item.createdAt)}
                       </p>
                     </div>
                   </div>
@@ -229,7 +246,7 @@ const Dashboard = () => {
           <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <User className="h-5 w-5 text-secondary" />
+                <UserIcon className="h-5 w-5 text-secondary" />
                 Your Profile
               </CardTitle>
             </CardHeader>
@@ -240,11 +257,9 @@ const Dashboard = () => {
                     Plan
                   </span>
                   <Badge
-                    variant={
-                      userStats.plan === "Free" ? "secondary" : "default"
-                    }
+                    variant={profile.plan === "Free" ? "secondary" : "default"}
                   >
-                    {userStats.plan}
+                    {profile.plan}
                   </Badge>
                 </div>
 
@@ -253,16 +268,7 @@ const Dashboard = () => {
                     Target Score
                   </span>
                   <span className="text-sm font-medium text-card-foreground">
-                    {userStats.ieltsTargetScore}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-foreground font-medium">
-                    Target Type
-                  </span>
-                  <span className="text-sm font-medium text-card-foreground">
-                    {userStats.ieltsTargetType}
+                    {targetScore ?? "Not set"}
                   </span>
                 </div>
 
@@ -271,17 +277,17 @@ const Dashboard = () => {
                     Member Since
                   </span>
                   <span className="text-sm font-medium text-card-foreground">
-                    {getDaysSinceMember(userStats.memberSince)} days
+                    {getDaysSinceMember(profile.createdAt)} days
                   </span>
                 </div>
 
-                {userStats.targetTestDate && (
+                {profile.targetTestDate && (
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-foreground font-medium">
                       Target Date
                     </span>
                     <span className="text-sm font-medium text-card-foreground">
-                      {new Date(userStats.targetTestDate).toLocaleDateString()}
+                      {new Date(profile.targetTestDate).toLocaleDateString()}
                     </span>
                   </div>
                 )}
@@ -290,51 +296,32 @@ const Dashboard = () => {
           </Card>
 
           {/* Progress Overview */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <BarChart3 className="h-5 w-5 text-secondary" />
-                Progress Overview
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium text-card-foreground">
-                      Days Streak
-                    </p>
-                    <span className="text-xs text-muted-foreground">
-                      {quickStats.daysStreak} days / 5 days
-                    </span>
-                  </div>
-                  <Progress
-                    value={Math.min(quickStats.daysStreak * 2 * 10, 100)}
-                    className="h-2"
-                  />
-                </div>
-
+          {targetScore != null && averageBand != null && (
+            <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-card-foreground">
+                  <BarChart3 className="h-5 w-5 text-secondary" />
+                  Progress Overview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <p className="text-sm font-medium text-card-foreground">
                       Current Average
                     </p>
                     <span className="text-xs text-muted-foreground">
-                      {quickStats.averageBand.toFixed(1)} /{" "}
-                      {userStats.ieltsTargetScore}
+                      {averageBand.toFixed(1)} / {targetScore}
                     </span>
                   </div>
                   <Progress
-                    value={
-                      (quickStats.averageBand / userStats.ieltsTargetScore) *
-                      100
-                    }
+                    value={Math.min((averageBand / targetScore) * 100, 100)}
                     className="h-2"
                   />
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick Actions */}
           <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">

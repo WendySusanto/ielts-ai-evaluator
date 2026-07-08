@@ -15,7 +15,6 @@ import {
   Mail,
   Calendar,
   Award,
-  BookOpen,
   Settings,
   Save,
   Loader2,
@@ -33,23 +32,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
-import { useAuth } from "@/contexts/AuthContext";
 import { ProfileSkeleton } from "@/components/skeleton/ProfileSkeleton";
 import ErrorPage from "./ErrorPage";
 
+interface ProfileFormValues {
+  fullName: string;
+  ieltsTargetScore: number | null;
+  targetTestDate: string; // yyyy-MM-dd, "" when unset
+}
+
 const Profile = () => {
-  const { user: currentUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Fetch current user profile data
   const {
     data: userProfile,
     isLoading,
     error,
     refetch,
     mutate,
-  } = useApi<User>("/api/GetUserProfile");
+  } = useApi<User>("/api/me");
 
   const {
     register,
@@ -58,46 +60,47 @@ const Profile = () => {
     setValue,
     watch,
     formState: { isDirty },
-  } = useForm<Partial<User>>();
+  } = useForm<ProfileFormValues>({
+    defaultValues: { fullName: "", ieltsTargetScore: null, targetTestDate: "" },
+  });
+
   // Update form when user profile data loads
   useEffect(() => {
     if (userProfile) {
-      console.log("User Profile Loaded:", userProfile);
       reset({
-        ...userProfile,
+        fullName: userProfile.fullName ?? "",
+        ieltsTargetScore: userProfile.ieltsTargetScore,
         targetTestDate: userProfile.targetTestDate
           ? new Date(userProfile.targetTestDate).toLocaleDateString("en-CA")
-          : new Date().toLocaleDateString("en-CA"),
+          : "",
       });
     }
   }, [userProfile, reset]);
 
-  const handleSaveProfile = async (data: Partial<User>) => {
+  const handleSaveProfile = async (data: ProfileFormValues) => {
     setIsSaving(true);
-    try {
-      await mutate({
-        url: "/api/user",
-        method: "POST",
-        data: {
-          ...data,
-          userId: currentUser?.userId,
-          dateTimeOffset: new Date().getTimezoneOffset(),
-        },
-        onSuccess: () => {
-          toast.success("Profile updated successfully");
-          setIsEditing(false);
-        },
-        onError: (error) => {
-          toast.error("Failed to update profile", {
-            description: error.message,
-          });
-        },
-      });
-    } catch (error) {
-      console.error("Profile update error:", error);
-    } finally {
-      setIsSaving(false);
-    }
+    // Backend stores 0 / default(DateTimeOffset) as "not set" and returns null for them.
+    await mutate({
+      url: "/api/me",
+      method: "PUT",
+      data: {
+        fullName: data.fullName,
+        ieltsTargetScore: data.ieltsTargetScore ?? 0,
+        targetTestDate: data.targetTestDate
+          ? new Date(data.targetTestDate).toISOString()
+          : "0001-01-01T00:00:00+00:00",
+      },
+      onSuccess: () => {
+        toast.success("Profile updated successfully");
+        setIsEditing(false);
+      },
+      onError: (error) => {
+        toast.error("Failed to update profile", {
+          description: error.message,
+        });
+      },
+    });
+    setIsSaving(false);
   };
 
   const handleCancel = () => {
@@ -145,11 +148,7 @@ const Profile = () => {
                   </CardDescription>
                 </div>
                 {!isEditing ? (
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsEditing(true)}
-                    className="border-gray-200 dark:border-gray-600"
-                  >
+                  <Button variant="outline" onClick={() => setIsEditing(true)}>
                     <Settings className="h-4 w-4 mr-2" />
                     Edit Profile
                   </Button>
@@ -159,7 +158,6 @@ const Profile = () => {
                       variant="outline"
                       onClick={handleCancel}
                       disabled={isSaving}
-                      className="border-gray-200 dark:border-gray-600"
                     >
                       Cancel
                     </Button>
@@ -184,6 +182,22 @@ const Profile = () => {
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="fullName" className="text-sm font-medium">
+                      Full Name
+                    </Label>
+                    <div className="relative">
+                      <UserIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="fullName"
+                        {...register("fullName")}
+                        disabled={!isEditing}
+                        className="pl-10"
+                        placeholder="Your full name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="email" className="text-sm font-medium">
                       Email Address
                     </Label>
@@ -198,19 +212,20 @@ const Profile = () => {
                       />
                     </div>
                   </div>
+                </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="plan" className="text-sm font-medium">
-                      Current Plan
-                    </Label>
-                    <div className="relative">
-                      <Award className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        value={userProfile?.plan || "Free"}
-                        disabled={true}
-                        className="pl-10 bg-muted"
-                      />
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="plan" className="text-sm font-medium">
+                    Current Plan
+                  </Label>
+                  <div className="relative">
+                    <Award className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      id="plan"
+                      value={userProfile?.plan || "Free"}
+                      disabled={true}
+                      className="pl-10 bg-muted"
+                    />
                   </div>
                 </div>
 
@@ -224,32 +239,6 @@ const Profile = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label
-                        htmlFor="ieltsTargetType"
-                        className="text-sm font-medium"
-                      >
-                        Target Type
-                      </Label>
-                      <Select
-                        value={watch("ieltsTargetType")}
-                        onValueChange={(value) =>
-                          setValue("ieltsTargetType", value)
-                        }
-                        disabled={!isEditing}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select target type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Academic">Academic</SelectItem>
-                          <SelectItem value="General Training">
-                            General Training
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label
                         htmlFor="ieltsTargetScore"
                         className="text-sm font-medium"
                       >
@@ -258,7 +247,9 @@ const Profile = () => {
                       <Select
                         value={watch("ieltsTargetScore")?.toString() || ""}
                         onValueChange={(value) =>
-                          setValue("ieltsTargetScore", parseFloat(value))
+                          setValue("ieltsTargetScore", parseFloat(value), {
+                            shouldDirty: true,
+                          })
                         }
                         disabled={!isEditing}
                       >
@@ -276,24 +267,24 @@ const Profile = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="targetTestDate"
-                      className="text-sm font-medium"
-                    >
-                      Target Test Date
-                    </Label>
-                    <div className="relative">
-                      <Calendar className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        id="targetTestDate"
-                        type="date"
-                        {...register("targetTestDate")}
-                        disabled={!isEditing}
-                        className="pl-10"
-                      />
+                    <div className="space-y-2">
+                      <Label
+                        htmlFor="targetTestDate"
+                        className="text-sm font-medium"
+                      >
+                        Target Test Date
+                      </Label>
+                      <div className="relative">
+                        <Calendar className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="targetTestDate"
+                          type="date"
+                          {...register("targetTestDate")}
+                          disabled={!isEditing}
+                          className="pl-10"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -302,62 +293,8 @@ const Profile = () => {
           </Card>
         </div>
 
-        {/* Statistics & Quick Info */}
+        {/* Account Status */}
         <div className="space-y-6">
-          {/* Usage Statistics */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <BookOpen className="h-5 w-5 text-secondary" />
-                Usage Statistics
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
-                    <BookOpen className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-card-foreground">
-                      Writing Tasks
-                    </p>
-                    <p className="text-sm text-foreground font-medium">
-                      Completed
-                    </p>
-                  </div>
-                </div>
-                <Badge
-                  variant="secondary"
-                >
-                  {userProfile?.writingQuotaUsed || 0}
-                </Badge>
-              </div>
-
-              <div className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                    <UserIcon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-card-foreground">
-                      Speaking Tasks
-                    </p>
-                    <p className="text-sm text-foreground font-medium">
-                      Completed
-                    </p>
-                  </div>
-                </div>
-                <Badge
-                  variant="secondary"
-                >
-                  {userProfile?.speakingQuotaUsed || 0}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Account Status */}
           <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
@@ -382,7 +319,7 @@ const Profile = () => {
                   Target Score
                 </span>
                 <span className="text-sm font-medium text-card-foreground">
-                  {userProfile?.ieltsTargetScore || "Not set"}
+                  {userProfile?.ieltsTargetScore ?? "Not set"}
                 </span>
               </div>
 
@@ -399,10 +336,12 @@ const Profile = () => {
 
               <div className="flex justify-between items-center">
                 <span className="text-sm text-foreground font-medium">
-                  Auth Provider
+                  Member Since
                 </span>
                 <span className="text-sm font-medium text-card-foreground">
-                  {userProfile?.authProvider || "Firebase"}
+                  {userProfile?.createdAt
+                    ? new Date(userProfile.createdAt).toLocaleDateString()
+                    : "-"}
                 </span>
               </div>
             </CardContent>

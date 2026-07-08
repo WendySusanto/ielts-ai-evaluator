@@ -16,7 +16,7 @@ const Writing = () => {
 
   const { data: writingPrompts = [], isLoading: isLoadingPrompts } = useApi<
     WritingPrompt[]
-  >("/api/writing-prompt");
+  >("/api/writing-prompts");
 
   if (isLoadingPrompts) {
     return <WritingSkeleton />;

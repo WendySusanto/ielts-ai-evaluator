@@ -2,20 +2,14 @@ import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySk
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/contexts/AuthContext";
 import { useApi } from "@/hooks/use-api";
-import type {
-  EvaluationHistoryItem,
-  EvaluationType,
-} from "@/types/feedbackHistory";
-import type { SpeakingHistoryItem } from "@/types/Speaking";
+import type { EvaluationType, WritingHistoryItem } from "@/types/feedbackHistory";
+import type { SpeakingSessionHistoryItem } from "@/types/Speaking";
 import {
   BarChart3,
   Calendar,
   Clock,
-  Download,
   Eye,
   History,
   Mic,
@@ -35,115 +29,67 @@ interface UnifiedHistoryItem {
   topic: string;
   overallBand: number;
   createdAt: string;
-  // Normalised four-criteria record (key -> band) for the score breakdown.
-  criteria: { label: string; band: number }[];
-  summary: string;
   detailPath: string;
 }
+
+const TASK_LABELS: Record<string, string> = {
+  Task1: "Task 1",
+  Task2: "Task 2",
+  Part1: "Part 1",
+  Part2: "Part 2",
+  Part3: "Part 3",
+};
 
 const FeedbackHistory = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<EvaluationType>("all");
-  const { user } = useAuth();
 
   // Fetch writing + speaking history in parallel.
   const {
     data: writingResponse,
     isLoading: writingLoading,
     error: writingError,
-  } = useApi<EvaluationHistoryItem[]>(
-    `/api/evaluation-history?userId=${user?.userId}`,
-  );
+  } = useApi<WritingHistoryItem[]>("/api/v2/writing/evaluations");
 
-  const { data: speakingResponse, isLoading: speakingLoading } = useApi<
-    SpeakingHistoryItem[]
-  >(`/api/speaking-history`);
+  const {
+    data: speakingResponse,
+    isLoading: speakingLoading,
+    error: speakingError,
+  } = useApi<SpeakingSessionHistoryItem[]>("/api/v2/speaking/sessions");
 
   const isLoading = writingLoading || speakingLoading;
-  const error = writingError;
+  const error = writingError || speakingError;
 
   const feedbackHistory = useMemo<UnifiedHistoryItem[]>(() => {
-    const writing: UnifiedHistoryItem[] = (writingResponse || [])
-      .filter((h) => h.feedback != null)
-      .map((h) => ({
-        id: h.essayEvaluationId,
-        evaluationType: "Writing",
-        taskType: h.taskType,
-        topic: h.topic,
-        overallBand: h.overallBand,
-        createdAt: h.createdAt,
-        criteria: [
-          {
-            label: "Task Response",
-            band: h.feedback.criteria.taskResponse.band,
-          },
-          {
-            label: "Coherence",
-            band: h.feedback.criteria.coherenceCohesion.band,
-          },
-          {
-            label: "Vocabulary",
-            band: h.feedback.criteria.lexicalResource.band,
-          },
-          {
-            label: "Grammar",
-            band: h.feedback.criteria.grammaticalRangeAccuracy.band,
-          },
-        ],
-        summary: `Overall band score: ${h.feedback.overallBand}/9. ${
-          h.feedback.criteria.taskResponse.generalFeedback?.slice(0, 150) || ""
-        }...`,
-        detailPath: `/feedback/${h.essayEvaluationId}`,
-      }));
+    const writing: UnifiedHistoryItem[] = (writingResponse || []).map((h) => ({
+      id: h.writingEvaluationId,
+      evaluationType: "Writing",
+      taskType: h.taskType,
+      topic: h.topic,
+      overallBand: h.overallBand,
+      createdAt: h.createdAt,
+      detailPath: `/feedback/${h.writingEvaluationId}`,
+    }));
 
-    const speaking: UnifiedHistoryItem[] = (speakingResponse || [])
-      .filter((h) => h.feedback != null)
-      .map((h) => ({
-        id: h.speakingEvaluationId,
-        evaluationType: "Speaking",
-        taskType: h.part,
-        topic: h.topic,
-        overallBand: h.overallBand,
-        createdAt: h.createdAt,
-        criteria: [
-          {
-            label: "Fluency",
-            band: h.feedback!.criteria.fluencyCoherence.band,
-          },
-          {
-            label: "Vocabulary",
-            band: h.feedback!.criteria.lexicalResource.band,
-          },
-          {
-            label: "Grammar",
-            band: h.feedback!.criteria.grammaticalRangeAccuracy.band,
-          },
-          {
-            label: "Pronunciation",
-            band: h.feedback!.criteria.pronunciation.band,
-          },
-        ],
-        summary: `Overall band score: ${h.feedback!.overallBand}/9. ${
-          h.feedback!.criteria.fluencyCoherence.generalFeedback?.slice(
-            0,
-            150,
-          ) || ""
-        }...`,
-        detailPath: `/speaking-feedback/${h.speakingEvaluationId}`,
-      }));
+    const speaking: UnifiedHistoryItem[] = (speakingResponse || []).map((h) => ({
+      id: h.speakingSessionId,
+      evaluationType: "Speaking",
+      taskType: h.part,
+      topic: h.topic,
+      overallBand: h.overallBand,
+      createdAt: h.createdAt,
+      detailPath: `/speaking-feedback/${h.speakingSessionId}`,
+    }));
 
     return [...writing, ...speaking].sort(
-      (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
   }, [writingResponse, speakingResponse]);
 
-  // Show loading state
   if (isLoading) {
     return <FeedbackHistorySkeleton />;
   }
 
-  // Show error state
   if (error) {
     return (
       <ErrorPage
@@ -168,11 +114,7 @@ const FeedbackHistory = () => {
   const filteredHistory =
     activeTab === "all"
       ? feedbackHistory
-      : feedbackHistory.filter((item) =>
-          activeTab === "Speaking"
-            ? item.evaluationType === "Speaking"
-            : item.evaluationType === "Writing",
-        );
+      : feedbackHistory.filter((item) => item.evaluationType === activeTab);
 
   return (
     <div className="p-6 space-y-6 min-h-full">
@@ -228,9 +170,7 @@ const FeedbackHistory = () => {
               <div>
                 <p className="text-2xl font-bold text-card-foreground">
                   {feedbackHistory.length > 0
-                    ? Math.max(
-                        ...feedbackHistory.map((item) => item.overallBand),
-                      )
+                    ? Math.max(...feedbackHistory.map((item) => item.overallBand))
                     : 0}
                 </p>
                 <p className="text-sm text-foreground font-medium">
@@ -247,14 +187,11 @@ const FeedbackHistory = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold text-card-foreground">
-                  {(() => {
-                    if (feedbackHistory.length === 0) return 0;
-                    const dates = feedbackHistory.map((item) =>
+                  {new Set(
+                    feedbackHistory.map((item) =>
                       new Date(item.createdAt).toDateString(),
-                    );
-                    const uniqueDates = new Set(dates);
-                    return uniqueDates.size;
-                  })()}
+                    ),
+                  ).size}
                 </p>
                 <p className="text-sm text-foreground font-medium">
                   Days Active
@@ -363,7 +300,7 @@ const FeedbackHistory = () => {
                       key={session.id}
                       className="border border-border rounded-lg p-6 bg-muted/50 transition-colors hover:bg-muted/80"
                     >
-                      <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center">
                             {session.evaluationType === "Speaking" ? (
@@ -373,15 +310,14 @@ const FeedbackHistory = () => {
                             )}
                           </div>
                           <div>
-                            <h3 className="font-semibold text-card-foreground text-lg">
-                              {session.evaluationType === "Speaking"
-                                ? "Speaking"
-                                : `Writing ${
-                                    session.taskType === "Task1"
-                                      ? "Task 1"
-                                      : "Task 2"
-                                  }`}
-                            </h3>
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-card-foreground text-lg">
+                                {session.evaluationType}
+                              </h3>
+                              <Badge variant="outline">
+                                {TASK_LABELS[session.taskType] ?? session.taskType}
+                              </Badge>
+                            </div>
                             <p className="text-foreground font-medium">
                               {session.topic}
                             </p>
@@ -389,20 +325,12 @@ const FeedbackHistory = () => {
                         </div>
 
                         <div className="text-right flex flex-col items-end gap-2">
-                          <div className="flex items-center justify-end">
-                            <Badge
-                              variant={getScoreBadgeVariant(
-                                session.overallBand,
-                              )}
-                              className="text-sm font-medium"
-                            >
-                              Band {session.overallBand}
-                            </Badge>
-
-                            <span className="text-sm font-medium text-foreground">
-                              {/* No improvement calculation available yet */}
-                            </span>
-                          </div>
+                          <Badge
+                            variant={getScoreBadgeVariant(session.overallBand)}
+                            className="text-sm font-medium"
+                          >
+                            Band {session.overallBand}
+                          </Badge>
                           <div className="flex items-center gap-3 text-xs text-foreground font-medium">
                             <span className="flex items-center gap-1">
                               <Calendar className="h-3 w-3" />
@@ -410,48 +338,17 @@ const FeedbackHistory = () => {
                             </span>
                             <span className="flex items-center gap-1">
                               <Clock className="h-3 w-3" />
-                              {new Date(session.createdAt).toLocaleTimeString(
-                                [],
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                },
-                              )}
+                              {new Date(session.createdAt).toLocaleTimeString([], {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Score Breakdown */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-                        {session.criteria.map((c) => (
-                          <div key={c.label} className="text-center">
-                            <p className="text-xs text-foreground font-medium mb-1">
-                              {c.label}
-                            </p>
-                            <p className="font-semibold text-indigo-600 dark:text-indigo-400 text-lg">
-                              {c.band}
-                            </p>
-                            <Progress
-                              value={(c.band / 9) * 100}
-                              className="h-2 mt-1"
-                            />
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* AI Feedback */}
-                      <div className="bg-muted/50 rounded-lg p-4 mb-4 border-border">
-                        <h4 className="font-medium text-card-foreground mb-2">
-                          AI Feedback
-                        </h4>
-                        <p className="text-sm text-foreground font-medium">
-                          {session.summary}
-                        </p>
-                      </div>
-
                       {/* Actions */}
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 mt-4">
                         <Button
                           variant="outline"
                           size="sm"
@@ -460,14 +357,6 @@ const FeedbackHistory = () => {
                         >
                           <Eye className="h-4 w-4" />
                           View Details
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2 border-border text-card-foreground hover:bg-muted"
-                        >
-                          <Download className="h-4 w-4" />
-                          Export Report
                         </Button>
                       </div>
                     </div>

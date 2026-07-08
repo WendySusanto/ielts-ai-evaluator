@@ -8,33 +8,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
-import type { SpeakingDetail } from "@/types/Speaking";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Award,
-  MessageSquare,
-  Mic,
-  TrendingUp,
-} from "lucide-react";
+import type { SpeakingSessionDetail } from "@/types/Speaking";
+import { ArrowLeft, Award, Mic, TrendingUp } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import ErrorPage from "./ErrorPage";
-
-const CRITERIA_LABELS: Record<string, string> = {
-  fluencyCoherence: "Fluency & Coherence",
-  lexicalResource: "Lexical Resource",
-  grammaticalRangeAccuracy: "Grammar & Accuracy",
-  pronunciation: "Pronunciation",
-};
-
-const getScoreColor = (score: number) => {
-  if (score >= 7.5) return "text-green-600 dark:text-green-400";
-  if (score >= 6.5) return "text-blue-600 dark:text-blue-400";
-  if (score >= 5.5) return "text-orange-600 dark:text-orange-400";
-  return "text-red-600 dark:text-red-400";
-};
 
 const getScoreBadgeVariant = (score: number) => {
   if (score >= 7.5) return "default";
@@ -50,7 +28,7 @@ const SpeakingFeedback = () => {
     data: detail,
     isLoading,
     error,
-  } = useApi<SpeakingDetail>(`/api/speaking-detail?id=${speakingId}`);
+  } = useApi<SpeakingSessionDetail>(`/api/v2/speaking/sessions/${speakingId}`);
 
   if (isLoading) {
     return <DetailedFeedbackSkeleton />;
@@ -67,16 +45,12 @@ const SpeakingFeedback = () => {
 
   const feedback = detail.feedback;
   const partLabel =
-    detail.part === "Part1"
-      ? "Part 1"
-      : detail.part === "Part2"
-        ? "Part 2"
-        : "Part 3";
+    detail.part === "Part1" ? "Part 1" : detail.part === "Part2" ? "Part 2" : "Part 3";
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
           <Button
             variant="outline"
@@ -87,10 +61,8 @@ const SpeakingFeedback = () => {
             Back to History
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-              Speaking Feedback
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <h1 className="text-3xl font-bold">Speaking Feedback</h1>
+            <p className="text-foreground font-medium">
               {partLabel} — {detail.topic}
             </p>
           </div>
@@ -104,7 +76,7 @@ const SpeakingFeedback = () => {
         </Badge>
       </div>
 
-      {/* Overall performance */}
+      {/* Summary */}
       <Card className="bg-secondary border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-secondary-foreground">
@@ -113,24 +85,7 @@ const SpeakingFeedback = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {Object.entries(feedback.criteria).map(([key, criteria]) => (
-              <div key={key} className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  {CRITERIA_LABELS[key]}
-                </p>
-                <p
-                  className={`text-2xl font-bold ${getScoreColor(criteria.band)}`}
-                >
-                  {criteria.band}
-                </p>
-                <Progress
-                  value={(criteria.band / 9) * 100}
-                  className="h-2 mt-2"
-                />
-              </div>
-            ))}
-          </div>
+          <p className="text-secondary-foreground">{feedback.summary}</p>
         </CardContent>
       </Card>
 
@@ -139,90 +94,83 @@ const SpeakingFeedback = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5 text-primary" />
-            Your Transcript
+            Conversation Transcript
           </CardTitle>
-          <CardDescription>
-            This is what we transcribed from your spoken answer.
-          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 leading-relaxed whitespace-pre-wrap">
-            {detail.transcript}
-          </div>
+        <CardContent className="space-y-3">
+          {detail.turns.map((turn, i) => (
+            <div
+              key={i}
+              className={`rounded-lg p-3 ${
+                turn.role === "candidate"
+                  ? "bg-secondary text-secondary-foreground ml-8"
+                  : "bg-muted text-foreground mr-8"
+              }`}
+            >
+              <p className="text-xs font-semibold mb-1 capitalize">{turn.role}</p>
+              <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
+            </div>
+          ))}
         </CardContent>
       </Card>
 
       {/* Criteria breakdown */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {Object.entries(feedback.criteria).map(([key, criteria]) => (
-          <Card key={key}>
+        {feedback.criteria.map((criterion) => (
+          <Card key={criterion.name}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-primary" />
-                  {CRITERIA_LABELS[key]}
-                </span>
-                <Badge variant={getScoreBadgeVariant(criteria.band)}>
-                  Band {criteria.band}
+                <span>{criterion.name.replace(/([A-Z])/g, " $1").trim()}</span>
+                <Badge variant={getScoreBadgeVariant(criterion.band)}>
+                  Band {criterion.band}
                 </Badge>
               </CardTitle>
-              {criteria.generalFeedback && (
-                <CardDescription>{criteria.generalFeedback}</CardDescription>
-              )}
+              <CardDescription>{criterion.justification}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                {Object.entries(criteria.subScores).map(
-                  ([subKey, subScore]) => (
-                    <div key={subKey} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium capitalize">
-                          {subKey.replace(/([A-Z])/g, " $1").trim()}
-                        </span>
-                        <span
-                          className={`font-semibold ${getScoreColor(subScore.score)}`}
-                        >
-                          {subScore.score}/9
-                        </span>
-                      </div>
-                      <Progress
-                        value={(subScore.score / 9) * 100}
-                        className="h-1"
-                      />
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        {subScore.comment}
-                      </p>
-                    </div>
-                  ),
-                )}
-              </div>
-
-              {criteria.issues.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-orange-500" />
-                    Specific Issues Found
-                  </h4>
+              {criterion.examples.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">Examples from your turns</h4>
                   <div className="space-y-2">
-                    {criteria.issues.map((issue, index) => (
-                      <div
-                        key={index}
-                        className="border rounded-lg p-3 bg-muted border-border"
+                    {criterion.examples.map((example, i) => (
+                      <p
+                        key={i}
+                        className="text-sm italic border-l-2 border-border pl-3 text-foreground"
                       >
-                        <p className="text-sm font-medium mb-1">
-                          "{issue.text}"
-                        </p>
-                        <p className="text-xs text-foreground font-medium">
-                          {issue.comment}
-                        </p>
-                      </div>
+                        "{example}"
+                      </p>
                     ))}
                   </div>
+                </div>
+              )}
+              {criterion.improvements.length > 0 && (
+                <div>
+                  <h4 className="font-semibold text-sm mb-2">How to improve</h4>
+                  <ul className="space-y-1 list-disc list-inside text-sm text-foreground">
+                    {criterion.improvements.map((improvement, i) => (
+                      <li key={i}>{improvement}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </CardContent>
           </Card>
         ))}
+
+        {/* Pronunciation — Azure PA lands in Phase 4; placeholder until then. */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              <span>Pronunciation</span>
+              <Badge variant="outline">Not assessed</Badge>
+            </CardTitle>
+            <CardDescription>
+              {detail.pronunciation
+                ? "Pronunciation data received but not yet rendered."
+                : "Pronunciation assessment is not available yet for this session."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
 
       {/* Actions */}

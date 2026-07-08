@@ -25,9 +25,8 @@ import { useNavigate, useParams } from "react-router";
 import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
 import NotFound from "./NotFound";
 import { formatText } from "@/lib/utils";
-import { EssayEvaluate } from "@/types/EssayEvaluate";
+import type { WritingEvaluationDto } from "@/types/evaluation";
 import { toast } from "sonner";
-import { useAuth } from "@/contexts/AuthContext";
 
 const WritingPractice = () => {
   const { taskType, taskId } = useParams<{
@@ -35,10 +34,8 @@ const WritingPractice = () => {
     taskId: string;
   }>();
 
-  const { user } = useAuth();
-
   const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
-    useApi<WritingPrompt>(`/api/writing-prompt?id=${taskId}`);
+    useApi<WritingPrompt>(`/api/writing-prompts/${taskId}`);
 
   const initialTimeValue = writingPrompt?.duration
     ? writingPrompt.duration
@@ -74,7 +71,7 @@ const WritingPractice = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showWordCountDialog, setShowWordCountDialog] = useState(false);
 
-  const { mutate } = useApi<EssayEvaluate>("/api/writing/evaluate", {
+  const { mutate } = useApi<WritingEvaluationDto>("/api/v2/writing/evaluations", {
     skipInitialFetch: true,
   });
 
@@ -116,24 +113,20 @@ const WritingPractice = () => {
   const submitEssay = async () => {
     setIsAnalyzing(true);
 
-    const payload: EssayEvaluate = {
-      writingPromptId: writingPrompt?.writingPromptId ?? taskId ?? "", // Use nullish coalescing,
-      userId: user?.userId ?? "",
-      userAnswer: essay,
-      taskType: taskTypeDesc,
-      question: writingPrompt?.questionText || "",
-      imageDescription: writingPrompt?.imageDescription || "",
+    const payload = {
+      writingPromptId: writingPrompt?.writingPromptId ?? taskId ?? "",
+      essayText: essay,
     };
 
     await mutate({
-      url: "/api/writing/evaluate",
+      url: "/api/v2/writing/evaluations",
       method: "POST",
       data: payload,
-      onSuccess: () => {
+      onSuccess: (result) => {
         setIsAnalyzing(false);
         setIsSubmitted(true);
         toast.success("Essay analyzed successfully!");
-        navigate("/feedback");
+        navigate(`/feedback/${result.writingEvaluationId}`);
       },
       onError: (error) => {
         toast.error(`Error analyzing essay: ${error.message}`);

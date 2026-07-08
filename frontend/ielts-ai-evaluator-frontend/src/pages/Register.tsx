@@ -82,30 +82,6 @@ export default function Register() {
   const location = useLocation();
   const from = (location.state as any)?.from?.pathname || "/";
 
-  // const {
-  //   isLoading: isLoadingRegister,
-  //   error: registerError,
-  //   mutate: mutateUsers,
-  // } = useFetch<UserType[]>("/api/user", {
-  //   skipInitialFetch: true,
-  // });
-
-  // const registerAsync = async (data: UserType) => {
-  //   await mutateUsers({
-  //     url: "api/user",
-  //     method: "POST",
-  //     data,
-  //     onSuccess: () => {
-  //       toast.success("Successfully registered");
-  //     },
-  //     onError: (error) => {
-  //       toast.error("Failed to register", {
-  //         description: error.message,
-  //       });
-  //     },
-  //   });
-  // };
-
   // If already authenticated redirect
   useEffect(() => {
     if (!loading && user) {

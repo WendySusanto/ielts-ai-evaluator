@@ -42,7 +42,7 @@ const Speaking = () => {
 
   const { data: speakingPrompts = [], isLoading } = useApi<
     SpeakingPrompt[]
-  >("/api/speaking-prompt");
+  >("/api/speaking-prompts");
 
   if (isLoading) {
     return <WritingSkeleton />;
