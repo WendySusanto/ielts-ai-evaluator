@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import DetailedFeedback from "./pages/DetailedFeedback";
 import FeedbackHistory from "./pages/FeedbackHistory";
 import Login from "./pages/Login";
+import NotFound from "./pages/NotFound";
 import Premium from "./pages/Premium";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
@@ -129,6 +130,7 @@ function App() {
                             </PrivateRoute>
                           }
                         />
+                        <Route path="*" element={<NotFound />} />
                       </Routes>
                     </MainLayout>
                   </main>

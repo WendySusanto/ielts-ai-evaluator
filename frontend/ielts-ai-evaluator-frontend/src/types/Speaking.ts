@@ -32,9 +32,9 @@ export interface SpeakingPromptUpsertRequest {
   isActive: boolean;
 }
 
-/** One turn of the conversation. Role: "examiner" | "candidate". */
+/** One turn of the conversation. */
 export interface SpeakingTurn {
-  role: string;
+  role: "examiner" | "candidate";
   text: string;
 }
 
