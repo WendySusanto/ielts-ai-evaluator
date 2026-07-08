@@ -28,6 +28,15 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             var (status, message, isDomain) = Map(ex);
             if (!isDomain) _logger.LogError(ex, "Unhandled exception");
 
+            // If the response already started streaming (e.g. the exception surfaced during
+            // result serialization), CreateResponse would throw "StatusCode cannot be set".
+            // Nothing can rewrite the wire at that point — log and let the host finish.
+            if (context.GetHttpContext()?.Response.HasStarted == true)
+            {
+                _logger.LogError(ex, "Exception after response started; response cannot be rewritten");
+                return;
+            }
+
             var res = req.CreateResponse((HttpStatusCode)status);
             await res.WriteAsJsonAsync(new { message });
             res.StatusCode = (HttpStatusCode)status; // WriteAsJsonAsync resets to 200
