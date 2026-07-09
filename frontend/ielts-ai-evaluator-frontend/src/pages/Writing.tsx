@@ -49,7 +49,7 @@ const Writing = () => {
         value={selectedTask}
         onValueChange={(value) => setSelectedTask(value as "task1" | "task2")}
       >
-        <TabsList className="grid w-full grid-cols-2  dark:bg-card border border-gray-200 dark:border-gray-700 p-1 rounded-sm h-10 ">
+        <TabsList className="grid w-full grid-cols-2  dark:bg-card border border-border p-1 rounded-sm h-10 ">
           <TabsTrigger
             value="task1"
             className="cursor-pointer rounded-sm data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground items-center flex justify-center transition-colors duration-200"
@@ -126,10 +126,10 @@ const Writing = () => {
               </div>
 
               <div className="p-3 bg-muted rounded-lg border border-border">
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                <p className="text-xs text-muted-foreground mb-1">
                   Preview:
                 </p>
-                <p className="text-sm text-gray-700 dark:text-gray-300 italic">
+                <p className="text-sm text-muted-foreground italic">
                   {topic.preview}
                 </p>
               </div>

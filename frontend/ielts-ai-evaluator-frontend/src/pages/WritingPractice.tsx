@@ -197,8 +197,8 @@ const WritingPractice = () => {
           <strong>Focus:</strong> Present clear arguments with specific examples
         </p>
       </div>
-      <div className="p-3 bg-green-100/50 dark:bg-green-900 rounded-lg">
-        <p className="text-sm text-green-700 dark:text-green-300">
+      <div className="p-3 bg-tip/10 rounded-lg">
+        <p className="text-sm text-tip">
           <strong>Balance:</strong> Consider multiple viewpoints before stating
           your position
         </p>
@@ -266,7 +266,6 @@ const WritingPractice = () => {
       <Button
         onClick={() => navigate(-1)}
         variant="outline"
-        className="border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back
@@ -410,7 +409,7 @@ const WritingPractice = () => {
         <DialogContent className="w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-tip" />
               Word Count Below Minimum
             </DialogTitle>
             <DialogDescription>
@@ -431,7 +430,7 @@ const WritingPractice = () => {
                 setShowWordCountDialog(false);
                 await submitEssay();
               }}
-              className="bg-yellow-600 hover:bg-yellow-700"
+              className="bg-tip hover:bg-tip/90 text-tip-foreground"
             >
               Submit Anyway
             </Button>

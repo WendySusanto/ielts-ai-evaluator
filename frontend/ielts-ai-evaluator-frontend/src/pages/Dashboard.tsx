@@ -90,7 +90,7 @@ const Dashboard = () => {
       value: (writingCount + speakingCount).toString(),
       change: averageBand != null ? `Average: ${averageBand.toFixed(1)}` : "No evaluations yet",
       icon: BookOpen,
-      color: "text-blue-600 dark:text-blue-400",
+      color: "text-primary",
     },
     {
       title: "Writing Tasks",
@@ -99,21 +99,21 @@ const Dashboard = () => {
         ? `Last: ${getRelativeTime(lastWriting.createdAt)}`
         : "No recent activity",
       icon: PenTool,
-      color: "text-green-600 dark:text-green-400",
+      color: "text-primary",
     },
     {
       title: "Speaking Tasks",
       value: speakingCount.toString(),
       change: targetScore != null ? `Target: ${targetScore}` : "No target set",
       icon: Mic,
-      color: "text-purple-600 dark:text-purple-400",
+      color: "text-tip",
     },
     {
       title: "Average Band",
       value: averageBand != null ? averageBand.toFixed(1) : "N/A",
       change: "Across all evaluations",
       icon: Target,
-      color: "text-orange-600 dark:text-orange-400",
+      color: "text-tip",
     },
   ];
 
@@ -198,8 +198,8 @@ const Dashboard = () => {
                       <div
                         className={`p-2 rounded-lg ${
                           item.type === "speaking"
-                            ? "bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400"
-                            : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                            ? "bg-tip/10 text-tip"
+                            : "bg-primary/10 text-primary"
                         }`}
                       >
                         {item.type === "speaking" ? (
@@ -350,7 +350,7 @@ const Dashboard = () => {
               </Button>
               <Button
                 variant="outline"
-                className="w-full justify-start border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full justify-start"
                 onClick={() => navigate("/writing")}
               >
                 <PenTool className="h-4 w-4 mr-2" />
@@ -358,7 +358,7 @@ const Dashboard = () => {
               </Button>
               <Button
                 variant="outline"
-                className="w-full justify-start border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="w-full justify-start"
                 onClick={() => navigate("/feedback")}
               >
                 <BarChart3 className="h-4 w-4 mr-2" />

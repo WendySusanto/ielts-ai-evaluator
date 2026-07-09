@@ -193,11 +193,11 @@ export default function Register() {
             className={`h-1 flex-1 rounded-full transition-colors ${
               i < passwordValidation.score
                 ? passwordValidation.score >= 4
-                  ? "bg-green-500"
+                  ? "bg-primary"
                   : passwordValidation.score >= 3
-                  ? "bg-yellow-500"
-                  : "bg-red-500"
-                : "bg-gray-200 dark:bg-gray-700"
+                  ? "bg-tip"
+                  : "bg-destructive"
+                : "bg-muted"
             }`}
           />
         ))}
@@ -213,7 +213,7 @@ export default function Register() {
             <div
               key={label}
               className={`flex items-center gap-1 ${
-                valid ? "text-green-600 dark:text-green-400" : "text-gray-400"
+                valid ? "text-primary" : "text-muted-foreground"
               }`}
             >
               {valid ? (
@@ -254,7 +254,7 @@ export default function Register() {
               variant="outline"
               disabled={submitting}
               onClick={handleGoogle}
-              className="w-full flex items-center justify-center gap-2 border-gray-200 dark:border-gray-600"
+              className="w-full flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -439,7 +439,7 @@ export default function Register() {
                 </Tooltip>
               </div>
               {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-red-600 dark:text-red-400">
+                <p className="text-xs text-destructive">
                   Passwords do not match
                 </p>
               )}
@@ -493,7 +493,7 @@ export default function Register() {
 
             {error && (
               <div
-                className="text-sm rounded-md border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-2"
+                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-2"
                 role="alert"
                 aria-live="assertive"
               >

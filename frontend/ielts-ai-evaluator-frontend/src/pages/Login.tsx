@@ -144,7 +144,7 @@ export default function Login() {
               variant="outline"
               disabled={submitting}
               onClick={handleGoogle}
-              className="w-full flex items-center justify-center gap-2 border-gray-200 dark:border-gray-600"
+              className="w-full flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -222,7 +222,7 @@ export default function Login() {
                 {/* <button
                   type="button"
                   onClick={handleForgotPassword}
-                  className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-xs text-tip hover:underline"
                   disabled={submitting}
                 >
                   Forgot password?
@@ -289,7 +289,7 @@ export default function Login() {
 
             {error && (
               <div
-                className="text-sm rounded-md border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-2"
+                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-2"
                 role="alert"
                 aria-live="assertive"
               >
@@ -298,7 +298,7 @@ export default function Login() {
             )}
             {resetMessage && (
               <div
-                className="text-sm rounded-md border border-green-300 dark:border-green-500/40 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 p-2"
+                className="text-sm rounded-md border border-primary/40 bg-primary/10 text-primary p-2"
                 role="status"
                 aria-live="polite"
               >

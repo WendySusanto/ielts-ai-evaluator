@@ -159,7 +159,6 @@ const SpeakingPractice = () => {
       <Button
         onClick={() => navigate(-1)}
         variant="outline"
-        className="border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back
@@ -233,7 +232,7 @@ const SpeakingPractice = () => {
                   disabled={!speech.isSupported}
                   className={`relative flex items-center justify-center h-20 w-20 rounded-full transition-all duration-300 disabled:opacity-40 ${
                     speech.isListening
-                      ? "bg-red-500 hover:bg-red-600 animate-pulse"
+                      ? "bg-destructive hover:bg-destructive/90 animate-pulse"
                       : "bg-primary hover:bg-primary/90"
                   }`}
                 >
@@ -272,7 +271,7 @@ const SpeakingPractice = () => {
                   className="min-h-[200px] resize-none"
                 />
                 {speech.error && (
-                  <p className="text-xs text-red-500">
+                  <p className="text-xs text-destructive">
                     Microphone error: {speech.error}
                   </p>
                 )}
@@ -328,7 +327,7 @@ const SpeakingPractice = () => {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-tip" />
               Response Looks Short
             </DialogTitle>
             <DialogDescription>
@@ -346,7 +345,7 @@ const SpeakingPractice = () => {
                 setShowShortDialog(false);
                 await submit();
               }}
-              className="bg-yellow-600 hover:bg-yellow-700"
+              className="bg-tip hover:bg-tip/90 text-tip-foreground"
             >
               Submit Anyway
             </Button>

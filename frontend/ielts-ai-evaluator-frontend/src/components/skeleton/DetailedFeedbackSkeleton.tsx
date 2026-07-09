@@ -56,7 +56,7 @@ export function DetailedFeedbackSkeleton() {
           <Skeleton className="h-4 w-80" />
         </CardHeader>
         <CardContent>
-          <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-6 space-y-3">
+          <div className="bg-muted rounded-lg p-6 space-y-3">
             {/* Simulate essay paragraphs */}
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-11/12" />
@@ -99,7 +99,7 @@ export function DetailedFeedbackSkeleton() {
               </div>
 
               {/* Issues skeleton */}
-              <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="mt-4 pt-4 border-t border-border">
                 <Skeleton className="h-4 w-32 mb-3" />
                 <div className="space-y-2">
                   {[1, 2].map((issueIndex) => (

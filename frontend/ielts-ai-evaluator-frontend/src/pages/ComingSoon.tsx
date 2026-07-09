@@ -55,7 +55,6 @@ const ComingSoon = ({
           <Button
             variant="outline"
             onClick={() => navigate(-1)}
-            className="border-gray-200 dark:border-gray-600"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Go Back
@@ -78,7 +77,7 @@ const ComingSoon = ({
                   <Rocket className="h-12 w-12 text-secondary-foreground" />
                 </div>
                 <div className="absolute -top-2 -right-2">
-                  <Sparkles className="h-6 w-6 text-yellow-500 animate-pulse" />
+                  <Sparkles className="h-6 w-6 text-tip animate-pulse" />
                 </div>
               </div>
 
@@ -134,10 +133,10 @@ const ComingSoon = ({
                   variant="outline"
                   className={`text-xs ${
                     feature.status === "In Development"
-                      ? "border-green-200 text-green-700 dark:border-green-700 dark:text-green-400"
+                      ? "border-primary/30 text-primary"
                       : feature.status === "Planning"
-                      ? "border-yellow-200 text-yellow-700 dark:border-yellow-700 dark:text-yellow-400"
-                      : "border-blue-200 text-blue-700 dark:border-blue-700 dark:text-blue-400"
+                      ? "border-tip/30 text-tip"
+                      : "border-border text-muted-foreground"
                   }`}
                 >
                   {feature.status}
@@ -163,7 +162,6 @@ const ComingSoon = ({
             <Button
               variant="outline"
               onClick={() => navigate("/feedback")}
-              className="border-gray-200 dark:border-gray-600"
             >
               View Your Progress
             </Button>

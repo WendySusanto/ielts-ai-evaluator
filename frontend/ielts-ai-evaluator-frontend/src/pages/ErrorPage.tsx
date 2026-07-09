@@ -25,8 +25,8 @@ const ErrorPage = ({
       <Card className="w-full max-w-md border-0 shadow-lg bg-card backdrop-blur-sm">
         <CardContent className="p-8 text-center">
           <div className="mb-6">
-            <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="h-8 w-8 text-red-600 dark:text-red-400" />
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-8 w-8 text-destructive" />
             </div>
 
             <h2 className="text-xl font-semibold text-card-foreground mb-2">
@@ -43,7 +43,6 @@ const ErrorPage = ({
               <Button
                 variant="outline"
                 onClick={() => navigate(-1)}
-                className="border-gray-200 dark:border-gray-600"
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
