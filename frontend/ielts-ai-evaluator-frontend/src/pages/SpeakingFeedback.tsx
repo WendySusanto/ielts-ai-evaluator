@@ -1,23 +1,24 @@
-import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { useApi } from "@/hooks/use-api";
-import type { SpeakingSessionDetail } from "@/types/Speaking";
-import { ArrowLeft, Award, Mic, TrendingUp } from "lucide-react";
+import { ArrowLeft, AudioLines } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useApi } from "@/hooks/use-api";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BandScore } from "@/components/feedback/BandScore";
+import { CriterionCard } from "@/components/feedback/CriterionCard";
+import { SpeakingFeedbackSkeleton } from "@/components/skeleton/SpeakingFeedbackSkeleton";
+import type { SpeakingSessionDetail } from "@/types/Speaking";
 import ErrorPage from "./ErrorPage";
 
-const getScoreBadgeVariant = (score: number) => {
-  if (score >= 7.5) return "default";
-  if (score >= 6.5) return "secondary";
-  return "outline";
+const PART_LABELS: Record<string, string> = {
+  Part1: "Part 1",
+  Part2: "Part 2",
+  Part3: "Part 3",
+};
+
+const CRITERION_LABELS: Record<string, string> = {
+  FluencyCoherence: "Fluency & Coherence",
+  LexicalResource: "Lexical Resource",
+  GrammaticalRangeAccuracy: "Grammatical Range & Accuracy",
 };
 
 const SpeakingFeedback = () => {
@@ -31,7 +32,7 @@ const SpeakingFeedback = () => {
   } = useApi<SpeakingSessionDetail>(`/api/v2/speaking/sessions/${speakingId}`);
 
   if (isLoading) {
-    return <DetailedFeedbackSkeleton />;
+    return <SpeakingFeedbackSkeleton />;
   }
 
   if (error || !detail) {
@@ -43,152 +44,114 @@ const SpeakingFeedback = () => {
     );
   }
 
-  const feedback = detail.feedback;
-  const partLabel =
-    detail.part === "Part1" ? "Part 1" : detail.part === "Part2" ? "Part 2" : "Part 3";
+  const { feedback } = detail;
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={() => navigate("/feedback")}
-            className="flex items-center gap-2"
-          >
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div className="flex items-start gap-4">
+          <Button variant="outline" onClick={() => navigate("/feedback")}>
             <ArrowLeft className="h-4 w-4" />
-            Back to History
+            Back
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">Speaking Feedback</h1>
-            <p className="text-foreground font-medium">
-              {partLabel} — {detail.topic}
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              {PART_LABELS[detail.part] ?? detail.part} · {detail.topic}
             </p>
+            <h1 className="text-3xl font-bold">Speaking feedback</h1>
           </div>
         </div>
-        <Badge
-          variant={getScoreBadgeVariant(feedback.overallBand)}
-          className="text-lg px-4 py-2"
-        >
-          <Award className="h-4 w-4 mr-2" />
-          Band {feedback.overallBand}
-        </Badge>
+        <div className="text-right">
+          <BandScore band={detail.overallBand} size="hero" />
+          <p className="text-sm text-muted-foreground">Overall band</p>
+          <p className="text-xs text-muted-foreground">
+            {new Date(detail.createdAt).toLocaleDateString(undefined, {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+          </p>
+        </div>
       </div>
 
       {/* Summary */}
       <Card className="bg-secondary border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-secondary-foreground">
-            <TrendingUp className="h-5 w-5" />
-            Overall Performance
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <p className="text-secondary-foreground">{feedback.summary}</p>
         </CardContent>
       </Card>
 
+      {/* Criteria breakdown */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {feedback.criteria.map((criterion) => (
+          <CriterionCard
+            key={criterion.name}
+            name={CRITERION_LABELS[criterion.name] ?? criterion.name}
+            band={criterion.band}
+            justification={criterion.justification}
+            examples={criterion.examples}
+            improvements={criterion.improvements}
+          />
+        ))}
+
+        {/* Pronunciation — Azure PA lands in Phase 4. Header shape matches
+            CriterionCard's so this slot can be swapped in seamlessly. */}
+        {detail.pronunciation === null && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Not assessed yet</CardTitle>
+                <AudioLines className="h-5 w-5 text-muted-foreground" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                Pronunciation scoring with per-word analysis arrives with the live
+                examiner.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
       {/* Transcript */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mic className="h-5 w-5 text-primary" />
-            Conversation Transcript
-          </CardTitle>
+          <CardTitle>Your conversation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.turns.map((turn, i) => (
             <div
               key={i}
-              className={`rounded-lg p-3 ${
-                turn.role === "candidate"
-                  ? "bg-secondary text-secondary-foreground ml-8"
-                  : "bg-muted text-foreground mr-8"
+              className={`flex flex-col ${
+                turn.role === "candidate" ? "items-end" : "items-start"
               }`}
             >
-              <p className="text-xs font-semibold mb-1 capitalize">{turn.role}</p>
-              <p className="text-sm whitespace-pre-wrap">{turn.text}</p>
+              <p className="text-xs text-muted-foreground mb-1">
+                {turn.role === "candidate" ? "You" : "Examiner"}
+              </p>
+              <div
+                className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+                  turn.role === "candidate"
+                    ? "bg-secondary text-secondary-foreground"
+                    : "bg-muted text-foreground"
+                }`}
+              >
+                {turn.text}
+              </div>
             </div>
           ))}
         </CardContent>
       </Card>
 
-      {/* Criteria breakdown */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {feedback.criteria.map((criterion) => (
-          <Card key={criterion.name}>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>{criterion.name.replace(/([A-Z])/g, " $1").trim()}</span>
-                <Badge variant={getScoreBadgeVariant(criterion.band)}>
-                  Band {criterion.band}
-                </Badge>
-              </CardTitle>
-              <CardDescription>{criterion.justification}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {criterion.examples.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">Examples from your turns</h4>
-                  <div className="space-y-2">
-                    {criterion.examples.map((example, i) => (
-                      <p
-                        key={i}
-                        className="text-sm italic border-l-2 border-border pl-3 text-foreground"
-                      >
-                        "{example}"
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {criterion.improvements.length > 0 && (
-                <div>
-                  <h4 className="font-semibold text-sm mb-2">How to improve</h4>
-                  <ul className="space-y-1 list-disc list-inside text-sm text-foreground">
-                    {criterion.improvements.map((improvement, i) => (
-                      <li key={i}>{improvement}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-
-        {/* Pronunciation — Azure PA lands in Phase 4; placeholder until then. */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>Pronunciation</span>
-              <Badge variant="outline">Not assessed</Badge>
-            </CardTitle>
-            <CardDescription>
-              {detail.pronunciation
-                ? "Pronunciation data received but not yet rendered."
-                : "Pronunciation assessment is not available yet for this session."}
-            </CardDescription>
-          </CardHeader>
-        </Card>
+      {/* Footer actions */}
+      <div className="flex flex-wrap gap-3 justify-end">
+        <Button variant="outline" onClick={() => navigate("/feedback")}>
+          View history
+        </Button>
+        <Button onClick={() => navigate("/speaking")}>Practice again</Button>
       </div>
-
-      {/* Actions */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4 justify-center">
-            <Button onClick={() => navigate("/feedback")} variant="outline">
-              Back to History
-            </Button>
-            <Button
-              className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-              onClick={() => navigate("/speaking")}
-            >
-              Practice More Speaking
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
