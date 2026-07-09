@@ -1,22 +1,11 @@
+import { BandScore } from "@/components/feedback/BandScore";
 import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
 import type { EvaluationType, WritingHistoryItem } from "@/types/feedbackHistory";
 import type { SpeakingSessionHistoryItem } from "@/types/Speaking";
-import {
-  BarChart3,
-  Calendar,
-  Clock,
-  Eye,
-  History,
-  Mic,
-  PenTool,
-  Target,
-  TrendingUp,
-} from "lucide-react";
+import { ChevronRight, Mic, PenTool } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ErrorPage from "./ErrorPage";
@@ -40,6 +29,29 @@ const TASK_LABELS: Record<string, string> = {
   Part3: "Part 3",
 };
 
+// Format a timestamp as a short relative label (Dashboard.tsx has an equivalent local helper).
+function getRelativeTime(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) return "Today";
+  if (diffDays === 1) return "Yesterday";
+  if (diffDays < 7) return `${diffDays} days ago`;
+  return date.toLocaleDateString();
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
+}
+
+const EMPTY_STATE: Record<EvaluationType, { message: string; ctaLabel: string; ctaPath: string }> = {
+  all: { message: "No feedback yet", ctaLabel: "Start a session", ctaPath: "/writing" },
+  Writing: { message: "No writing evaluations yet", ctaLabel: "Start writing", ctaPath: "/writing" },
+  Speaking: { message: "No speaking sessions yet", ctaLabel: "Start speaking", ctaPath: "/speaking" },
+};
+
 const FeedbackHistory = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<EvaluationType>("all");
@@ -49,12 +61,14 @@ const FeedbackHistory = () => {
     data: writingResponse,
     isLoading: writingLoading,
     error: writingError,
+    refetch: refetchWriting,
   } = useApi<WritingHistoryItem[]>("/api/v2/writing/evaluations");
 
   const {
     data: speakingResponse,
     isLoading: speakingLoading,
     error: speakingError,
+    refetch: refetchSpeaking,
   } = useApi<SpeakingSessionHistoryItem[]>("/api/v2/speaking/sessions");
 
   const isLoading = writingLoading || speakingLoading;
@@ -95,278 +109,109 @@ const FeedbackHistory = () => {
       <ErrorPage
         title="Error loading feedback history"
         message={error?.message || "Failed to load data"}
+        onRetry={() => {
+          refetchWriting();
+          refetchSpeaking();
+        }}
       />
     );
   }
 
-  const getScoreBadgeVariant = (score: number) => {
-    if (score >= 7.5) return "default";
-    if (score >= 6.5) return "secondary";
-    return "outline";
-  };
-
-  const averageScore =
-    feedbackHistory.length > 0
-      ? feedbackHistory.reduce((sum, item) => sum + item.overallBand, 0) /
-        feedbackHistory.length
-      : 0;
+  const writingAverage = average(feedbackHistory.filter((i) => i.evaluationType === "Writing").map((i) => i.overallBand));
+  const speakingAverage = average(feedbackHistory.filter((i) => i.evaluationType === "Speaking").map((i) => i.overallBand));
 
   const filteredHistory =
     activeTab === "all"
       ? feedbackHistory
       : feedbackHistory.filter((item) => item.evaluationType === activeTab);
 
+  const emptyState = EMPTY_STATE[activeTab];
+
   return (
     <div className="p-6 space-y-6 min-h-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-primary mb-2">
-            Feedback History
-          </h1>
-          <p className="text-foreground font-medium text-lg">
+          <h1 className="text-3xl font-bold text-foreground">Feedback history</h1>
+          <p className="text-muted-foreground">
             Track your progress and review detailed AI feedback
           </p>
         </div>
+
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EvaluationType)}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="Writing">Writing</TabsTrigger>
+            <TabsTrigger value="Speaking">Speaking</TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
-      {/* Stats Dashboard */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {averageScore.toFixed(1)}
-                </p>
-                <p className="text-sm text-foreground font-medium">
-                  Average Score
-                </p>
-              </div>
-              <Target className="h-8 w-8 text-secondary/60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {feedbackHistory.length}
-                </p>
-                <p className="text-sm text-foreground font-medium">
-                  Total Sessions
-                </p>
-              </div>
-              <BarChart3 className="h-8 w-8 text-secondary/60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {feedbackHistory.length > 0
-                    ? Math.max(...feedbackHistory.map((item) => item.overallBand))
-                    : 0}
-                </p>
-                <p className="text-sm text-foreground font-medium">
-                  Highest Score
-                </p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-secondary/60" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-lg bg-card/80 backdrop-blur-sm">
-          <CardContent className="pt-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {new Set(
-                    feedbackHistory.map((item) =>
-                      new Date(item.createdAt).toDateString(),
-                    ),
-                  ).size}
-                </p>
-                <p className="text-sm text-foreground font-medium">
-                  Days Active
-                </p>
-              </div>
-              <Calendar className="h-8 w-8 text-secondary/60" />
-            </div>
-          </CardContent>
-        </Card>
+      {/* Stat tiles */}
+      <div className="grid sm:grid-cols-3 gap-4">
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">Total sessions</p>
+          <p className="text-2xl font-bold text-foreground">{feedbackHistory.length}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">Writing average</p>
+          {writingAverage !== null ? (
+            <BandScore band={writingAverage} size="sm" />
+          ) : (
+            <p className="text-2xl font-bold text-muted-foreground">—</p>
+          )}
+        </div>
+        <div className="rounded-lg border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground">Speaking average</p>
+          {speakingAverage !== null ? (
+            <BandScore band={speakingAverage} size="sm" />
+          ) : (
+            <p className="text-2xl font-bold text-muted-foreground">—</p>
+          )}
+        </div>
       </div>
 
-      {/* Progress Chart */}
-      <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-card-foreground">
-            <TrendingUp className="h-5 w-5 text-secondary" />
-            Score Progress Over Time
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {feedbackHistory.length <= 0 && (
-            <p className="text-muted-foreground">No feedback available</p>
-          )}
-          {feedbackHistory.length > 0 && (
-            <div className="h-64 flex items-end justify-between bg-muted rounded-lg p-6">
-              {feedbackHistory
-                .slice()
-                .reverse()
-                .map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex flex-col items-center gap-2"
-                  >
-                    <div className="text-xs text-foreground font-medium text-center">
-                      {new Date(session.createdAt).toLocaleDateString("en-US", {
-                        month: "2-digit",
-                        day: "2-digit",
-                      })}
-                    </div>
-                    <div
-                      className="bg-primary rounded-t-lg w-8 flex items-end justify-center text-primary-foreground text-xs font-medium"
-                      style={{ height: `${(session.overallBand / 9) * 200}px` }}
-                    >
-                      {session.overallBand}
-                    </div>
-                    <div className="text-xs text-foreground font-medium text-center">
-                      {session.evaluationType === "Speaking"
-                        ? "S"
-                        : session.taskType === "Task1"
-                          ? "W1"
-                          : "W2"}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* List */}
+      {filteredHistory.length === 0 ? (
+        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed border-border py-16 text-center">
+          <p className="text-muted-foreground">{emptyState.message}</p>
+          <Button onClick={() => navigate(emptyState.ctaPath)}>{emptyState.ctaLabel}</Button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filteredHistory.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => navigate(item.detailPath)}
+              className="flex w-full min-h-11 items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary">
+                {item.evaluationType === "Speaking" ? (
+                  <Mic className="h-5 w-5 text-secondary-foreground" />
+                ) : (
+                  <PenTool className="h-5 w-5 text-secondary-foreground" />
+                )}
+              </div>
 
-      {/* Detailed History with Tabs */}
-      <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-card-foreground">
-            <History className="h-5 w-5 text-secondary" />
-            Session History
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) => setActiveTab(value as EvaluationType)}
-            className="w-full"
-          >
-            <TabsList className="grid w-full grid-cols-3 bg-muted/50">
-              <TabsTrigger
-                value="all"
-                className="data-[state=active]:bg-card text-card-foreground"
-              >
-                All Sessions
-              </TabsTrigger>
-              <TabsTrigger
-                value="Speaking"
-                className="data-[state=active]:bg-card text-card-foreground"
-              >
-                Speaking
-              </TabsTrigger>
-              <TabsTrigger
-                value="Writing"
-                className="data-[state=active]:bg-card text-card-foreground"
-              >
-                Writing
-              </TabsTrigger>
-            </TabsList>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-foreground">{item.topic}</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  {item.evaluationType} · {TASK_LABELS[item.taskType] ?? item.taskType}
+                </p>
+              </div>
 
-            <TabsContent value={activeTab} className="mt-6">
-              {filteredHistory.length == 0 && (
-                <div className="text-center text-muted-foreground">
-                  No sessions found.
-                </div>
-              )}
-
-              {filteredHistory.length > 0 && (
-                <div className="space-y-4">
-                  {filteredHistory.map((session) => (
-                    <div
-                      key={session.id}
-                      className="border border-border rounded-lg p-6 bg-muted/50 transition-colors hover:bg-muted/80"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 bg-secondary rounded-full flex items-center justify-center">
-                            {session.evaluationType === "Speaking" ? (
-                              <Mic className="h-6 w-6 text-secondary-foreground" />
-                            ) : (
-                              <PenTool className="h-6 w-6 text-secondary-foreground" />
-                            )}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-card-foreground text-lg">
-                                {session.evaluationType}
-                              </h3>
-                              <Badge variant="outline">
-                                {TASK_LABELS[session.taskType] ?? session.taskType}
-                              </Badge>
-                            </div>
-                            <p className="text-foreground font-medium">
-                              {session.topic}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="text-right flex flex-col items-end gap-2">
-                          <Badge
-                            variant={getScoreBadgeVariant(session.overallBand)}
-                            className="text-sm font-medium"
-                          >
-                            Band {session.overallBand}
-                          </Badge>
-                          <div className="flex items-center gap-3 text-xs text-foreground font-medium">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {new Date(session.createdAt).toLocaleDateString()}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(session.createdAt).toLocaleTimeString([], {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 mt-4">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2 border-border text-card-foreground hover:bg-muted"
-                          onClick={() => navigate(session.detailPath)}
-                        >
-                          <Eye className="h-4 w-4" />
-                          View Details
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+              <div className="flex shrink-0 items-center gap-3">
+                <BandScore band={item.overallBand} size="sm" />
+                <span className="text-xs text-muted-foreground">
+                  {getRelativeTime(item.createdAt)}
+                </span>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 };
