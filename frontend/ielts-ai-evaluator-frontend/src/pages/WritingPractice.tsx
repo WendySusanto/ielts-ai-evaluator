@@ -1,24 +1,24 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { PenTool, BarChart3, ArrowLeft, AlertTriangle } from "lucide-react";
+  ArrowLeft,
+  FileText,
+  Clock,
+  Save,
+  Lightbulb,
+  Send,
+  Pause,
+  Play,
+  RotateCcw,
+  Loader2,
+} from "lucide-react";
 import WritingPrompt from "@/types/WritingPrompt";
 import { useApi } from "@/hooks/use-api";
 import { useNavigate, useParams } from "react-router";
@@ -27,6 +27,42 @@ import NotFound from "./NotFound";
 import { formatText } from "@/lib/utils";
 import type { WritingEvaluationDto } from "@/types/evaluation";
 import { toast } from "sonner";
+
+const STRUCTURE: Record<"Task1" | "Task2", { title: string; description: string }[]> = {
+  Task2: [
+    { title: "Introduction", description: "Paraphrase the question and state your position." },
+    { title: "Body 1", description: "Present your first idea with a supporting example." },
+    { title: "Body 2", description: "Present a second idea, or address a counterpoint." },
+    { title: "Conclusion", description: "Restate your position and summarize your reasoning." },
+  ],
+  Task1: [
+    { title: "Introduction", description: "Paraphrase what the chart or diagram shows." },
+    { title: "Overview", description: "Give 2 key trends or features, with no specific data." },
+    { title: "Body 1", description: "Describe the first group of data in detail." },
+    { title: "Body 2", description: "Describe the second group, including comparisons." },
+  ],
+};
+
+const COACH_TIPS: Record<"Task1" | "Task2", string[]> = {
+  Task2: [
+    "Support every main point with a specific example or reason - examiners reward developed ideas, not just claims.",
+    "Keep paragraphing consistent: one central idea per body paragraph makes your argument easier to follow.",
+  ],
+  Task1: [
+    "Never give opinions in Task 1 - describe only what the data shows, using an objective tone throughout.",
+    "Group similar data together and use comparative language (e.g. 'whereas', 'in contrast') instead of listing numbers.",
+  ],
+};
+
+const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean);
+const sentencesOf = (text: string) =>
+  text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+
+const formatTime = (seconds: number) => {
+  const mins = Math.floor(Math.max(seconds, 0) / 60);
+  const secs = Math.max(seconds, 0) % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
 
 const WritingPractice = () => {
   const { taskType, taskId } = useParams<{
@@ -37,406 +73,264 @@ const WritingPractice = () => {
   const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
     useApi<WritingPrompt>(`/api/writing-prompts/${taskId}`);
 
-  const initialTimeValue = writingPrompt?.duration
-    ? writingPrompt.duration
-    : taskType === "task1"
-    ? 1200
-    : 2400;
-
-  const taskTypeDesc = taskType == "Task1" ? "Task 1" : "Task 2";
-
-  // Add these constants at the top of your file after imports
-  const TASK1_PLACEHOLDER = `Begin writing your Task 1 response here. Remember to:
-- Introduce what the chart/graph shows
-- Provide an overview of the main trends
-- Describe specific data and patterns
-- Compare significant changes or differences
-- Use appropriate data description vocabulary
-- Include at least {minWords} words`;
-
-  const TASK2_PLACEHOLDER = `Begin writing your Task 2 response here. Remember to:
-- Introduce the topic and your position
-- Present your main arguments clearly
-- Support with relevant examples
-- Consider different viewpoints
-- Write a clear conclusion
-- Include at least {minWords} words`;
-
-  // Then update your Textarea component to use these constants
-
-  const [essay, setEssay] = useState("");
-  const [timeLeft, setTimeLeft] = useState(initialTimeValue); // 20 or 40 minutes
-  const [wordCount, setWordCount] = useState(0);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [showWordCountDialog, setShowWordCountDialog] = useState(false);
-
   const { mutate } = useApi<WritingEvaluationDto>("/api/v2/writing/evaluations", {
     skipInitialFetch: true,
   });
 
   const navigate = useNavigate();
 
+  const [essay, setEssay] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [isPaused, setIsPaused] = useState(false);
+  const draftKey = writingPrompt ? `draft:writing:${writingPrompt.writingPromptId}` : null;
+
+  // Initialize the countdown once the prompt (and its duration) has loaded.
   useEffect(() => {
-    if (timeLeft > 0 && !isSubmitted) {
-      const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-      return () => clearTimeout(timer);
+    if (writingPrompt && timeLeft === null) {
+      setTimeLeft(writingPrompt.duration);
     }
-  }, [timeLeft, isSubmitted]);
+  }, [writingPrompt, timeLeft]);
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setEssay(text);
-    setWordCount(
-      text
-        .trim()
-        .split(/\s+/)
-        .filter((word) => word.length > 0).length
-    );
-  };
-
-  const handleAnalyze = async () => {
-    if (wordCount < (writingPrompt?.minimumWords || 150)) {
-      setShowWordCountDialog(true);
-      return;
+  // Restore any saved draft once we know which prompt we're on. Runs once per
+  // draftKey so it never clobbers text the user has already started typing.
+  useEffect(() => {
+    if (!draftKey) return;
+    const saved = localStorage.getItem(draftKey);
+    if (saved) {
+      setEssay(saved);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
 
-    await submitEssay();
+  useEffect(() => {
+    if (timeLeft === null || timeLeft <= 0 || isPaused || isSubmitting) return;
+    const timer = setTimeout(() => setTimeLeft((t) => (t ?? 0) - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [timeLeft, isPaused, isSubmitting]);
+
+  const words = useMemo(() => wordsOf(essay), [essay]);
+  const sentences = useMemo(() => sentencesOf(essay), [essay]);
+  const minimumWords = writingPrompt?.minimumWords ?? 150;
+  const belowMinimum = words.length < minimumWords;
+
+  const resolvedTaskType: "Task1" | "Task2" = writingPrompt?.taskType ?? (taskType === "Task1" ? "Task1" : "Task2");
+
+  const handleSaveDraft = () => {
+    if (!draftKey) return;
+    localStorage.setItem(draftKey, essay);
+    toast.success("Draft saved");
   };
 
-  const submitEssay = async () => {
-    setIsAnalyzing(true);
-
-    const payload = {
-      writingPromptId: writingPrompt?.writingPromptId ?? taskId ?? "",
-      essayText: essay,
-    };
+  const handleSubmit = async () => {
+    if (belowMinimum || isSubmitting || !writingPrompt) return;
+    setIsSubmitting(true);
 
     await mutate({
       url: "/api/v2/writing/evaluations",
       method: "POST",
-      data: payload,
+      data: {
+        writingPromptId: writingPrompt.writingPromptId,
+        essayText: essay,
+      },
       onSuccess: (result) => {
-        setIsAnalyzing(false);
-        setIsSubmitted(true);
+        setIsSubmitting(false);
+        if (draftKey) localStorage.removeItem(draftKey);
         toast.success("Essay analyzed successfully!");
         navigate(`/feedback/${result.writingEvaluationId}`);
       },
       onError: (error) => {
+        setIsSubmitting(false);
         toast.error(`Error analyzing essay: ${error.message}`);
-        setIsAnalyzing(false);
       },
     });
   };
-
-  const minWords = writingPrompt?.minimumWords || 150;
-  const wordProgress = Math.min((wordCount / minWords) * 100, 100);
 
   if (isLoadingPrompts) {
     return <WritingPracticeSkeleton />;
   }
 
-  if (!isLoadingPrompts && !writingPrompt) {
+  if (!writingPrompt) {
     return <NotFound />;
   }
 
-  const Task1Tips = () => (
-    <>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Structure:</strong> Introduction → Overview → Body paragraphs
-          with details
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Language:</strong> Use varied vocabulary for trends (increase,
-          rise, peak, decline)
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Time:</strong> Spend about 20 minutes on Task 1
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Focus:</strong> Describe data objectively, don't give opinions
-        </p>
-      </div>
-    </>
-  );
-
-  const Task2Tips = () => (
-    <>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Structure:</strong> Introduction → Clear position → Supporting
-          paragraphs → Conclusion
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Language:</strong> Use academic vocabulary, linking words, and
-          complex sentences
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Time:</strong> Spend about 40 minutes on Task 2
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Focus:</strong> Present clear arguments with specific examples
-        </p>
-      </div>
-      <div className="p-3 bg-tip/10 rounded-lg">
-        <p className="text-sm text-tip">
-          <strong>Balance:</strong> Consider multiple viewpoints before stating
-          your position
-        </p>
-      </div>
-    </>
-  );
-
-  const Task1Phrases = () => (
-    <>
-      <div className="text-sm text-card-foreground">
-        <p className="font-medium mb-1">Introducing:</p>
-        <p className="">"The chart illustrates..."</p>
-        <p className="">"The data shows..."</p>
-      </div>
-      <div className="text-sm">
-        <p className="font-medium text-card-foreground mb-1">Comparing:</p>
-        <p className="">"In contrast to..."</p>
-        <p className="">"While X increased, Y decreased..."</p>
-      </div>
-      <div className="text-sm">
-        <p className="font-medium text-card-foreground mb-1">Trends:</p>
-        <p className="">"Rose steadily..."</p>
-        <p className="">"Fluctuated between..."</p>
-      </div>
-    </>
-  );
-
-  const Task2Phrases = () => (
-    <>
-      <div className="text-sm text-card-foreground">
-        <p className="font-medium mb-1">Introducing the Topic:</p>
-        <p className="">
-          "In recent years, there has been growing concern about..."
-        </p>
-        <p className="">
-          "One of the most significant issues facing society is..."
-        </p>
-      </div>
-      <div className="text-sm">
-        <p className="font-medium text-card-foreground mb-1">
-          Expressing Opinion:
-        </p>
-        <p className="">"In my view, the most compelling reason is..."</p>
-        <p className="">"While some argue that..., I believe that..."</p>
-      </div>
-      <div className="text-sm">
-        <p className="font-medium text-card-foreground mb-1">
-          Supporting Arguments:
-        </p>
-        <p className="">"A clear example of this can be seen in..."</p>
-        <p className="">"This is evidenced by the fact that..."</p>
-      </div>
-      <div className="text-sm">
-        <p className="font-medium text-card-foreground mb-1">Concluding:</p>
-        <p className="">
-          "In conclusion, while there are various perspectives..."
-        </p>
-        <p className="">"Taking all these points into consideration..."</p>
-      </div>
-    </>
-  );
-
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <Button
-        onClick={() => navigate(-1)}
-        variant="outline"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back
-      </Button>
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Writing {taskTypeDesc}</h1>
-        <p className="text-foreground font-medium">
-          Academic Writing - Describe visual information in at least {minWords}{" "}
-          words
-        </p>
+      {/* Top bar */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <Button
+            onClick={() => navigate(-1)}
+            variant="ghost"
+            className="-ml-3 h-11"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <p className="text-xs uppercase tracking-wider text-primary font-semibold">
+            {resolvedTaskType === "Task1" ? "Task 1" : "Task 2"} &middot; {writingPrompt.questionType}
+          </p>
+          <h1 className="text-3xl font-bold">{writingPrompt.topic}</h1>
+        </div>
+
+        <Card className="flex-row items-center gap-3 px-4 py-2 w-fit">
+          <Clock className="h-5 w-5 text-primary shrink-0" />
+          <span className="text-lg font-semibold tabular-nums min-w-[3.5rem]">
+            {formatTime(timeLeft ?? writingPrompt.duration)}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11"
+            aria-label={isPaused ? "Resume timer" : "Pause timer"}
+            onClick={() => setIsPaused((p) => !p)}
+          >
+            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11"
+            aria-label="Reset timer"
+            onClick={() => {
+              setTimeLeft(writingPrompt.duration);
+              setIsPaused(false);
+            }}
+          >
+            <RotateCcw className="h-4 w-4" />
+          </Button>
+        </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Writing Area */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Task Description */}
-          <Card>
+      {/* Workspace */}
+      <div className="grid lg:grid-cols-[1fr_320px] gap-6">
+        {/* Main column */}
+        <div className="space-y-6 order-1">
+          <Card className="bg-secondary">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Task Description
+              <CardTitle className="flex items-center gap-2 text-secondary-foreground">
+                <FileText className="h-5 w-5" />
+                Your prompt
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="p-4 bg-secondary rounded-lg border-l-4 border-border">
-                <p className="text-secondary-foreground mb-4 whitespace-pre-wrap">
-                  <strong>{formatText(writingPrompt?.questionText)}</strong>
+            <CardContent className="space-y-3">
+              <p className="text-secondary-foreground whitespace-pre-wrap">
+                {formatText(writingPrompt.questionText)}
+              </p>
+              {writingPrompt.imageDescription && (
+                <p className="text-sm text-secondary-foreground/80">
+                  {writingPrompt.imageDescription}
                 </p>
-              </div>
-
-              {/* Sample Chart Placeholder */}
-              {writingPrompt?.imageUrl ? (
-                <div className="mt-4 p-8 bg-muted rounded-lg border-2 border-dashed border-border">
-                  <img
-                    src={writingPrompt.imageUrl}
-                    alt="Task Chart"
-                    className="w-full object-center object-cover"
-                  />
-                </div>
-              ) : (
-                ""
+              )}
+              {writingPrompt.imageUrl && (
+                <img
+                  src={writingPrompt.imageUrl}
+                  alt="Task visual"
+                  className="w-full rounded-md object-cover"
+                />
               )}
             </CardContent>
           </Card>
 
-          {/* Writing Area */}
           <Card>
-            <CardHeader className="flex justify-between items-center">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <PenTool className="h-5 w-5 text-primary" />
-                  Your Response
-                </CardTitle>
-                <CardDescription className="text-foreground font-medium">
-                  Write your response here. Aim for at least {minWords} words.
-                </CardDescription>
-              </div>
-              <Badge variant={"secondary"} className="text-lg">
-                <span>{formatTime(timeLeft)}</span>
-              </Badge>
+            <CardHeader className="flex-row items-center justify-between gap-4">
+              <CardTitle>Your response</CardTitle>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                <span className={belowMinimum ? "text-tip font-medium" : undefined}>
+                  {words.length} / {minimumWords} words
+                </span>
+                {" "}&middot; {sentences.length} sentences
+              </span>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">
-                    Word Count Progress
-                  </span>
-                  <Badge
-                    variant={wordCount >= minWords ? "default" : "secondary"}
-                  >
-                    {wordCount}/{minWords} words
-                  </Badge>
-                </div>
-                <Progress value={wordProgress} className="h-2" />
-                <p className="text-xs text-foreground font-medium">
-                  {wordCount < minWords
-                    ? `${
-                        minWords - wordCount
-                      } more words needed to meet minimum requirement`
-                    : "Great! You've met the minimum word requirement"}
-                </p>
-              </div>
+            <CardContent className="space-y-3">
               <Textarea
-                placeholder={
-                  taskType === "Task1"
-                    ? TASK1_PLACEHOLDER.replace(
-                        "{minWords}",
-                        minWords.toString()
-                      )
-                    : TASK2_PLACEHOLDER.replace(
-                        "{minWords}",
-                        minWords.toString()
-                      )
-                }
                 value={essay}
-                onChange={handleTextChange}
-                className="min-h-[400px] resize-none"
+                onChange={(e) => setEssay(e.target.value)}
+                placeholder="Start writing your response here..."
+                className="min-h-[400px] resize-none border-0 shadow-none focus-visible:ring-1 focus-visible:ring-ring"
               />
 
-              <div className="flex justify-between items-center">
-                {/* <Button variant="outline">Save Draft</Button> */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <Button variant="outline" onClick={handleSaveDraft} className="h-11">
+                  <Save className="h-4 w-4 mr-2" />
+                  Save draft
+                </Button>
                 <Button
-                  onClick={handleAnalyze}
-                  disabled={isAnalyzing}
-                  className="min-w-[120px] bg-primary hover:bg-primary/90 text-primary-foreground"
+                  onClick={handleSubmit}
+                  disabled={belowMinimum || isSubmitting}
+                  className="h-11 min-w-[200px]"
                 >
-                  {isAnalyzing ? "Analyzing..." : "Get AI Feedback"}
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  {isSubmitting ? "Submitting..." : "Submit for AI feedback"}
                 </Button>
               </div>
+
+              {belowMinimum && (
+                <p className="text-xs text-tip">
+                  {minimumWords - words.length} more words to meet the minimum
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Writing Tips */}
+        {/* Guidance rail */}
+        <div className="space-y-6 order-2">
           <Card>
             <CardHeader>
-              <CardTitle>{taskTypeDesc} Tips</CardTitle>
+              <CardTitle>Suggested structure</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {taskType === "Task1" ? <Task1Tips /> : <Task2Tips />}
+              {STRUCTURE[resolvedTaskType].map((step, index) => (
+                <div key={step.title} className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                    {index + 1}
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{step.title}</p>
+                    <p className="text-sm text-muted-foreground">{step.description}</p>
+                  </div>
+                </div>
+              ))}
             </CardContent>
           </Card>
 
-          {/* Sample Phrases */}
-          <Card>
+          <Card className="bg-tip text-tip-foreground">
             <CardHeader>
-              <CardTitle>Useful Phrases</CardTitle>
+              <CardTitle className="flex items-center gap-2 text-tip-foreground">
+                <Lightbulb className="h-5 w-5" />
+                Coach's tip
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {taskType === "Task1" ? <Task1Phrases /> : <Task2Phrases />}
+              {COACH_TIPS[resolvedTaskType].map((tip) => (
+                <p key={tip} className="text-sm">
+                  {tip}
+                </p>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Not the right topic?</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="h-11 w-full"
+                onClick={() => navigate("/writing")}
+              >
+                Change topic
+              </Button>
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Word Count Confirmation Dialog */}
-      <Dialog open={showWordCountDialog} onOpenChange={setShowWordCountDialog}>
-        <DialogContent className="w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-tip" />
-              Word Count Below Minimum
-            </DialogTitle>
-            <DialogDescription>
-              Your essay has {wordCount} words, but the minimum requirement is{" "}
-              {writingPrompt?.minimumWords || 150} words. Submitting an essay
-              below the minimum word count may result in a lower band score.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setShowWordCountDialog(false)}
-            >
-              Continue Writing
-            </Button>
-            <Button
-              onClick={async () => {
-                setShowWordCountDialog(false);
-                await submitEssay();
-              }}
-              className="bg-tip hover:bg-tip/90 text-tip-foreground"
-            >
-              Submit Anyway
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };
