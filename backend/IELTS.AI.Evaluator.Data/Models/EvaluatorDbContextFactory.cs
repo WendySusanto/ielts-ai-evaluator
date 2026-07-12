@@ -16,7 +16,7 @@ namespace IELTS.AI.Evaluator.Data.Models
         {
             var connectionString =
                 Environment.GetEnvironmentVariable("DbConnectionString")
-                ?? "Host=localhost;Port=5432;Database=ielts;Username=postgres;Password=postgres";
+                ?? "Host=localhost;Port=5501;Database=ielts;Username=postgres;Password=postgres";
 
             var optionsBuilder = new DbContextOptionsBuilder<EvaluatorDbContext>();
             optionsBuilder.UseNpgsql(connectionString);
