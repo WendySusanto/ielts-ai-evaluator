@@ -86,9 +86,10 @@ const WritingPractice = () => {
   const draftKey = writingPrompt ? `draft:writing:${writingPrompt.writingPromptId}` : null;
 
   // Initialize the countdown once the prompt (and its duration) has loaded.
+  // duration is stored in minutes; the countdown ticks in seconds.
   useEffect(() => {
     if (writingPrompt && timeLeft === null) {
-      setTimeLeft(writingPrompt.duration);
+      setTimeLeft(writingPrompt.duration * 60);
     }
   }, [writingPrompt, timeLeft]);
 
@@ -193,7 +194,7 @@ const WritingPractice = () => {
             className="h-11 w-11"
             aria-label="Reset timer"
             onClick={() => {
-              setTimeLeft(writingPrompt.duration);
+              setTimeLeft(writingPrompt.duration * 60);
               setIsPaused(false);
             }}
           >

@@ -97,7 +97,7 @@ const SpeakingFeedback = () => {
 
         {/* Pronunciation — Azure PA lands in Phase 4. Header shape matches
             CriterionCard's so this slot can be swapped in seamlessly. */}
-        {detail.pronunciation === null && (
+        {!detail.pronunciation && (
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">

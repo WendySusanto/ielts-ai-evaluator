@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
+import { getRelativeTime } from "@/lib/utils";
 import { DashboardData } from "@/types/dashboard";
 import type { User } from "@/types/User";
 import {
@@ -43,19 +44,6 @@ const Dashboard = () => {
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - memberDate.getTime());
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
-  // Format date to relative time
-  const getRelativeTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = now.getTime() - date.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
   };
 
   if (isLoading || isLoadingProfile) {

@@ -3,6 +3,7 @@ import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySk
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
+import { getRelativeTime } from "@/lib/utils";
 import type { EvaluationType, WritingHistoryItem } from "@/types/feedbackHistory";
 import type { SpeakingSessionHistoryItem } from "@/types/Speaking";
 import { ChevronRight, Mic, PenTool } from "lucide-react";
@@ -29,17 +30,6 @@ const TASK_LABELS: Record<string, string> = {
   Part3: "Part 3",
 };
 
-// Format a timestamp as a short relative label (Dashboard.tsx has an equivalent local helper).
-function getRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays} days ago`;
-  return date.toLocaleDateString();
-}
 
 function average(values: number[]): number | null {
   if (values.length === 0) return null;
@@ -156,7 +146,7 @@ const FeedbackHistory = () => {
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Writing average</p>
           {writingAverage !== null ? (
-            <BandScore band={writingAverage} size="sm" />
+            <BandScore band={writingAverage} size="md" />
           ) : (
             <p className="text-2xl font-bold text-muted-foreground">—</p>
           )}
@@ -164,7 +154,7 @@ const FeedbackHistory = () => {
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-sm text-muted-foreground">Speaking average</p>
           {speakingAverage !== null ? (
-            <BandScore band={speakingAverage} size="sm" />
+            <BandScore band={speakingAverage} size="md" />
           ) : (
             <p className="text-2xl font-bold text-muted-foreground">—</p>
           )}
