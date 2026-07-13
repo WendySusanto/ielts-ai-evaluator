@@ -12,6 +12,21 @@ public record SpeakingCriterion(
 /// <summary>One turn of the conversation. Role: "examiner" | "candidate".</summary>
 public record SpeakingTurn(string Role, string Text);
 
+/// <summary>One word from Azure Pronunciation Assessment's per-word breakdown.</summary>
+public record PronunciationWord(string Word, decimal AccuracyScore, string ErrorType);
+
+/// <summary>Azure Pronunciation Assessment result, aggregated client-side across candidate turns
+/// and submitted with the final evaluation. Band is always server-recomputed from
+/// PronunciationScore — never trust a client-supplied value.</summary>
+public record PronunciationResult(
+    decimal Band,
+    decimal PronunciationScore,
+    decimal AccuracyScore,
+    decimal FluencyScore,
+    decimal ProsodyScore,
+    decimal CompletenessScore,
+    List<PronunciationWord> Words);
+
 /// <summary>Deep structured feedback for one speaking session. camelCase on the wire —
 /// this is also the contract for the Phase 3 feedback screens. OverallBand here is the
 /// service-computed average of the three criteria below, rounded to the nearest 0.5 —

@@ -79,12 +79,18 @@ public class SpeakingServiceTests
         return (svc, db, gemini, user, prompt);
     }
 
-    private static SpeakingEvaluateRequest Request(SpeakingPrompt prompt, List<SpeakingTurn>? turns = null) =>
+    private static SpeakingEvaluateRequest Request(SpeakingPrompt prompt, List<SpeakingTurn>? turns = null,
+        PronunciationResult? pronunciation = null) =>
         new(prompt.SpeakingPromptId, "Part1", turns ?? new List<SpeakingTurn>
         {
             new("examiner", "Tell me about your hometown."),
             new("candidate", "I come from a small town near the coast, it's quiet and beautiful."),
-        });
+        }, pronunciation);
+
+    // Band is deliberately wrong/nonzero here to prove the service ignores client input and recomputes it.
+    private static PronunciationResult Pronunciation(decimal pronunciationScore, decimal band = 0m,
+        List<PronunciationWord>? words = null) =>
+        new(band, pronunciationScore, 80m, 80m, 80m, 80m, words ?? new List<PronunciationWord>());
 
     [Fact]
     public async Task FreeUser_UnderQuota_Succeeds()
@@ -163,6 +169,82 @@ public class SpeakingServiceTests
         var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
         Assert.Equal(6.5m, result.OverallBand);
         Assert.Equal(6.5m, result.Feedback.OverallBand);
+    }
+
+    [Fact]
+    public async Task Evaluate_WithPronunciation_MergesBandIntoOverall()
+    {
+        var (svc, _, _, user, prompt) = Setup();
+        var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: Pronunciation(72m)));
+
+        // Gemini 6.0/6.5/7.0 + PA band 6.5 (72/100*9 = 6.48 -> 6.5) averaged -> 6.5.
+        Assert.Equal(6.5m, result.OverallBand);
+    }
+
+    [Fact]
+    public async Task Evaluate_WithPronunciation_IgnoresClientSuppliedBand()
+    {
+        var (svc, db, _, user, prompt) = Setup();
+        var result = await svc.EvaluateAsync(user.UserId, "Free",
+            Request(prompt, pronunciation: Pronunciation(pronunciationScore: 50m, band: 9m)));
+
+        var row = await db.SpeakingSessions.SingleAsync(s => s.SpeakingSessionId == result.SpeakingSessionId);
+        var stored = JsonSerializer.Deserialize<PronunciationResult>(row.Pronunciation!, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+        Assert.Equal(4.5m, stored!.Band);
+    }
+
+    [Theory]
+    [InlineData(-1, 80, 80, 80, 80)]
+    [InlineData(101, 80, 80, 80, 80)]
+    [InlineData(80, -1, 80, 80, 80)]
+    [InlineData(80, 80, 101, 80, 80)]
+    [InlineData(80, 80, 80, -1, 80)]
+    [InlineData(80, 80, 80, 80, 101)]
+    public async Task Evaluate_PronunciationScoreOutOfRange_ThrowsValidation(
+        decimal pronunciationScore, decimal accuracyScore, decimal fluencyScore, decimal prosodyScore, decimal completenessScore)
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        var pronunciation = new PronunciationResult(0m, pronunciationScore, accuracyScore, fluencyScore, prosodyScore, completenessScore, new List<PronunciationWord>());
+        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: pronunciation)));
+        Assert.Equal("Invalid pronunciation assessment data.", ex.Message);
+        Assert.Equal(0, gemini.Calls);
+    }
+
+    [Fact]
+    public async Task Evaluate_PronunciationWordsOverCap_ThrowsValidation()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        var words = Enumerable.Range(0, 401).Select(i => new PronunciationWord($"w{i}", 80m, "None")).ToList();
+        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: Pronunciation(72m, words: words))));
+        Assert.Equal("Invalid pronunciation assessment data.", ex.Message);
+        Assert.Equal(0, gemini.Calls);
+    }
+
+    [Fact]
+    public async Task GetDetail_WithPronunciation_RoundTripsParsedObject()
+    {
+        var (svc, _, _, user, prompt) = Setup();
+        var words = new List<PronunciationWord> { new("hello", 95m, "None") };
+        var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: Pronunciation(72m, words: words)));
+
+        var detail = await svc.GetDetailAsync(user.UserId, result.SpeakingSessionId);
+        Assert.NotNull(detail.Pronunciation);
+        Assert.Equal(6.5m, detail.Pronunciation!.Band);
+        Assert.Equal(72m, detail.Pronunciation.PronunciationScore);
+        Assert.Single(detail.Pronunciation.Words);
+        Assert.Equal("hello", detail.Pronunciation.Words[0].Word);
+    }
+
+    [Fact]
+    public async Task GetDetail_WithoutPronunciation_PronunciationStaysNull()
+    {
+        var (svc, _, _, user, prompt) = Setup();
+        var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+
+        var detail = await svc.GetDetailAsync(user.UserId, result.SpeakingSessionId);
+        Assert.Null(detail.Pronunciation);
     }
 
     [Fact]

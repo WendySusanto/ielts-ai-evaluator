@@ -8,11 +8,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace IELTS.AI.Evaluator.Functions.Services;
 
-public record SpeakingEvaluateRequest(Guid SpeakingPromptId, string Part, List<SpeakingTurn> Turns);
+public record SpeakingEvaluateRequest(Guid SpeakingPromptId, string Part, List<SpeakingTurn> Turns,
+    PronunciationResult? Pronunciation = null); // Band on input is ignored — the service always recomputes it.
 public record SpeakingSessionDto(Guid SpeakingSessionId, decimal OverallBand, SpeakingFeedback Feedback);
 public record SpeakingSessionHistoryItemDto(Guid SpeakingSessionId, string Part, string Topic, decimal OverallBand, DateTime CreatedAt);
 public record SpeakingSessionDetailDto(Guid SpeakingSessionId, string Part, string Topic, string QuestionText,
-    List<SpeakingTurn> Turns, decimal OverallBand, SpeakingFeedback Feedback, string? Pronunciation, DateTime CreatedAt);
+    List<SpeakingTurn> Turns, decimal OverallBand, SpeakingFeedback Feedback, PronunciationResult? Pronunciation, DateTime CreatedAt);
 
 public interface ISpeakingService
 {
@@ -71,14 +72,22 @@ public class SpeakingService : ISpeakingService
                 throw new QuotaExceededException("Daily speaking evaluation quota reached. Upgrade to Premium for unlimited evaluations.");
         }
 
+        // Pronunciation (Azure PA) is client-aggregated but never client-scored: the band is always
+        // recomputed here from the raw pronunciationScore, never trusted from the wire.
+        var pronunciation = request.Pronunciation is { } pa ? pa with { Band = RoundToHalf(pa.PronunciationScore / 100 * 9) } : null;
+        if (pronunciation is not null)
+            ValidatePronunciation(pronunciation);
+
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
         var result = await _gemini.GenerateAsync<SpeakingFeedback>(
             SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema);
 
-        // Overall band is the average of the three Gemini-assessed criteria, rounded to the
-        // nearest 0.5 — not whatever Gemini put in its own overallBand field. Pronunciation
-        // (Azure PA, Phase 4) will fold into this average later.
-        var overallBand = Math.Round(result.Value.Criteria.Average(c => c.Band) * 2, MidpointRounding.AwayFromZero) / 2;
+        // Overall band is the average of the three Gemini-assessed criteria plus, when present, the
+        // Azure PA band, rounded to the nearest 0.5 — not whatever Gemini put in its own overallBand field.
+        var bands = result.Value.Criteria.Select(c => c.Band);
+        if (pronunciation is not null)
+            bands = bands.Append(pronunciation.Band);
+        var overallBand = RoundToHalf(bands.Average());
         var feedback = result.Value with { OverallBand = overallBand };
 
         var session = new SpeakingSession
@@ -90,6 +99,7 @@ public class SpeakingService : ISpeakingService
             Turns = JsonSerializer.Serialize(request.Turns, CamelCase),
             OverallBand = overallBand,
             Feedback = JsonSerializer.Serialize(feedback, CamelCase),
+            Pronunciation = pronunciation is null ? null : JsonSerializer.Serialize(pronunciation, CamelCase),
             AiModel = result.Model,
             PromptTokens = result.PromptTokens,
             CompletionTokens = result.CompletionTokens,
@@ -121,9 +131,21 @@ public class SpeakingService : ISpeakingService
 
         var turns = JsonSerializer.Deserialize<List<SpeakingTurn>>(session.Turns, CamelCase)!;
         var feedback = JsonSerializer.Deserialize<SpeakingFeedback>(session.Feedback, CamelCase)!;
+        var pronunciation = session.Pronunciation is null
+            ? null
+            : JsonSerializer.Deserialize<PronunciationResult>(session.Pronunciation, CamelCase);
         return new SpeakingSessionDetailDto(
             session.SpeakingSessionId, session.Part, session.SpeakingPrompt.Topic, session.SpeakingPrompt.QuestionText,
-            turns, session.OverallBand, feedback, session.Pronunciation, session.CreatedAt);
+            turns, session.OverallBand, feedback, pronunciation, session.CreatedAt);
+    }
+
+    private static decimal RoundToHalf(decimal value) => Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
+
+    private static void ValidatePronunciation(PronunciationResult pa)
+    {
+        var scores = new[] { pa.PronunciationScore, pa.AccuracyScore, pa.FluencyScore, pa.ProsodyScore, pa.CompletenessScore };
+        if (scores.Any(s => s < 0 || s > 100) || pa.Words.Count > 400)
+            throw new ValidationException("Invalid pronunciation assessment data.");
     }
 
     /// <summary>Shared with ExaminerService: the combined-turns cap protects the paid Gemini call
