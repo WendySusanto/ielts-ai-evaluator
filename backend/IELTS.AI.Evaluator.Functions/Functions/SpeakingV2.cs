@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
@@ -14,8 +15,13 @@ public class SpeakingV2
     private static readonly JsonSerializerOptions Web = new(JsonSerializerDefaults.Web);
 
     private readonly ISpeakingService _speakingService;
+    private readonly IExaminerService _examinerService;
 
-    public SpeakingV2(ISpeakingService speakingService) => _speakingService = speakingService;
+    public SpeakingV2(ISpeakingService speakingService, IExaminerService examinerService)
+    {
+        _speakingService = speakingService;
+        _examinerService = examinerService;
+    }
 
     [Function("SpeakingV2_Evaluate")]
     public async Task<IActionResult> EvaluateAsync(
@@ -45,5 +51,16 @@ public class SpeakingV2
     {
         var detail = await _speakingService.GetDetailAsync(context.GetUserId()!.Value, id);
         return new OkObjectResult(detail);
+    }
+
+    [Function("SpeakingV2_ExaminerTurn")]
+    public async Task<IActionResult> ExaminerTurnAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking/examiner-turn")] HttpRequest req,
+        FunctionContext context)
+    {
+        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var request = JsonSerializer.Deserialize<ExaminerTurnRequest>(body, Web)!;
+        var result = await _examinerService.NextTurnAsync(context.GetUserId()!.Value, request);
+        return new OkObjectResult(result);
     }
 }

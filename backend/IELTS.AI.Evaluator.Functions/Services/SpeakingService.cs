@@ -53,9 +53,7 @@ public class SpeakingService : ISpeakingService
 
         // All turns (including examiner) are client-controlled and get rendered verbatim into the paid
         // Gemini call by BuildUserContent, so the candidate-only cap above isn't enough on its own.
-        var conversationLength = request.Turns.Sum(t => t.Text?.Length ?? 0);
-        if (conversationLength > MaxConversationLength)
-            throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
+        ValidateConversationCap(request.Turns);
 
         var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId)
             ?? throw new NotFoundException("Speaking prompt not found.");
@@ -126,6 +124,15 @@ public class SpeakingService : ISpeakingService
         return new SpeakingSessionDetailDto(
             session.SpeakingSessionId, session.Part, session.SpeakingPrompt.Topic, session.SpeakingPrompt.QuestionText,
             turns, session.OverallBand, feedback, session.Pronunciation, session.CreatedAt);
+    }
+
+    /// <summary>Shared with ExaminerService: the combined-turns cap protects the paid Gemini call
+    /// regardless of which endpoint is building the prompt from client-controlled turns.</summary>
+    internal static void ValidateConversationCap(List<SpeakingTurn> turns)
+    {
+        var conversationLength = turns.Sum(t => t.Text?.Length ?? 0);
+        if (conversationLength > MaxConversationLength)
+            throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
     }
 
     private static string BuildUserContent(SpeakingPrompt prompt, string part, List<SpeakingTurn> turns)

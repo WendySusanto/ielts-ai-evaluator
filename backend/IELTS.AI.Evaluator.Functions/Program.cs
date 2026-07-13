@@ -31,6 +31,7 @@ var host = new HostBuilder()
         services.AddHttpClient<ISpeechTokenService, SpeechTokenService>();
         services.AddScoped<IWritingService, WritingService>();
         services.AddScoped<ISpeakingService, SpeakingService>();
+        services.AddScoped<IExaminerService, ExaminerService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
         services.AddScoped<ISpeakingPromptService, SpeakingPromptService>();
         services.AddScoped<IUserService, UserService>();
