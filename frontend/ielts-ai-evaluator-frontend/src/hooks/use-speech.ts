@@ -55,6 +55,16 @@ function toMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
+// SDK close() throws on already-disposed objects; disposal paths can legitimately race
+// (e.g. stopSpeaking vs. speak's own cleanup), so swallow that.
+function safeClose(obj: { close: () => void } | null): void {
+  try {
+    obj?.close();
+  } catch {
+    // already disposed
+  }
+}
+
 interface UseSpeechResult {
   supported: boolean;
   speak: (text: string) => Promise<void>;
@@ -74,6 +84,10 @@ export function useSpeech(): UseSpeechResult {
   const synthesizerRef = useRef<SpeechSynthesizer | null>(null);
   const playerRef = useRef<SpeakerAudioDestination | null>(null);
   const recognizerRef = useRef<SpeechRecognizer | null>(null);
+  // In-flight startListening(); stopListening() awaits it so a fast start-then-stop
+  // can't leave a recognizer that came up live after stop already returned.
+  const startPromiseRef = useRef<Promise<void> | null>(null);
+  const disposedRef = useRef(false);
   const segmentsRef = useRef<string[]>([]);
   const segmentAssessmentsRef = useRef<TurnAssessment[]>([]);
 
@@ -82,8 +96,10 @@ export function useSpeech(): UseSpeechResult {
   );
 
   const stopSpeaking = useCallback(() => {
-    playerRef.current?.close();
-    synthesizerRef.current?.close();
+    // Closing the player fires onAudioEnd, resolving any in-flight speak(); its finally
+    // block may then close these again — safeClose makes the double-close harmless.
+    safeClose(playerRef.current);
+    safeClose(synthesizerRef.current);
     playerRef.current = null;
     synthesizerRef.current = null;
   }, []);
@@ -91,21 +107,25 @@ export function useSpeech(): UseSpeechResult {
   const speak = useCallback(
     async (text: string) => {
       setError(null);
-      stopSpeaking();
+      stopSpeaking(); // interrupt any in-flight synthesis so two speaks never overlap
+      let synthesizer: SpeechSynthesizer | null = null;
+      let player: SpeakerAudioDestination | null = null;
       try {
         const { token, region, voice } = await getSpeechToken();
         const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
         speechConfig.speechSynthesisVoiceName = voice;
 
-        const player = new SpeakerAudioDestination();
+        player = new SpeakerAudioDestination();
         const audioConfig = AudioConfig.fromSpeakerOutput(player);
-        const synthesizer = new SpeechSynthesizer(speechConfig, audioConfig);
+        synthesizer = new SpeechSynthesizer(speechConfig, audioConfig);
         synthesizerRef.current = synthesizer;
         playerRef.current = player;
 
+        const localPlayer = player;
+        const localSynthesizer = synthesizer;
         await new Promise<void>((resolve, reject) => {
-          player.onAudioEnd = () => resolve();
-          synthesizer.speakTextAsync(
+          localPlayer.onAudioEnd = () => resolve();
+          localSynthesizer.speakTextAsync(
             text,
             (result) => {
               if (result.reason !== ResultReason.SynthesizingAudioCompleted) {
@@ -120,22 +140,28 @@ export function useSpeech(): UseSpeechResult {
         setError(toMessage(e));
         throw e;
       } finally {
-        synthesizerRef.current?.close();
-        playerRef.current?.close();
-        synthesizerRef.current = null;
-        playerRef.current = null;
+        // Dispose THIS call's objects, not whatever the shared refs point at — a newer
+        // overlapping speak() may already own the refs. Only clear refs we still own.
+        safeClose(synthesizer);
+        safeClose(player);
+        if (synthesizerRef.current === synthesizer) synthesizerRef.current = null;
+        if (playerRef.current === player) playerRef.current = null;
       }
     },
     [stopSpeaking],
   );
 
   const startListening = useCallback(async () => {
+    // ponytail: re-entrant start is a no-op — one recognizer per hook is all the
+    // examiner-call UI needs, and it can't orphan a live mic.
+    if (recognizerRef.current || startPromiseRef.current) return;
+
     setError(null);
     setInterimTranscript("");
     segmentsRef.current = [];
     segmentAssessmentsRef.current = [];
 
-    try {
+    const startPromise = (async () => {
       const { token, region } = await getSpeechToken();
       const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
       const audioConfig = AudioConfig.fromDefaultMicrophoneInput();
@@ -178,20 +204,52 @@ export function useSpeech(): UseSpeechResult {
         setError(e.errorDetails || "Speech recognition was canceled");
       };
 
-      recognizerRef.current = recognizer;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          recognizer.startContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
+        });
+      } catch (e) {
+        safeClose(recognizer); // never leak a recognizer whose start failed
+        throw e;
+      }
 
-      await new Promise<void>((resolve, reject) => {
-        recognizer.startContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
-      });
+      // Commit only after the recognizer is fully live; stopListening awaits
+      // startPromiseRef, so it always sees either null or a started recognizer.
+      if (disposedRef.current) {
+        // component unmounted mid-start: release the mic instead of committing
+        recognizer.stopContinuousRecognitionAsync(
+          () => safeClose(recognizer),
+          () => safeClose(recognizer),
+        );
+        return;
+      }
+      recognizerRef.current = recognizer;
+    })();
+
+    startPromiseRef.current = startPromise;
+    try {
+      await startPromise;
     } catch (e) {
       setError(toMessage(e));
       throw e;
+    } finally {
+      startPromiseRef.current = null;
     }
   }, []);
 
   const stopListening = useCallback(async () => {
+    // A stop issued during startup waits for the start to land, then stops it.
+    if (startPromiseRef.current) {
+      try {
+        await startPromiseRef.current;
+      } catch {
+        // failed start already cleaned itself up; nothing to stop
+      }
+    }
+
     const recognizer = recognizerRef.current;
     if (!recognizer) return { transcript: "", assessment: null };
+    recognizerRef.current = null; // claim it so a concurrent stop can't double-dispose
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -200,8 +258,7 @@ export function useSpeech(): UseSpeechResult {
     } catch (e) {
       setError(toMessage(e));
     } finally {
-      recognizer.close();
-      recognizerRef.current = null;
+      safeClose(recognizer);
       setInterimTranscript("");
     }
 
@@ -215,10 +272,12 @@ export function useSpeech(): UseSpeechResult {
 
   // Dispose any live SDK objects (they hold the mic/speaker) if the component unmounts mid-turn.
   useEffect(() => {
+    disposedRef.current = false;
     return () => {
-      recognizerRef.current?.close();
-      synthesizerRef.current?.close();
-      playerRef.current?.close();
+      disposedRef.current = true;
+      safeClose(recognizerRef.current);
+      safeClose(synthesizerRef.current);
+      safeClose(playerRef.current);
     };
   }, []);
 
