@@ -223,6 +223,18 @@ public class SpeakingServiceTests
     }
 
     [Fact]
+    public async Task Evaluate_PronunciationWordsNull_ThrowsValidation()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        // NRT isn't runtime-enforced through System.Text.Json: "words": null on the wire deserializes to null.
+        var pronunciation = Pronunciation(72m) with { Words = null! };
+        var ex = await Assert.ThrowsAsync<ValidationException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: pronunciation)));
+        Assert.Equal("Invalid pronunciation assessment data.", ex.Message);
+        Assert.Equal(0, gemini.Calls);
+    }
+
+    [Fact]
     public async Task GetDetail_WithPronunciation_RoundTripsParsedObject()
     {
         var (svc, _, _, user, prompt) = Setup();

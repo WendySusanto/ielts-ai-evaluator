@@ -144,7 +144,8 @@ public class SpeakingService : ISpeakingService
     private static void ValidatePronunciation(PronunciationResult pa)
     {
         var scores = new[] { pa.PronunciationScore, pa.AccuracyScore, pa.FluencyScore, pa.ProsodyScore, pa.CompletenessScore };
-        if (scores.Any(s => s < 0 || s > 100) || pa.Words.Count > 400)
+        // NRT isn't runtime-enforced through System.Text.Json — "words": null on the wire lands here as null.
+        if (scores.Any(s => s < 0 || s > 100) || pa.Words is null || pa.Words.Count > 400)
             throw new ValidationException("Invalid pronunciation assessment data.");
     }
 
