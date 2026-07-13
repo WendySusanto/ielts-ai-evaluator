@@ -28,6 +28,7 @@ var host = new HostBuilder()
             options.UseNpgsql(connectionString));
 
         services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>();
+        services.AddHttpClient<ISpeechTokenService, SpeechTokenService>();
         services.AddScoped<IWritingService, WritingService>();
         services.AddScoped<ISpeakingService, SpeakingService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
