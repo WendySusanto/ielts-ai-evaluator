@@ -88,3 +88,43 @@ export interface SpeakingSessionDetail {
   pronunciation: string | null;
   createdAt: string;
 }
+
+// GET /api/speech/token — Azure Speech STS token used to drive TTS/STT client-side.
+export interface SpeechToken {
+  token: string;
+  region: string;
+  voice: string;
+}
+
+/** One word from Azure Pronunciation Assessment's per-word breakdown. */
+export interface PronunciationWord {
+  word: string;
+  accuracyScore: number;
+  errorType: string;
+}
+
+/** Azure Pronunciation Assessment result, aggregated client-side across candidate turns and
+ * submitted with the final evaluation. Band is always server-recomputed from pronunciationScore
+ * — the client never sends a meaningful value. */
+export interface PronunciationResult {
+  band?: number;
+  pronunciationScore: number;
+  accuracyScore: number;
+  fluencyScore: number;
+  prosodyScore: number;
+  completenessScore: number;
+  words: PronunciationWord[];
+}
+
+// Body for POST /api/speaking/examiner-turn
+export interface ExaminerTurnRequest {
+  speakingPromptId: string;
+  part: string;
+  turns: SpeakingTurn[];
+}
+
+// Response from POST /api/speaking/examiner-turn
+export interface ExaminerTurnResult {
+  nextQuestion: string;
+  partComplete: boolean;
+}
