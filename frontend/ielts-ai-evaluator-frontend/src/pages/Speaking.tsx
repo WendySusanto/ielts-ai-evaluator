@@ -1,168 +1,116 @@
-import { WritingSkeleton } from "@/components/skeleton/WritingSkeleton";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useApi } from "@/hooks/use-api";
-import type { SpeakingPart, SpeakingPrompt } from "@/types/Speaking";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@radix-ui/react-tabs";
-import { Clock, MessageCircle, MessagesSquare, Mic, User } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, Mic } from "lucide-react";
 import { useState } from "react";
+import type { SpeakingPart, SpeakingPrompt } from "@/types/Speaking";
+import { useApi } from "@/hooks/use-api";
+import { SpeakingSkeleton } from "@/components/skeleton/SpeakingSkeleton";
 import { useNavigate } from "react-router";
+import ErrorPage from "./ErrorPage";
 
-const PART_META: Record<
-  SpeakingPart,
-  { label: string; title: string; blurb: string; icon: typeof Mic }
-> = {
-  Part1: {
-    label: "Part 1",
-    title: "Introduction & Interview",
-    blurb:
-      "Answer familiar questions about yourself, your home, work, studies and interests. Speak for 4-5 minutes in short, natural responses.",
-    icon: User,
-  },
-  Part2: {
-    label: "Part 2",
-    title: "Individual Long Turn (Cue Card)",
-    blurb:
-      "You get a cue card and 1 minute to prepare, then speak for 1-2 minutes without interruption. Cover every bullet point on the card.",
-    icon: MessageCircle,
-  },
-  Part3: {
-    label: "Part 3",
-    title: "Two-way Discussion",
-    blurb:
-      "Discuss more abstract ideas connected to the Part 2 topic. Give developed, well-reasoned answers for 4-5 minutes.",
-    icon: MessagesSquare,
-  },
+const PART_LABEL: Record<SpeakingPart, string> = {
+  Part1: "Part 1",
+  Part2: "Part 2",
+  Part3: "Part 3",
 };
 
 const Speaking = () => {
-  const [selectedPart, setSelectedPart] = useState<SpeakingPart>("Part1");
+  const [partFilter, setPartFilter] = useState<SpeakingPart>("Part1");
+
   const navigate = useNavigate();
 
-  const { data: speakingPrompts = [], isLoading } = useApi<
-    SpeakingPrompt[]
-  >("/api/speaking-prompts");
+  const {
+    data: speakingPrompts,
+    isLoading: isLoadingPrompts,
+    error,
+    refetch,
+  } = useApi<SpeakingPrompt[]>("/api/speaking-prompts");
 
-  if (isLoading) {
-    return <WritingSkeleton />;
+  if (isLoadingPrompts) {
+    return <SpeakingSkeleton />;
   }
 
-  const prompts = (speakingPrompts as SpeakingPrompt[]) ?? [];
-  const currentTopics = prompts.filter((p) => p.part === selectedPart);
+  if (error) {
+    return (
+      <ErrorPage
+        title="Failed to load speaking topics"
+        message={error.message}
+        onRetry={refetch}
+      />
+    );
+  }
+
+  const prompts = speakingPrompts ?? [];
+  const topics = prompts.filter((prompt) => prompt.part === partFilter);
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">
-          Speaking Practice
+      <div>
+        <h1 className="text-3xl font-bold text-foreground">
+          Speaking practice
         </h1>
-        <p className="text-foreground font-medium text-lg">
-          Practice each part of the IELTS Speaking test and get instant
-          AI-powered feedback on fluency, vocabulary, grammar and pronunciation.
+        <p className="mt-1 text-muted-foreground">
+          Browse speaking topics and start a practice session with instant
+          feedback.
         </p>
       </div>
 
-      {/* Part selection */}
+      {/* Filter row */}
       <Tabs
-        value={selectedPart}
-        onValueChange={(value) => setSelectedPart(value as SpeakingPart)}
+        value={partFilter}
+        onValueChange={(value) => setPartFilter(value as SpeakingPart)}
       >
-        <TabsList className="grid w-full grid-cols-3 dark:bg-card border border-border p-1 rounded-md h-11">
-          {(Object.keys(PART_META) as SpeakingPart[]).map((part) => {
-            const Icon = PART_META[part].icon;
-            return (
-              <TabsTrigger
-                key={part}
-                value={part}
-                className="cursor-pointer rounded-sm data-[state=active]:bg-secondary data-[state=active]:text-secondary-foreground items-center flex justify-center gap-2 transition-colors duration-200"
-              >
-                <Icon className="h-4 w-4" />
-                {PART_META[part].label}
-              </TabsTrigger>
-            );
-          })}
+        <TabsList>
+          <TabsTrigger value="Part1">Part 1</TabsTrigger>
+          <TabsTrigger value="Part2">Part 2</TabsTrigger>
+          <TabsTrigger value="Part3">Part 3</TabsTrigger>
         </TabsList>
-
-        {(Object.keys(PART_META) as SpeakingPart[]).map((part) => (
-          <TabsContent key={part} value={part} className="mt-6">
-            <div className="mb-6 p-4 rounded-lg border bg-secondary border-border">
-              <h3 className="font-semibold text-secondary-foreground mb-2">
-                {PART_META[part].label} — {PART_META[part].title}
-              </h3>
-              <p className="text-secondary-foreground text-sm">
-                {PART_META[part].blurb}
-              </p>
-            </div>
-          </TabsContent>
-        ))}
       </Tabs>
 
-      {/* Topics grid */}
-      {currentTopics.length === 0 ? (
-        <Card className="border-0 shadow-lg bg-card">
-          <CardContent className="py-12 text-center">
-            <Mic className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground font-medium">
-              No {PART_META[selectedPart].label} topics available yet. Check
-              back soon!
-            </p>
-          </CardContent>
-        </Card>
+      {/* Topic grid */}
+      {topics.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Mic className="mb-4 h-12 w-12 text-muted-foreground" />
+          <p className="font-semibold text-foreground">No topics yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ask an admin to add speaking prompts.
+          </p>
+        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {currentTopics.map((topic) => (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {topics.map((topic) => (
             <Card
               key={topic.speakingPromptId}
-              className="border-0 shadow-lg bg-card hover:shadow-xl transition-all duration-300"
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                navigate(`/speaking/${topic.part}/${topic.speakingPromptId}`)
+              }
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  navigate(
+                    `/speaking/${topic.part}/${topic.speakingPromptId}`
+                  );
+                }
+              }}
+              className="cursor-pointer gap-3 p-5 transition-transform duration-200 hover:-translate-y-0.5 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <CardHeader className="pb-4">
-                <div className="flex justify-between items-start mb-2">
-                  <CardTitle className="text-lg font-semibold text-card-foreground">
-                    {topic.topic}
-                  </CardTitle>
-                  <Badge className="text-xs font-medium bg-secondary text-secondary-foreground rounded-full px-2 py-1">
-                    {topic.level}
-                  </Badge>
-                </div>
-                <p className="text-foreground font-medium text-sm">
-                  {topic.description}
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    {Math.round(topic.duration / 60)} min
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Mic className="h-4 w-4" />
-                    {PART_META[selectedPart].label}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-muted rounded-lg border border-border">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Preview:
-                  </p>
-                  <p className="text-sm text-muted-foreground italic">
-                    {topic.preview}
-                  </p>
-                </div>
-
-                <Button
-                  onClick={() =>
-                    navigate(
-                      `/speaking/${topic.part}/${topic.speakingPromptId}`,
-                    )
-                  }
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-                >
-                  <Mic className="h-4 w-4 mr-2" />
-                  Start Speaking
-                </Button>
-              </CardContent>
+              <h3 className="font-semibold text-card-foreground">
+                {topic.topic}
+              </h3>
+              <p className="line-clamp-2 text-sm text-muted-foreground">
+                {topic.preview}
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-sm text-muted-foreground">
+                <Badge variant="secondary">{PART_LABEL[topic.part]}</Badge>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {Math.round(topic.duration / 60)} min
+                </span>
+              </div>
             </Card>
           ))}
         </div>
