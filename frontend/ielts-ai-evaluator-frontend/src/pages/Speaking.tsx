@@ -9,6 +9,8 @@ import { SpeakingSkeleton } from "@/components/skeleton/SpeakingSkeleton";
 import { useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
+type PartFilter = "all" | SpeakingPart;
+
 const PART_LABEL: Record<SpeakingPart, string> = {
   Part1: "Part 1",
   Part2: "Part 2",
@@ -16,7 +18,7 @@ const PART_LABEL: Record<SpeakingPart, string> = {
 };
 
 const Speaking = () => {
-  const [partFilter, setPartFilter] = useState<SpeakingPart>("Part1");
+  const [partFilter, setPartFilter] = useState<PartFilter>("all");
 
   const navigate = useNavigate();
 
@@ -42,7 +44,9 @@ const Speaking = () => {
   }
 
   const prompts = speakingPrompts ?? [];
-  const topics = prompts.filter((prompt) => prompt.part === partFilter);
+  const topics = prompts.filter(
+    (prompt) => partFilter === "all" || prompt.part === partFilter
+  );
 
   return (
     <div className="space-y-6">
@@ -60,9 +64,10 @@ const Speaking = () => {
       {/* Filter row */}
       <Tabs
         value={partFilter}
-        onValueChange={(value) => setPartFilter(value as SpeakingPart)}
+        onValueChange={(value) => setPartFilter(value as PartFilter)}
       >
         <TabsList>
+          <TabsTrigger value="all">All</TabsTrigger>
           <TabsTrigger value="Part1">Part 1</TabsTrigger>
           <TabsTrigger value="Part2">Part 2</TabsTrigger>
           <TabsTrigger value="Part3">Part 3</TabsTrigger>
