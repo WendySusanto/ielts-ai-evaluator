@@ -58,6 +58,9 @@ export interface SpeakingEvaluateRequest {
   speakingPromptId: string;
   part: string;
   turns: SpeakingTurn[];
+  // Aggregated client-side via aggregateAssessments(); omitted entirely when no
+  // candidate turn produced a pronunciation assessment (e.g. typed-mode fallback).
+  pronunciation?: PronunciationResult;
 }
 
 // Response from POST /api/v2/speaking/sessions
