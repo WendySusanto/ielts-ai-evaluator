@@ -148,11 +148,15 @@ const SpeakingPractice = () => {
         turns: updatedTurns,
       };
       const result = await api.post<ExaminerTurnResult>("/api/speaking/examiner-turn", body);
-      setTurns((prev) => [...prev, { role: "examiner", text: result.nextQuestion }]);
       if (result.partComplete) setPartComplete(true);
-      setCallState("examinerSpeaking");
-      if (speech.supported && !forcedTypedMode) {
-        await speech.speak(result.nextQuestion).catch(() => {});
+      // Backend's turn-cap short-circuit returns partComplete with an empty nextQuestion —
+      // nothing to render or speak (speak("") may never fire onAudioEnd).
+      if (result.nextQuestion) {
+        setTurns((prev) => [...prev, { role: "examiner", text: result.nextQuestion }]);
+        setCallState("examinerSpeaking");
+        if (speech.supported && !forcedTypedMode) {
+          await speech.speak(result.nextQuestion).catch(() => {});
+        }
       }
       setCallState("yourTurn");
     } catch (e) {
@@ -352,7 +356,9 @@ const SpeakingPractice = () => {
               </ul>
             )}
             {part2Phase === "prep" && (
-              <Badge variant="outline">Prep time: {formatClock(prepLeft)}</Badge>
+              <Badge variant="outline">
+                {prepLeft <= 0 ? "Starting mic…" : `Prep time: ${formatClock(prepLeft)}`}
+              </Badge>
             )}
             {part2Phase === "talk" && (
               <Badge variant="outline">Speaking: {formatClock(talkLeft)}</Badge>
@@ -412,7 +418,7 @@ const SpeakingPractice = () => {
               )}
             >
               {callState === "listening" ? (
-                <Square className="h-5 w-5 text-white" />
+                <Square className="h-5 w-5 text-destructive-foreground" />
               ) : (
                 <Mic className="h-5 w-5 text-primary-foreground" />
               )}
