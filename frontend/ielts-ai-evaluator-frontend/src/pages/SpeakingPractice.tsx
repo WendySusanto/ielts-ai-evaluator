@@ -230,10 +230,21 @@ const SpeakingPractice = () => {
         setCallState("yourTurn");
         return;
       }
-      setPart2Phase("talk");
-      setTalkLeft(TALK_SECONDS);
-      setCallState("listening");
-      speech.startListening().catch(() => {});
+      // First mic use happens here (permission prompt / Azure token), so commit to the
+      // talk view only once the recognizer is actually live — the talk view has no
+      // mic/typed controls to recover with if the start fails.
+      speech.startListening().then(
+        () => {
+          setTalkLeft(TALK_SECONDS);
+          setPart2Phase("talk");
+          setCallState("listening");
+        },
+        () => {
+          // speech.error effect flips forcedTypedMode + toasts; land on the typed textarea.
+          setPart2Phase("done");
+          setCallState("yourTurn");
+        },
+      );
       return;
     }
     const t = setTimeout(() => setPrepLeft((s) => s - 1), 1000);
