@@ -88,7 +88,7 @@ export interface SpeakingSessionDetail {
   turns: SpeakingTurn[];
   overallBand: number;
   feedback: SpeakingFeedback;
-  pronunciation: string | null;
+  pronunciation: PronunciationResult | null;
   createdAt: string;
 }
 
