@@ -19,7 +19,7 @@ Approach chosen: **targeted additions to existing pages**, reusing `useApi`, sha
 New `BandTrendCard` component: hand-rolled inline SVG line chart (no chart library).
 
 - Y axis: fixed 0–9 band scale. X axis: time.
-- Points colored by type — writing = teal (primary), speaking = orange (tip), matching the existing stat-tile colors. Single connected line through all points in date order.
+- Points colored by type — writing = teal, speaking = orange — via two new dedicated tokens (`--chart-writing`, `--chart-speaking`) with per-mode values validated by the dataviz palette checker (the raw `--primary`/`--tip` tokens fail its chroma/lightness checks). Single connected neutral line through all points in date order; per-point native `<title>` hover tooltips; two-item legend.
 - Dashed horizontal line at `ieltsTargetScore` when set.
 - Empty state when fewer than 2 points: "Complete more evaluations to see your trend."
 - Placed above Recent Evaluations in the left column of `Dashboard.tsx`.
@@ -30,20 +30,19 @@ New `BandTrendCard` component: hand-rolled inline SVG line chart (no chart libra
 
 `Admin.tsx` (519 lines; `WritingPromptForm` is defined inside the component body — a remount-on-render bug) splits into `src/components/admin/`:
 
-- `WritingPromptsTab` + `WritingPromptForm` (extracted to top level, behavior unchanged)
+- `WritingPromptsTab` + `WritingPromptForm` (extracted to top level; fixes two latent bugs — the dialog never closing after submit, and the `isActive` Radix checkbox not registering with react-hook-form)
 - `SpeakingPromptsTab` + `SpeakingPromptForm`
-- `UsersTab`
-- `RecentEvaluationsTab`
+- `UsersTab` + `RecentEvaluationsDialog`
 
-`Admin.tsx` becomes a thin four-tab shell (Writing Tasks / Speaking Tasks / Users / Recent Evaluations).
+`Admin.tsx` becomes a thin three-tab shell (Writing Tasks / Speaking Tasks / Users).
 
 **Speaking-prompt form** fields mirror `SpeakingPrompt` (backend model): topic, description, preview, part (`Part1`/`Part2`/`Part3`), question text, cue points (textarea, newline-separated, optional — mainly Part 2), duration (seconds), level (`Academic`/`General`), isActive. Submits to existing `POST /api/speaking-prompts` upsert. List loads with `includeInactive=true` like writing prompts. No delete button — the `isActive` toggle is the archive mechanism.
 
-**Sorting:** one shared `useSortedRows` hook (~20 lines: column key + direction state, client-side sort) with clickable header cells showing a direction arrow. Used by all four tables.
+**Sorting:** one shared `useSortedRows` hook (~20 lines: column key + direction state, client-side sort) with clickable header cells showing a direction arrow. Used by all admin tables.
 
 **Validation:** required fields render inline error text (currently `required: true` blocks submit silently).
 
-**Recent Evaluations tab:** read-only sorted table from `/api/manage/recent-evaluations` — user, type, task, band, date; rows navigate to the matching feedback page (`/feedback/:id` or `/speaking-feedback/:id`).
+**Recent evaluations:** the backend endpoint is per-user (`GET /api/manage/recent-evaluations?userId=…`, 10 most recent, no user info in the DTO), so this ships as a "view recent evaluations" action on each Users row opening a read-only dialog (type, topic, task, band, date). No navigation into feedback pages — ownership checks 403 an admin opening another user's feedback.
 
 Empty states on all tables (already the pattern for writing prompts/users; carried to the new tabs).
 
