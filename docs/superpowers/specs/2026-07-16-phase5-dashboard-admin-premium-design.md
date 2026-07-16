@@ -56,7 +56,7 @@ Replace the `ComingSoon` usage in `Premium.tsx` with a two-column comparison:
 - Current-plan badge read from `/api/me`.
 - CTA: disabled-style button firing a "Payments coming soon" toast. No billing integration (out of scope for v2).
 
-`ComingSoon` component itself stays for any other route that uses it.
+`ComingSoon` has no other consumers — delete `pages/ComingSoon.tsx` once Premium stops using it.
 
 ## 4. Profile — polish only
 
