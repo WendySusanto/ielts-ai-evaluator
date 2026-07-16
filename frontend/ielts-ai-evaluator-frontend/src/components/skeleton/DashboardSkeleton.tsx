@@ -32,8 +32,21 @@ export const DashboardSkeleton = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Activity Skeleton */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-6">
+          {/* Band Trend Skeleton */}
+          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-5 w-5" />
+                <Skeleton className="h-6 w-28" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-52 w-full rounded-xl" />
+            </CardContent>
+          </Card>
+
+          {/* Recent Activity Skeleton */}
           <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
             <CardHeader className="pb-4">
               <div className="flex items-center gap-2">

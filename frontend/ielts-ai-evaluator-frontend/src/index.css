@@ -28,6 +28,8 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-tip: var(--tip);
   --color-tip-foreground: var(--tip-foreground);
+  --color-chart-writing: var(--chart-writing);
+  --color-chart-speaking: var(--chart-speaking);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -68,6 +70,9 @@
   --destructive-foreground: oklch(0.99 0.003 84);
   --tip: oklch(0.62 0.15 45);                   /* warm orange */
   --tip-foreground: oklch(0.995 0.005 84);
+  /* Band-trend chart series — validated (dataviz palette checker) against white card */
+  --chart-writing: oklch(0.58 0.13 185);
+  --chart-speaking: oklch(0.62 0.15 45);
   --border: oklch(0.91 0.012 84);
   --input: oklch(0.91 0.012 84);
   --ring: oklch(0.51 0.09 195);
@@ -105,6 +110,9 @@
   --destructive-foreground: oklch(0.16 0.02 220);
   --tip: oklch(0.7 0.14 50);
   --tip-foreground: oklch(0.17 0.02 220);
+  /* validated against dark card oklch(0.235 0.017 220) */
+  --chart-writing: oklch(0.62 0.11 190);
+  --chart-speaking: oklch(0.64 0.14 50);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.72 0.1 185);
