@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { History } from "lucide-react";
 import { useApi } from "@/hooks/use-api";
 import { useSortedRows } from "@/hooks/use-sorted-rows";
 import { SortableHead } from "./SortableHead";
@@ -5,6 +7,8 @@ import ErrorPage from "@/pages/ErrorPage";
 import { TableSkeleton } from "@/components/skeleton/TableSkeleton";
 import { User } from "@/types/User";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { RecentEvaluationsDialog } from "./RecentEvaluationsDialog";
 import {
   Card,
   CardContent,
@@ -16,6 +20,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
@@ -29,6 +34,7 @@ export const UsersTab = () => {
   } = useApi<User[]>("/api/manage/users");
 
   const { sorted, key, dir, toggle } = useSortedRows(users ?? [], "email");
+  const [viewing, setViewing] = useState<User | null>(null);
 
   if (error) {
     return (
@@ -73,6 +79,7 @@ export const UsersTab = () => {
                   onClick={() => toggle(c.k)}
                 />
               ))}
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -87,11 +94,21 @@ export const UsersTab = () => {
                 </TableCell>
                 <TableCell>{user.ieltsTargetScore ?? "Not set"}</TableCell>
                 <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title="View recent evaluations"
+                    onClick={() => setViewing(user)}
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
             {sorted.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   No users found.
                 </TableCell>
               </TableRow>
@@ -99,6 +116,9 @@ export const UsersTab = () => {
           </TableBody>
         </Table>
       </CardContent>
+      {viewing && (
+        <RecentEvaluationsDialog user={viewing} onClose={() => setViewing(null)} />
+      )}
     </Card>
   );
 };
