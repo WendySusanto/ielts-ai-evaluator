@@ -44,8 +44,12 @@ export const SpeakingPromptsTab = () => {
     isLoading,
     error,
     refetch,
-    mutate,
   } = useApi<SpeakingPrompt[]>("/api/speaking-prompts?includeInactive=true");
+
+  // Separate hook instance for the upsert: mutate overwrites its hook's data
+  // with the POST response (a single prompt), which would poison the list
+  // that useSortedRows spreads.
+  const { mutate } = useApi<SpeakingPrompt>("", { skipInitialFetch: true });
 
   const { sorted, key, dir, toggle } = useSortedRows(prompts ?? [], "topic");
 

@@ -102,15 +102,25 @@ export const WritingPromptForm = ({ prompt, onSubmit, onCancel }: WritingPromptF
           <Label htmlFor="duration">Duration (minutes)</Label>
           <Input
             type="number"
-            {...register("duration", { required: true, valueAsNumber: true })}
+            {...register("duration", {
+              required: true,
+              valueAsNumber: true,
+              validate: (v) => !Number.isNaN(v),
+            })}
           />
+          <FieldError show={!!errors.duration} label="Duration" />
         </div>
         <div>
           <Label htmlFor="minimumWords">Minimum Words</Label>
           <Input
             type="number"
-            {...register("minimumWords", { required: true, valueAsNumber: true })}
+            {...register("minimumWords", {
+              required: true,
+              valueAsNumber: true,
+              validate: (v) => !Number.isNaN(v),
+            })}
           />
+          <FieldError show={!!errors.minimumWords} label="Minimum words" />
         </div>
       </div>
 

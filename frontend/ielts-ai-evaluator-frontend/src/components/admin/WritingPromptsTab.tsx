@@ -42,8 +42,12 @@ export const WritingPromptsTab = () => {
     isLoading,
     error,
     refetch,
-    mutate,
   } = useApi<WritingPrompt[]>("/api/writing-prompts?includeInactive=true");
+
+  // Separate hook instance for the upsert: mutate overwrites its hook's data
+  // with the POST response (a single prompt), which would poison the list
+  // that useSortedRows spreads.
+  const { mutate } = useApi<WritingPrompt>("", { skipInitialFetch: true });
 
   const { sorted, key, dir, toggle } = useSortedRows(prompts ?? [], "topic");
 

@@ -46,7 +46,7 @@ export const UsersTab = () => {
     return (
       <Card>
         <CardContent className="pt-6">
-          <TableSkeleton columns={5} rows={5} />
+          <TableSkeleton columns={6} rows={5} />
         </CardContent>
       </Card>
     );

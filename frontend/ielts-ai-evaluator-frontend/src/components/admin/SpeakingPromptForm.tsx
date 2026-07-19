@@ -110,8 +110,13 @@ export const SpeakingPromptForm = ({ prompt, onSubmit, onCancel }: SpeakingPromp
           <Label htmlFor="duration">Duration (seconds)</Label>
           <Input
             type="number"
-            {...register("duration", { required: true, valueAsNumber: true })}
+            {...register("duration", {
+              required: true,
+              valueAsNumber: true,
+              validate: (v) => !Number.isNaN(v),
+            })}
           />
+          <FieldError show={!!errors.duration} label="Duration" />
         </div>
         <div>
           <Label htmlFor="level">Level</Label>
