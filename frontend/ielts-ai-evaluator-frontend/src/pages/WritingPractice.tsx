@@ -1,45 +1,67 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { useApi } from "@/hooks/use-api";
+import { formatText } from "@/lib/utils";
+import type { WritingEvaluationDto } from "@/types/evaluation";
+import WritingPrompt from "@/types/WritingPrompt";
 import {
   ArrowLeft,
-  FileText,
   Clock,
-  Save,
+  FileText,
   Lightbulb,
-  Send,
+  Loader2,
   Pause,
   Play,
   RotateCcw,
-  Loader2,
+  Save,
+  Send,
 } from "lucide-react";
-import WritingPrompt from "@/types/WritingPrompt";
-import { useApi } from "@/hooks/use-api";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
-import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSkeleton";
-import NotFound from "./NotFound";
-import { formatText } from "@/lib/utils";
-import type { WritingEvaluationDto } from "@/types/evaluation";
 import { toast } from "sonner";
+import NotFound from "./NotFound";
 
-const STRUCTURE: Record<"Task1" | "Task2", { title: string; description: string }[]> = {
+const STRUCTURE: Record<
+  "Task1" | "Task2",
+  { title: string; description: string }[]
+> = {
   Task2: [
-    { title: "Introduction", description: "Paraphrase the question and state your position." },
-    { title: "Body 1", description: "Present your first idea with a supporting example." },
-    { title: "Body 2", description: "Present a second idea, or address a counterpoint." },
-    { title: "Conclusion", description: "Restate your position and summarize your reasoning." },
+    {
+      title: "Introduction",
+      description: "Paraphrase the question and state your position.",
+    },
+    {
+      title: "Body 1",
+      description: "Present your first idea with a supporting example.",
+    },
+    {
+      title: "Body 2",
+      description: "Present a second idea, or address a counterpoint.",
+    },
+    {
+      title: "Conclusion",
+      description: "Restate your position and summarize your reasoning.",
+    },
   ],
   Task1: [
-    { title: "Introduction", description: "Paraphrase what the chart or diagram shows." },
-    { title: "Overview", description: "Give 2 key trends or features, with no specific data." },
-    { title: "Body 1", description: "Describe the first group of data in detail." },
-    { title: "Body 2", description: "Describe the second group, including comparisons." },
+    {
+      title: "Introduction",
+      description: "Paraphrase what the chart or diagram shows.",
+    },
+    {
+      title: "Overview",
+      description: "Give 2 key trends or features, with no specific data.",
+    },
+    {
+      title: "Body 1",
+      description: "Describe the first group of data in detail.",
+    },
+    {
+      title: "Body 2",
+      description: "Describe the second group, including comparisons.",
+    },
   ],
 };
 
@@ -56,7 +78,10 @@ const COACH_TIPS: Record<"Task1" | "Task2", string[]> = {
 
 const wordsOf = (text: string) => text.trim().split(/\s+/).filter(Boolean);
 const sentencesOf = (text: string) =>
-  text.split(/[.!?]+/).map((s) => s.trim()).filter(Boolean);
+  text
+    .split(/[.!?]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 
 const formatTime = (seconds: number) => {
   const mins = Math.floor(Math.max(seconds, 0) / 60);
@@ -73,9 +98,12 @@ const WritingPractice = () => {
   const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
     useApi<WritingPrompt>(`/api/writing-prompts/${taskId}`);
 
-  const { mutate } = useApi<WritingEvaluationDto>("/api/v2/writing/evaluations", {
-    skipInitialFetch: true,
-  });
+  const { mutate } = useApi<WritingEvaluationDto>(
+    "/api/v2/writing/evaluations",
+    {
+      skipInitialFetch: true,
+    },
+  );
 
   const navigate = useNavigate();
 
@@ -83,7 +111,9 @@ const WritingPractice = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [isPaused, setIsPaused] = useState(false);
-  const draftKey = writingPrompt ? `draft:writing:${writingPrompt.writingPromptId}` : null;
+  const draftKey = writingPrompt
+    ? `draft:writing:${writingPrompt.writingPromptId}`
+    : null;
 
   // Initialize the countdown once the prompt (and its duration) has loaded.
   // duration is stored in minutes; the countdown ticks in seconds.
@@ -115,7 +145,8 @@ const WritingPractice = () => {
   const minimumWords = writingPrompt?.minimumWords ?? 150;
   const belowMinimum = words.length < minimumWords;
 
-  const resolvedTaskType: "Task1" | "Task2" = writingPrompt?.taskType ?? (taskType === "Task1" ? "Task1" : "Task2");
+  const resolvedTaskType: "Task1" | "Task2" =
+    writingPrompt?.taskType ?? (taskType === "Task1" ? "Task1" : "Task2");
 
   const handleSaveDraft = () => {
     if (!draftKey) return;
@@ -169,7 +200,8 @@ const WritingPractice = () => {
             Back
           </Button>
           <p className="text-xs uppercase tracking-wider text-primary font-semibold">
-            {resolvedTaskType === "Task1" ? "Task 1" : "Task 2"} &middot; {writingPrompt.questionType}
+            {resolvedTaskType === "Task1" ? "Task 1" : "Task 2"} &middot;{" "}
+            {writingPrompt.questionType}
           </p>
           <h1 className="text-3xl font-bold">{writingPrompt.topic}</h1>
         </div>
@@ -186,7 +218,11 @@ const WritingPractice = () => {
             aria-label={isPaused ? "Resume timer" : "Pause timer"}
             onClick={() => setIsPaused((p) => !p)}
           >
-            {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+            {isPaused ? (
+              <Play className="h-4 w-4" />
+            ) : (
+              <Pause className="h-4 w-4" />
+            )}
           </Button>
           <Button
             variant="ghost"
@@ -218,11 +254,11 @@ const WritingPractice = () => {
               <p className="text-secondary-foreground whitespace-pre-wrap">
                 {formatText(writingPrompt.questionText)}
               </p>
-              {writingPrompt.imageDescription && (
+              {/* {writingPrompt.imageDescription && (
                 <p className="text-sm text-secondary-foreground/80">
                   {writingPrompt.imageDescription}
                 </p>
-              )}
+              )} */}
               {writingPrompt.imageUrl && (
                 <img
                   src={writingPrompt.imageUrl}
@@ -237,10 +273,12 @@ const WritingPractice = () => {
             <CardHeader className="flex-row items-center justify-between gap-4">
               <CardTitle>Your response</CardTitle>
               <span className="text-sm tabular-nums text-muted-foreground">
-                <span className={belowMinimum ? "text-tip font-medium" : undefined}>
+                <span
+                  className={belowMinimum ? "text-tip font-medium" : undefined}
+                >
                   {words.length} / {minimumWords} words
-                </span>
-                {" "}&middot; {sentences.length} sentences
+                </span>{" "}
+                &middot; {sentences.length} sentences
               </span>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -252,7 +290,11 @@ const WritingPractice = () => {
               />
 
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <Button variant="outline" onClick={handleSaveDraft} className="h-11">
+                <Button
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  className="h-11"
+                >
                   <Save className="h-4 w-4 mr-2" />
                   Save draft
                 </Button>
@@ -293,7 +335,9 @@ const WritingPractice = () => {
                   </span>
                   <div>
                     <p className="text-sm font-medium">{step.title}</p>
-                    <p className="text-sm text-muted-foreground">{step.description}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {step.description}
+                    </p>
                   </div>
                 </div>
               ))}

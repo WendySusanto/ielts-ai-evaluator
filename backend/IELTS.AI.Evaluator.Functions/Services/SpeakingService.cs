@@ -78,7 +78,7 @@ public class SpeakingService : ISpeakingService
         if (pronunciation is not null)
             ValidatePronunciation(pronunciation);
 
-        var userContent = BuildUserContent(prompt, request.Part, request.Turns);
+        var userContent = BuildUserContent(prompt, request.Part, request.Turns, pronunciation);
         var result = await _gemini.GenerateAsync<SpeakingFeedback>(
             SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema);
 
@@ -158,13 +158,19 @@ public class SpeakingService : ISpeakingService
             throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
     }
 
-    private static string BuildUserContent(SpeakingPrompt prompt, string part, List<SpeakingTurn> turns)
+    private static string BuildUserContent(SpeakingPrompt prompt, string part, List<SpeakingTurn> turns,
+        PronunciationResult? pronunciation)
     {
         var sb = new StringBuilder();
         sb.AppendLine($"Part: {part}");
         sb.AppendLine($"Question: {prompt.QuestionText}");
         if (!string.IsNullOrWhiteSpace(prompt.Cuepoints))
             sb.AppendLine($"Cue points: {prompt.Cuepoints}");
+        // Gemini only ever sees text, so this is the one hesitation/pacing signal it gets for the
+        // Fluency and Coherence band. Stated explicitly when absent so it scores blind knowingly.
+        sb.AppendLine(pronunciation is null
+            ? "Measured speech fluency: not available (no spoken audio was assessed for this session)."
+            : $"Measured speech fluency (0-100, from pause length, pause placement and speech rate): {pronunciation.FluencyScore:F0}");
         sb.AppendLine("Transcript:");
         foreach (var turn in turns)
         {

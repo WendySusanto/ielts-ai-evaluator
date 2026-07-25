@@ -1,7 +1,7 @@
 // src/components/PrivateRoute.tsx
+import { JSX } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { JSX } from "react";
 
 export const PrivateRoute = ({
   children,

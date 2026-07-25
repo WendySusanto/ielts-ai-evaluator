@@ -5,24 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
+import { friendlyError } from "@/lib/friendly-error";
 import { getRelativeTime } from "@/lib/utils";
 import { DashboardData } from "@/types/dashboard";
 import type { User } from "@/types/User";
-import {
-  BarChart3,
-  BookOpen,
-  Clock,
-  Mic,
-  PenTool,
-  Star,
-  Target,
-  User as UserIcon,
-} from "lucide-react";
-import { useNavigate } from "react-router";
+import { BookOpen, Clock, Mic, PenTool } from "lucide-react";
+import { Link, useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
 const Dashboard = () => {
-  // Fetch dashboard stats + the profile fields the "welcome"/profile card needs.
+  // Fetch dashboard stats + the profile fields the greeting/progress hero needs.
   const {
     data: dashboardData,
     isLoading,
@@ -39,14 +31,6 @@ const Dashboard = () => {
 
   const navigate = useNavigate();
 
-  // Calculate days since member joined
-  const getDaysSinceMember = (memberSince: string) => {
-    const memberDate = new Date(memberSince);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - memberDate.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
-
   if (isLoading || isLoadingProfile) {
     return <DashboardSkeleton />;
   }
@@ -55,7 +39,7 @@ const Dashboard = () => {
     return (
       <ErrorPage
         title="Failed to load dashboard"
-        message={(error ?? profileError)!.message}
+        message={friendlyError((error ?? profileError)!)}
         onRetry={() => {
           refetch();
           refetchProfile();
@@ -70,297 +54,177 @@ const Dashboard = () => {
 
   const { writingCount, speakingCount, averageBand, recentItems } = dashboardData;
   const targetScore = profile.ieltsTargetScore;
-  const lastWriting = recentItems.find((i) => i.type === "writing");
+  const name = profile.fullName || "Student";
+  const totalEvals = writingCount + speakingCount;
 
-  // Dynamic stats based on API data
-  const stats = [
-    {
-      title: "Total Evaluations",
-      value: (writingCount + speakingCount).toString(),
-      change: averageBand != null ? `Average: ${averageBand.toFixed(1)}` : "No evaluations yet",
-      icon: BookOpen,
-      color: "text-primary",
-    },
-    {
-      title: "Writing Tasks",
-      value: writingCount.toString(),
-      change: lastWriting
-        ? `Last: ${getRelativeTime(lastWriting.createdAt)}`
-        : "No recent activity",
-      icon: PenTool,
-      color: "text-primary",
-    },
-    {
-      title: "Speaking Tasks",
-      value: speakingCount.toString(),
-      change: targetScore != null ? `Target: ${targetScore}` : "No target set",
-      icon: Mic,
-      color: "text-tip",
-    },
-    {
-      title: "Average Band",
-      value: averageBand != null ? averageBand.toFixed(1) : "N/A",
-      change: "Across all evaluations",
-      icon: Target,
-      color: "text-tip",
-    },
-  ];
+  // The one thing the hero answers: where am I versus my target, and what next.
+  const progressPct =
+    averageBand != null && targetScore != null
+      ? Math.min((averageBand / targetScore) * 100, 100)
+      : null;
+
+  const progressLine = () => {
+    if (totalEvals === 0) {
+      return "Ready to start? Complete your first practice and your band score will appear here.";
+    }
+    if (averageBand == null) {
+      return "You've started practicing — your average band will appear once your evaluations are scored.";
+    }
+    if (targetScore == null) {
+      return null; // handled with an inline link below
+    }
+    if (averageBand >= targetScore) {
+      return `You're averaging ${averageBand.toFixed(1)} — you've reached your target of ${targetScore}. Keep it up!`;
+    }
+    const gap = (targetScore - averageBand).toFixed(1);
+    return `You're averaging ${averageBand.toFixed(1)}, targeting ${targetScore}. ${gap} band to go.`;
+  };
 
   return (
     <div className="space-y-6 min-h-full">
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">
-          Welcome back, {profile.fullName || "Student"}!
-        </h1>
-        <p className="text-foreground font-medium text-lg">
-          {targetScore != null ? (
-            <>
-              Ready to continue your IELTS journey? You're targeting a{" "}
-              <span className="font-semibold text-card-foreground">
-                {targetScore}
-              </span>{" "}
-              band score.
-            </>
-          ) : (
-            "Ready to continue your IELTS journey?"
-          )}
-        </p>
-      </div>
+      {/* Progress hero — greeting + band-vs-target + the primary next action */}
+      <Card>
+        <CardContent>
+          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-4 md:max-w-xl">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground text-balance break-words">
+                Welcome back, {name}
+              </h1>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <Card
-            key={index}
-            className="border-0 shadow-lg bg-card/80 backdrop-blur-sm hover:shadow-xl transition-all duration-300"
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-1">
-                    {stat.title}
-                  </p>
-                  <p className="text-2xl font-bold text-card-foreground">
-                    {stat.value}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {stat.change}
-                  </p>
-                </div>
-                <div
-                  className={`p-3 rounded-full bg-muted dark:bg-muted/50 ${stat.color}`}
-                >
-                  <stat.icon className="h-6 w-6" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Band Trend + Recent Activity */}
-        <div className="lg:col-span-2 space-y-6">
-          <BandTrendCard
-            points={dashboardData.bandTrend}
-            targetScore={targetScore ?? null}
-          />
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm h-[500px]">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Clock className="h-5 w-5 text-secondary" />
-                Recent Evaluations
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {recentItems.length > 0 ? (
-                recentItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-muted border border-border cursor-pointer hover:bg-muted/80 transition-colors"
-                    onClick={() =>
-                      navigate(
-                        item.type === "speaking"
-                          ? `/speaking-feedback/${item.id}`
-                          : `/feedback/${item.id}`,
-                      )
-                    }
+              {averageBand != null && totalEvals > 0 && targetScore == null ? (
+                <p className="text-foreground/80">
+                  You're averaging {averageBand.toFixed(1)}.{" "}
+                  <Link
+                    to="/profile"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`p-2 rounded-lg ${
-                          item.type === "speaking"
-                            ? "bg-tip/10 text-tip"
-                            : "bg-primary/10 text-primary"
-                        }`}
-                      >
-                        {item.type === "speaking" ? (
-                          <Mic className="h-4 w-4" />
-                        ) : (
-                          <PenTool className="h-4 w-4" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="font-medium text-card-foreground">
-                          {item.type === "speaking"
-                            ? `Speaking ${
-                                item.taskType === "Part1"
-                                  ? "Part 1"
-                                  : item.taskType === "Part2"
-                                    ? "Part 2"
-                                    : "Part 3"
-                              }`
-                            : item.taskType === "Task1"
-                              ? "Writing Task 1"
-                              : "Writing Task 2"}
-                        </p>
-                        <p className="text-sm text-foreground font-medium">
-                          {item.topic}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Badge variant="secondary" className="mb-1">
-                        {item.overallBand.toFixed(1)}
-                      </Badge>
-                      <p className="text-xs text-muted-foreground">
-                        {getRelativeTime(item.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                    Set a target score
+                  </Link>{" "}
+                  to track your progress.
+                </p>
               ) : (
-                <div className="text-center py-8">
-                  <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-foreground font-medium">
-                    No evaluations yet. Start your first practice!
-                  </p>
+                <p className="text-foreground/80">{progressLine()}</p>
+              )}
+
+              {progressPct != null && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-card-foreground">
+                      Current average
+                    </span>
+                    <span className="text-muted-foreground">
+                      {averageBand!.toFixed(1)} / {targetScore}
+                    </span>
+                  </div>
+                  <Progress value={progressPct} className="h-2" />
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* User Profile & Progress */}
-        <div className="space-y-6">
-          {/* User Profile Card */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <UserIcon className="h-5 w-5 text-secondary" />
-                Your Profile
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-foreground font-medium">
-                    Plan
-                  </span>
-                  <Badge
-                    variant={profile.plan === "Free" ? "secondary" : "default"}
-                  >
-                    {profile.plan}
-                  </Badge>
-                </div>
+              {totalEvals > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {writingCount} writing · {speakingCount} speaking evaluations
+                </p>
+              )}
+            </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-foreground font-medium">
-                    Target Score
-                  </span>
-                  <span className="text-sm font-medium text-card-foreground">
-                    {targetScore ?? "Not set"}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-foreground font-medium">
-                    Member Since
-                  </span>
-                  <span className="text-sm font-medium text-card-foreground">
-                    {getDaysSinceMember(profile.createdAt)} days
-                  </span>
-                </div>
-
-                {profile.targetTestDate && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-foreground font-medium">
-                      Target Date
-                    </span>
-                    <span className="text-sm font-medium text-card-foreground">
-                      {new Date(profile.targetTestDate).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Progress Overview */}
-          {targetScore != null && averageBand != null && (
-            <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-card-foreground">
-                  <BarChart3 className="h-5 w-5 text-secondary" />
-                  Progress Overview
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <p className="text-sm font-medium text-card-foreground">
-                      Current Average
-                    </p>
-                    <span className="text-xs text-muted-foreground">
-                      {averageBand.toFixed(1)} / {targetScore}
-                    </span>
-                  </div>
-                  <Progress
-                    value={Math.min((averageBand / targetScore) * 100, 100)}
-                    className="h-2"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Quick Actions */}
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Star className="h-5 w-5 text-secondary" />
-                Quick Start
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                onClick={() => navigate("/speaking")}
-                className="w-full justify-start bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-              >
-                <Mic className="h-4 w-4 mr-2" />
-                Start Speaking Practice
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => navigate("/writing")}
-              >
+            <div className="flex flex-col gap-3 md:w-56 md:shrink-0">
+              <Button onClick={() => navigate("/writing")}>
                 <PenTool className="h-4 w-4 mr-2" />
-                Begin Writing Task
+                Start Writing Practice
               </Button>
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => navigate("/feedback")}
+              <Button variant="outline" onClick={() => navigate("/speaking")}>
+                <Mic className="h-4 w-4 mr-2" />
+                Practice Speaking
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Progress over time */}
+      <BandTrendCard
+        points={dashboardData.bandTrend}
+        targetScore={targetScore ?? null}
+      />
+
+      {/* Recent activity */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle asChild>
+            <h2 className="flex items-center gap-2 text-card-foreground">
+              <Clock className="h-5 w-5 text-muted-foreground" />
+              Recent Evaluations
+            </h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {recentItems.length > 0 ? (
+            recentItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className="w-full text-left flex items-center justify-between p-4 rounded-xl bg-muted border border-border hover:bg-muted/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                onClick={() =>
+                  navigate(
+                    item.type === "speaking"
+                      ? `/speaking-feedback/${item.id}`
+                      : `/feedback/${item.id}`,
+                  )
+                }
               >
-                <BarChart3 className="h-4 w-4 mr-2" />
-                View Progress Report
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                <div className="flex items-center gap-4 min-w-0">
+                  <div
+                    className={`shrink-0 p-2 rounded-lg ${
+                      item.type === "speaking"
+                        ? "bg-tip/10 text-tip"
+                        : "bg-primary/10 text-primary"
+                    }`}
+                  >
+                    {item.type === "speaking" ? (
+                      <Mic className="h-4 w-4" />
+                    ) : (
+                      <PenTool className="h-4 w-4" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-medium text-card-foreground truncate">
+                      {item.type === "speaking"
+                        ? `Speaking ${
+                            item.taskType === "Part1"
+                              ? "Part 1"
+                              : item.taskType === "Part2"
+                                ? "Part 2"
+                                : "Part 3"
+                          }`
+                        : item.taskType === "Task1"
+                          ? "Writing Task 1"
+                          : "Writing Task 2"}
+                    </p>
+                    <p className="text-sm text-foreground font-medium truncate">
+                      {item.topic}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0 ml-4">
+                  <Badge variant="secondary" className="mb-1">
+                    {item.overallBand.toFixed(1)}
+                  </Badge>
+                  <p className="text-xs text-muted-foreground">
+                    {getRelativeTime(item.createdAt)}
+                  </p>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="text-center py-8">
+              <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-foreground font-medium">
+                No evaluations yet. Start your first practice!
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

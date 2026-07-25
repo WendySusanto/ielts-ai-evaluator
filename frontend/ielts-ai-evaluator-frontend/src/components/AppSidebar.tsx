@@ -74,7 +74,7 @@ export function AppSidebar() {
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild className="h-11">
+              <SidebarMenuButton asChild className="h-11" tooltip={item.title}>
                 <NavLink
                   to={item.url}
                   end
@@ -96,12 +96,7 @@ export function AppSidebar() {
   );
 
   return (
-    <Sidebar
-      className={`${
-        collapsed ? "w-16" : "w-64"
-      } border-r border-sidebar-border transition-all duration-300`}
-      collapsible="icon"
-    >
+    <Sidebar collapsible="icon">
       <SidebarContent className="pt-4">
         <div className="px-4 mb-6">
           <div className="flex items-center gap-3">

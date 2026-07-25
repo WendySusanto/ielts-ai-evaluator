@@ -16,12 +16,14 @@ public class FakeStructuredClient : IGeminiStructuredClient
     private readonly object _canned;
 
     public int Calls { get; private set; }
+    public string? LastUserContent { get; private set; }
 
     public FakeStructuredClient(object canned) => _canned = canned;
 
     public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson)
     {
         Calls++;
+        LastUserContent = userContent;
         var json = JsonSerializer.Serialize(_canned, CamelCase);
         var value = JsonSerializer.Deserialize<T>(json, CamelCase)!;
         return Task.FromResult(new GeminiResult<T>(value, "gemini-test", 100, 200));

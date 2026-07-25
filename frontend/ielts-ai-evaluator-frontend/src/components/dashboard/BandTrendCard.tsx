@@ -29,11 +29,13 @@ export const BandTrendCard = ({ points, targetScore }: BandTrendCardProps) => {
     PLOT.x0 + (i / (points.length - 1)) * (PLOT.x1 - PLOT.x0);
 
   return (
-    <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+    <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="flex items-center gap-2 text-card-foreground">
-          <TrendingUp className="h-5 w-5 text-secondary" />
-          Band Trend
+        <CardTitle asChild>
+          <h2 className="flex items-center gap-2 text-card-foreground">
+            <TrendingUp className="h-5 w-5 text-muted-foreground" />
+            Band Trend
+          </h2>
         </CardTitle>
       </CardHeader>
       <CardContent>

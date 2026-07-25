@@ -193,6 +193,27 @@ public class SpeakingServiceTests
         Assert.Equal(4.5m, stored!.Band);
     }
 
+    // Gemini is text-only, so the Azure fluency score reaching the prompt is the only thing that lets it
+    // mark hesitation and pacing at all. These two are the runnable check that the line is still emitted.
+    [Fact]
+    public async Task Evaluate_WithPronunciation_SendsMeasuredFluencyToGemini()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        // Pronunciation() supplies fluencyScore 80 alongside the 72 overall pronunciation score.
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt, pronunciation: Pronunciation(72m)));
+        Assert.Contains(
+            "Measured speech fluency (0-100, from pause length, pause placement and speech rate): 80",
+            gemini.LastUserContent);
+    }
+
+    [Fact]
+    public async Task Evaluate_WithoutPronunciation_TellsGeminiFluencyIsUnmeasured()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+        Assert.Contains("Measured speech fluency: not available", gemini.LastUserContent);
+    }
+
     [Theory]
     [InlineData(-1, 80, 80, 80, 80)]
     [InlineData(101, 80, 80, 80, 80)]
