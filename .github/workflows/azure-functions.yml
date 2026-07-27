@@ -45,7 +45,7 @@ jobs:
           export PATH="$PATH:$HOME/.dotnet/tools"
           dotnet ef database update --project backend/IELTS.AI.Evaluator.Data
         env:
-          DbConnectionString: ${{ secrets.DB_CONNECTION_STRING }}
+          DbConnectionString: ${{ secrets.DbConnectionString }}
 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
