@@ -131,7 +131,14 @@ export function useSpeech(): UseSpeechResult {
               if (result.reason !== ResultReason.SynthesizingAudioCompleted) {
                 const details = CancellationDetails.fromResult(result);
                 reject(new Error(details.errorDetails || "Speech synthesis failed"));
+                return;
               }
+              // Synthesis done, but playback isn't. onAudioEnd only fires once MediaSource
+              // has had endOfStream() called, and the SDK gates that behind isClosed — which
+              // nothing but close() sets, and which it never calls for a speaker destination
+              // passed via AudioConfig. Without this the promise waits forever. close() does
+              // not cut playback short: the element drains its buffer, then fires 'ended'.
+              localPlayer.close();
             },
             (err) => reject(new Error(err)),
           );

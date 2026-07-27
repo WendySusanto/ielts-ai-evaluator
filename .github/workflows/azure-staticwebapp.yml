@@ -3,6 +3,9 @@ name: Deploy to Azure Static Web Apps (Vite + React)
 on:
   push:
     branches: ["main"]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/azure-staticwebapp.yml"
   pull_request:
     types: [opened, synchronize, reopened, closed]
     branches: ["main"]
