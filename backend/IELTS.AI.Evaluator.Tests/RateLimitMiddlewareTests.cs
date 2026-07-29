@@ -62,8 +62,9 @@ public class RateLimitMiddlewareTests
                 Interlocked.Increment(ref allowed);
         });
 
-        // Interlocked.Increment on the shared counter means no overshoot; a lost GetOrCreate
-        // factory race can only undercount, never let extra requests through.
-        Assert.True(allowed <= 50, $"allowed {allowed} of a 50 limit");
+        // Exactly 50, not "about 50": MemoryCache.GetOrCreate races its factory across threads,
+        // so without the lock in TryConsume each racer gets its own counter and a burst leaks
+        // past the cap. This assertion is what caught that.
+        Assert.Equal(50, allowed);
     }
 }

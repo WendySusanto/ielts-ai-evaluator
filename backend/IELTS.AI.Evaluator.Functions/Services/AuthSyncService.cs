@@ -32,11 +32,11 @@ public class AuthSyncService : IAuthSyncService
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
 
-        // Soft-deleted accounts can never get or refresh custom claims, so once the current ID
-        // token expires (<=1h) every other endpoint rejects them at the auth middleware.
-        // ponytail: closing that window needs either a DB read per request or checkRevoked:true
-        // (a Firebase round trip per request) — neither is worth it. A delete path should call
-        // FirebaseAuth.DisableUserAsync + RevokeRefreshTokensAsync to kill the session at once.
+        // Belt to the auth middleware's braces: it already rejects deleted accounts within its
+        // 60s account cache, and this stops a deleted user re-provisioning claims (or being
+        // resurrected as a second row) by calling sync directly.
+        // ponytail: a delete path should also call FirebaseAuth.DisableUserAsync +
+        // RevokeRefreshTokensAsync if you ever need the session killed inside that 60s.
         if (user is { IsDeleted: true })
         {
             _logger.LogWarning("Sync rejected for deleted user, Firebase uid {Uid}", firebaseUid);

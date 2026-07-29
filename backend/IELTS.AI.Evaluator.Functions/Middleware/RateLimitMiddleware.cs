@@ -28,6 +28,8 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
 
     private static readonly (int Limit, int WindowMinutes) Default = (300, 60);
 
+    private static readonly object Gate = new();
+
     private readonly IMemoryCache _cache;
 
     public RateLimitMiddleware(IMemoryCache cache) => _cache = cache;
@@ -63,13 +65,21 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
     /// isolated-worker FunctionContext.</summary>
     internal static bool TryConsume(IMemoryCache cache, string key, int limit, TimeSpan window)
     {
-        // GetOrCreate can race two factories on first hit; the loser's counter is discarded,
-        // costing at most one uncounted request per window. Not worth a lock.
-        var counter = cache.GetOrCreate(key, entry =>
+        StrongBox<int> counter;
+
+        // MemoryCache.GetOrCreate is not atomic: on a concurrent first hit it runs the factory
+        // on several threads and hands each its own counter, so every one of them sees "1" and
+        // passes — a burst slips past the limit. The lock guarantees a single shared counter.
+        // ponytail: one global lock, held for a dictionary lookup. Stripe it by key only if a
+        // profiler ever shows contention here.
+        lock (Gate)
         {
-            entry.AbsoluteExpirationRelativeToNow = window;
-            return new StrongBox<int>(0);
-        })!;
+            counter = cache.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = window;
+                return new StrongBox<int>(0);
+            })!;
+        }
 
         return Interlocked.Increment(ref counter.Value) <= limit;
     }

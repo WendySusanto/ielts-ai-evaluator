@@ -38,6 +38,16 @@ A stolen ID token is still the prerequisite for calling the API, so this is
 defence in depth rather than the primary control — but `*` also means any site
 can probe your endpoints and read the responses, so keep it closed.
 
+**Roles/plans** are authoritative in the `users.plan` column, not in the Firebase
+custom claim. The claim exists so the frontend can hide admin-only nav, but the
+backend re-reads the plan on every request (cached 60s per user in
+`FirebaseAuthenticationMiddleware`). So changing a plan with plain SQL is enough
+— it takes effect within a minute, with no token refresh or sign-out needed:
+
+```sql
+UPDATE users SET plan = 'Free' WHERE email = '...';   -- or 'Premium' / 'Admin'
+```
+
 **Rate limiting** is in-process (`RateLimitMiddleware`), keyed on the Firebase
 uid: 60/h for `speaking/examiner-turn`, 30/h for `speech/token`, 300/h for
 everything else. Windows are per-instance, so scaling out to N instances
