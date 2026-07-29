@@ -96,12 +96,19 @@ export function useSpeech(): UseSpeechResult {
   );
 
   const stopSpeaking = useCallback(() => {
-    // Closing the player fires onAudioEnd, resolving any in-flight speak(); its finally
-    // block may then close these again — safeClose makes the double-close harmless.
-    safeClose(playerRef.current);
-    safeClose(synthesizerRef.current);
+    const player = playerRef.current;
+    const synthesizer = synthesizerRef.current;
     playerRef.current = null;
     synthesizerRef.current = null;
+    // close() alone does NOT cut playback: it just ends the media stream, and the <audio>
+    // element keeps talking until it drains what it already buffered. pause() is the real
+    // stop. Because a paused element never fires 'ended', the SDK never raises onAudioEnd —
+    // the only thing that resolves an in-flight speak() — so raise it by hand. speak()'s
+    // finally block may close these again; safeClose makes the double-close harmless.
+    player?.pause();
+    safeClose(player);
+    safeClose(synthesizer);
+    player?.onAudioEnd?.(player);
   }, []);
 
   const speak = useCallback(
@@ -112,6 +119,9 @@ export function useSpeech(): UseSpeechResult {
       let player: SpeakerAudioDestination | null = null;
       try {
         const { token, region, voice } = await getSpeechToken();
+        // Unmounted while the token was in flight — the refs cleanup already ran, so building
+        // a player now would start audio nothing is left holding a handle to.
+        if (disposedRef.current) return;
         const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
         speechConfig.speechSynthesisVoiceName = voice;
 
@@ -283,10 +293,9 @@ export function useSpeech(): UseSpeechResult {
     return () => {
       disposedRef.current = true;
       safeClose(recognizerRef.current);
-      safeClose(synthesizerRef.current);
-      safeClose(playerRef.current);
+      stopSpeaking(); // pauses playback; a bare close() would let it finish the sentence
     };
-  }, []);
+  }, [stopSpeaking]);
 
   return {
     supported,
