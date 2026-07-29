@@ -1,4 +1,5 @@
 using IELTS.AI.Evaluator.Data.Models;
+using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -30,6 +31,18 @@ public class AuthSyncService : IAuthSyncService
         string firebaseUid, string? email, string? fullName, IReadOnlyDictionary<string, object> existingClaims)
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
+
+        // Soft-deleted accounts can never get or refresh custom claims, so once the current ID
+        // token expires (<=1h) every other endpoint rejects them at the auth middleware.
+        // ponytail: closing that window needs either a DB read per request or checkRevoked:true
+        // (a Firebase round trip per request) — neither is worth it. A delete path should call
+        // FirebaseAuth.DisableUserAsync + RevokeRefreshTokensAsync to kill the session at once.
+        if (user is { IsDeleted: true })
+        {
+            _logger.LogWarning("Sync rejected for deleted user, Firebase uid {Uid}", firebaseUid);
+            throw new ForbiddenException("This account is no longer active.");
+        }
+
         if (user is null)
         {
             user = new User

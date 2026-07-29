@@ -24,6 +24,27 @@ consoles and use only the new values below. Never put real values in tracked fil
 the deployed frontend URL in the Function App's portal CORS settings
 (with credentials enabled). An in-worker `AddCors` policy is never applied.
 
+Never leave the production origin list as `*`. Verify and lock it:
+
+```sh
+az functionapp cors show -g <resource-group> -n <function-app-name>
+# if it lists "*", replace it with the SWA origin only
+az functionapp cors remove -g <resource-group> -n <function-app-name> --allowed-origins '*'
+az functionapp cors add    -g <resource-group> -n <function-app-name> \
+  --allowed-origins https://<your-swa>.azurestaticapps.net
+```
+
+A stolen ID token is still the prerequisite for calling the API, so this is
+defence in depth rather than the primary control — but `*` also means any site
+can probe your endpoints and read the responses, so keep it closed.
+
+**Rate limiting** is in-process (`RateLimitMiddleware`), keyed on the Firebase
+uid: 60/h for `speaking/examiner-turn`, 30/h for `speech/token`, 300/h for
+everything else. Windows are per-instance, so scaling out to N instances
+loosens the effective cap N-fold — if the Function App runs on a plan that
+scales aggressively, either pin `functionAppScaleLimit` or move the counters
+to Redis.
+
 ## Frontend — Vite build-time env (`.env.production`)
 
 | Variable | Purpose |

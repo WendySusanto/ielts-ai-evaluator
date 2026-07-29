@@ -15,12 +15,16 @@ var host = new HostBuilder()
     {
         builder.UseMiddleware<ExceptionHandlingMiddleware>();
         builder.UseMiddleware<FirebaseAuthenticationMiddleware>();
+        // Must follow authentication: it keys the window on the verified Firebase uid.
+        builder.UseMiddleware<RateLimitMiddleware>();
     })
     // This is where you register all your services for dependency injection.
     .ConfigureServices((context, services) =>
     {
         // CORS is enforced by the Functions host, not the worker: Host.CORS in local.settings.json
         // for dev; portal CORS settings in production. An in-worker AddCors policy is never applied.
+
+        services.AddMemoryCache(); // backs RateLimitMiddleware's per-user windows
 
         var connectionString = Environment.GetEnvironmentVariable("DbConnectionString");
 
