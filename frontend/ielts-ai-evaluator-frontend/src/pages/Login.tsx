@@ -1,25 +1,25 @@
 // src/pages/Login.tsx
-import { useState, useEffect } from "react";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
-import { auth } from "../lib/firebase";
-import {
-  setPersistence,
-  browserLocalPersistence,
-  browserSessionPersistence,
-} from "firebase/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LogoMark } from "@/components/AppSidebar";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Eye, EyeOff, Loader2, Mail, Lock, KeyRound } from "lucide-react";
-import { LogoMark } from "@/components/AppSidebar";
+import {
+  browserLocalPersistence,
+  browserSessionPersistence,
+  setPersistence,
+} from "firebase/auth";
+import { Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
+import { auth } from "../lib/firebase";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
@@ -33,6 +33,7 @@ const mapAuthError = (code: string): string => {
       return "Account disabled. Contact support.";
     case "auth/user-not-found":
     case "auth/wrong-password":
+    case "auth/invalid-credential":
       return "Incorrect email or password.";
     case "auth/too-many-requests":
       return "Too many attempts. Please try again later.";
@@ -89,7 +90,7 @@ export default function Login() {
       // Set persistence according to Remember Me
       await setPersistence(
         auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
+        remember ? browserLocalPersistence : browserSessionPersistence,
       );
       await signIn(email.trim(), password);
       navigate(from, { replace: true });
@@ -108,7 +109,7 @@ export default function Login() {
       // Google sign-in uses LOCAL to persist unless user unchecks remember
       await setPersistence(
         auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
+        remember ? browserLocalPersistence : browserSessionPersistence,
       );
       await signInWithGoogle();
       navigate(from, { replace: true });
