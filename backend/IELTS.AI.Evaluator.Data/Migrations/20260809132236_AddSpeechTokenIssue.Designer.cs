@@ -3,6 +3,7 @@ using System;
 using IELTS.AI.Evaluator.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace IELTS.AI.Evaluator.Data.Migrations
 {
     [DbContext(typeof(EvaluatorDbContext))]
-    partial class EvaluatorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809132236_AddSpeechTokenIssue")]
+    partial class AddSpeechTokenIssue
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,41 +24,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.ExaminerTurnUsage", b =>
-                {
-                    b.Property<Guid>("ExaminerTurnUsageId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("CompletionTokens")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("PromptTokens")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
-
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ExaminerTurnUsageId");
-
-                    b.HasIndex("UserId", "CreatedAt");
-
-                    b.ToTable("ExaminerTurnUsages");
-                });
 
             modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingPrompt", b =>
                 {
@@ -380,17 +348,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.HasKey("WritingPromptId");
 
                     b.ToTable("WritingPrompts");
-                });
-
-            modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.ExaminerTurnUsage", b =>
-                {
-                    b.HasOne("IELTS.AI.Evaluator.Data.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("IELTS.AI.Evaluator.Data.Models.SpeakingSession", b =>

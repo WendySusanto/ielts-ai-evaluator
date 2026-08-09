@@ -13,14 +13,34 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-type NavItem = { title: string; url: string; icon: typeof LayoutDashboard };
+type NavItem = {
+  title: string;
+  url: string;
+  icon: typeof LayoutDashboard;
+  /** Extra route prefixes that belong to this section. */
+  alsoMatch?: string[];
+};
 
 const practiceItems: NavItem[] = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Speaking", url: "/speaking", icon: Mic },
   { title: "Writing", url: "/writing", icon: Edit3 },
-  { title: "Feedback History", url: "/feedback", icon: History },
+  {
+    title: "Feedback History",
+    url: "/feedback",
+    icon: History,
+    alsoMatch: ["/speaking-feedback"],
+  },
 ];
+
+// A section stays lit on its child routes, so /writing/Task2/7 keeps "Writing"
+// highlighted while the user is mid-practice. Matches on segment boundaries so
+// /speaking never claims /speaking-feedback.
+const isNavItemActive = (pathname: string, item: NavItem) =>
+  [item.url, ...(item.alsoMatch ?? [])].some(
+    (base) =>
+      pathname === base || (base !== "/" && pathname.startsWith(`${base}/`)),
+  );
 
 const accountItems: NavItem[] = [{ title: "Premium", url: "/premium", icon: Crown }];
 
@@ -55,10 +75,6 @@ export function AppSidebar() {
 
   const collapsed = !isMobile && state === "collapsed";
 
-  const isActive = (path: string) => currentPath === path;
-  const getNavCls = (active: boolean) =>
-    active ? "bg-sidebar-primary text-sidebar-primary-foreground" : "";
-
   const renderGroup = (label: string, items: NavItem[]) => (
     <SidebarGroup key={label}>
       <SidebarGroupLabel
@@ -72,24 +88,34 @@ export function AppSidebar() {
       </SidebarGroupLabel>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild className="h-11" tooltip={item.title}>
-                <NavLink
-                  to={item.url}
-                  end
-                  className={`flex items-center gap-3 px-3 py-2 rounded-full transition-all duration-200 ${getNavCls(
-                    isActive(item.url)
-                  )}`}
+          {items.map((item) => {
+            const active = isNavItemActive(currentPath, item);
+            return (
+              <SidebarMenuItem key={item.title}>
+                {/* Styling lives here, not on the NavLink: only this className is
+                    run through tailwind-merge against the button variants. */}
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.title}
+                  className={`h-11 gap-3 rounded-full px-3 transition-colors duration-200 ${
+                    active
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary hover:text-sidebar-primary-foreground active:bg-sidebar-primary active:text-sidebar-primary-foreground"
+                      : ""
+                  }`}
                 >
-                  <item.icon className="size-4 flex-shrink-0" />
-                  {!collapsed && (
-                    <span className="font-medium">{item.title}</span>
-                  )}
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
+                  <NavLink
+                    to={item.url}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <item.icon className="size-4 shrink-0" />
+                    {!collapsed && (
+                      <span className="font-medium">{item.title}</span>
+                    )}
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

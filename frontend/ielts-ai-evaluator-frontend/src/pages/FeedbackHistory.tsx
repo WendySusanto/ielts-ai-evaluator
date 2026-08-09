@@ -1,6 +1,7 @@
 import { BandScore } from "@/components/feedback/BandScore";
 import { FeedbackHistorySkeleton } from "@/components/skeleton/FeedbackHistorySkeleton";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useApi } from "@/hooks/use-api";
 import { getRelativeTime } from "@/lib/utils";
@@ -118,15 +119,12 @@ const FeedbackHistory = () => {
   const emptyState = EMPTY_STATE[activeTab];
 
   return (
-    <div className="p-6 space-y-6 min-h-full">
-      {/* Header */}
+    <div className="space-y-6 min-h-full">
+      {/* Header — the layout header owns the h1 ("Feedback History"). */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Feedback history</h1>
-          <p className="text-muted-foreground">
-            Track your progress and review detailed AI feedback
-          </p>
-        </div>
+        <p className="text-muted-foreground">
+          Track your progress and review detailed AI feedback
+        </p>
 
         <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as EvaluationType)}>
           <TabsList>
@@ -137,29 +135,27 @@ const FeedbackHistory = () => {
         </Tabs>
       </div>
 
-      {/* Stat tiles */}
-      <div className="grid sm:grid-cols-3 gap-4">
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Total sessions</p>
-          <p className="text-2xl font-bold text-foreground">{feedbackHistory.length}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Writing average</p>
-          {writingAverage !== null ? (
-            <BandScore band={writingAverage} size="md" />
-          ) : (
-            <p className="text-2xl font-bold text-muted-foreground">—</p>
-          )}
-        </div>
-        <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-sm text-muted-foreground">Speaking average</p>
-          {speakingAverage !== null ? (
-            <BandScore band={speakingAverage} size="md" />
-          ) : (
-            <p className="text-2xl font-bold text-muted-foreground">—</p>
-          )}
-        </div>
-      </div>
+      {/* Summary */}
+      <dl className="grid gap-4 sm:grid-cols-3">
+        {[
+          { label: "Total sessions", value: feedbackHistory.length, band: null },
+          { label: "Writing average", value: null, band: writingAverage },
+          { label: "Speaking average", value: null, band: speakingAverage },
+        ].map(({ label, value, band }) => (
+          <Card key={label} className="gap-1 p-4">
+            <dt className="text-sm text-muted-foreground">{label}</dt>
+            <dd>
+              {band !== null ? (
+                <BandScore band={band} size="md" />
+              ) : (
+                <span className="text-2xl font-bold tabular-nums text-foreground">
+                  {value ?? "—"}
+                </span>
+              )}
+            </dd>
+          </Card>
+        ))}
+      </dl>
 
       {/* List */}
       {filteredHistory.length === 0 ? (

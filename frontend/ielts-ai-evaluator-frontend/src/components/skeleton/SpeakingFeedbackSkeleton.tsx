@@ -3,7 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function SpeakingFeedbackSkeleton() {
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header Skeleton */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex items-start gap-4">

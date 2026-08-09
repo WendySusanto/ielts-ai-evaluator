@@ -1,10 +1,9 @@
 import { BrowserRouter, Route, Routes } from "react-router";
-import { Toaster } from "sonner";
-import "./App.css";
 import { AppSidebar } from "./components/AppSidebar";
 import MainLayout from "./components/MainLayout";
 import { PrivateRoute } from "./components/PrivateRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
+import { Toaster } from "./components/ui/sonner";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Admin from "./pages/Admin";
@@ -25,21 +24,21 @@ import WritingPractice from "./pages/WritingPractice";
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          {/* Auth Routes */}
-          <Route path="/login" element={<Login />} />
-
-          <Route path="/register" element={<Register />} />
-          {/* Main Application Routes */}
-          <Route
-            path="/*"
-            element={
-              <ThemeProvider>
-                <Toaster />
+      {/* Theme wraps every route so /login and /register honour it too. */}
+      <ThemeProvider>
+        <AuthProvider>
+          <Toaster />
+          <Routes>
+            {/* Auth Routes */}
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            {/* Main Application Routes */}
+            <Route
+              path="/*"
+              element={
                 <SidebarProvider>
                   <AppSidebar />
-                  <main className="flex-1">
+                  <main className="flex-1 min-w-0">
                     <MainLayout>
                       <Routes>
                         <Route
@@ -135,11 +134,11 @@ function App() {
                     </MainLayout>
                   </main>
                 </SidebarProvider>
-              </ThemeProvider>
-            }
-          />
-        </Routes>
-      </AuthProvider>
+              }
+            />
+          </Routes>
+        </AuthProvider>
+      </ThemeProvider>
     </BrowserRouter>
   );
 }

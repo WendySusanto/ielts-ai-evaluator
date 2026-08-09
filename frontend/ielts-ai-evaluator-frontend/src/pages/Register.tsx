@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { authErrorCode } from "../lib/auth";
 import { auth } from "../lib/firebase";
 import {
   setPersistence,
@@ -26,44 +27,109 @@ import {
   Lock,
   UserPlus,
   User,
-  CheckCircle,
-  XCircle,
+  Check,
+  X,
 } from "lucide-react";
 import { LogoMark } from "@/components/AppSidebar";
+import { GoogleIcon } from "@/components/GoogleIcon";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 
-// Password strength validation
+// Which field an error belongs to, so only that input is marked invalid.
+type AuthError = {
+  field?: "displayName" | "email" | "password" | "confirmPassword";
+  message: string;
+};
+
+// Password strength. Every rule scored here is also shown to the user, so the
+// meter, the checklist and the error message can never disagree.
+const PASSWORD_RULES = [
+  { label: "At least 8 characters", test: (p: string) => p.length >= 8 },
+  { label: "Uppercase letter", test: (p: string) => /[A-Z]/.test(p) },
+  { label: "Lowercase letter", test: (p: string) => /[a-z]/.test(p) },
+  { label: "Number", test: (p: string) => /\d/.test(p) },
+  {
+    label: "Symbol (!, ?, #…)",
+    test: (p: string) => /[!@#$%^&*(),.?":{}|<>]/.test(p),
+  },
+] as const;
+
 const validatePassword = (password: string) => {
-  const checks = {
-    length: password.length >= 8,
-    uppercase: /[A-Z]/.test(password),
-    lowercase: /[a-z]/.test(password),
-    number: /\d/.test(password),
-    special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-  };
-  const score = Object.values(checks).filter(Boolean).length;
-  return { checks, score, isValid: score >= 3 && checks.length };
+  const passed = PASSWORD_RULES.map((rule) => rule.test(password));
+  const score = passed.filter(Boolean).length;
+  // Length is required; any two further rules are enough.
+  return { passed, score, isValid: passed[0] && score >= 3 };
+};
+
+const PasswordStrength = ({ password }: { password: string }) => {
+  // Nothing typed yet: an empty meter is noise, not feedback.
+  if (!password) return null;
+
+  const { passed, score } = validatePassword(password);
+
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex gap-1" aria-hidden="true">
+        {PASSWORD_RULES.map((rule, i) => (
+          <div
+            key={rule.label}
+            className={`h-1 flex-1 rounded-full transition-colors ${
+              i < score
+                ? score >= 4
+                  ? "bg-primary"
+                  : score >= 3
+                    ? "bg-tip"
+                    : "bg-destructive"
+                : "bg-muted"
+            }`}
+          />
+        ))}
+      </div>
+      <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        {PASSWORD_RULES.map((rule, i) => (
+          <li
+            key={rule.label}
+            className={`flex items-center gap-1.5 ${
+              passed[i] ? "text-primary" : "text-muted-foreground"
+            }`}
+          >
+            {passed[i] ? (
+              <Check className="size-3 shrink-0" strokeWidth={3} />
+            ) : (
+              <X className="size-3 shrink-0" strokeWidth={3} />
+            )}
+            {rule.label}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 };
 
 // Map Firebase error codes to user friendly messages
-const mapAuthError = (code: string): string => {
+const mapAuthError = (code: string): AuthError => {
   switch (code) {
     case "auth/invalid-email":
-      return "Invalid email format.";
+      return { field: "email", message: "Invalid email format." };
     case "auth/email-already-in-use":
-      return "Email already registered. Try signing in instead.";
+      return {
+        field: "email",
+        message: "Email already registered. Try signing in instead.",
+      };
     case "auth/weak-password":
-      return "Password is too weak. Please choose a stronger password.";
+      return {
+        field: "password",
+        message: "Password is too weak. Please choose a stronger password.",
+      };
     case "auth/too-many-requests":
-      return "Too many attempts. Please try again later.";
+      return { message: "Too many attempts. Please try again later." };
     case "auth/popup-closed-by-user":
-      return "Google sign-in was closed.";
+      return { message: "Google sign-in was closed." };
     case "auth/operation-not-allowed":
-      return "Registration is currently disabled. Contact support.";
+      return { message: "Registration is currently disabled. Contact support." };
     default:
-      return "Registration failed. Please try again.";
+      return { message: "Registration failed. Please try again." };
   }
 };
 
@@ -76,12 +142,16 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [remember, setRemember] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // const [acceptTerms, setAcceptTerms] = useState(true);
+  // Which sign-up is in flight, so only that button shows a spinner.
+  const [pending, setPending] = useState<"email" | "google" | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || "/";
+  const from =
+    (location.state as { from?: { pathname?: string } } | null)?.from
+      ?.pathname || "/";
+
+  const busy = pending !== null;
 
   // If already authenticated redirect
   useEffect(() => {
@@ -90,45 +160,50 @@ export default function Register() {
     }
   }, [user, loading, from, navigate]);
 
-  const passwordValidation = validatePassword(password);
-
   const validate = (): boolean => {
     setError(null);
 
     if (!displayName.trim()) {
-      setError("Display name is required.");
+      setError({ field: "displayName", message: "Full name is required." });
       return false;
     }
     if (displayName.trim().length < 2) {
-      setError("Display name must be at least 2 characters.");
+      setError({
+        field: "displayName",
+        message: "Full name must be at least 2 characters.",
+      });
       return false;
     }
     if (!email) {
-      setError("Email is required.");
+      setError({ field: "email", message: "Email is required." });
       return false;
     }
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address.");
+      setError({
+        field: "email",
+        message: "Please enter a valid email address.",
+      });
       return false;
     }
     if (!password) {
-      setError("Password is required.");
+      setError({ field: "password", message: "Password is required." });
       return false;
     }
-    if (!passwordValidation.isValid) {
-      setError(
-        "Password must be at least 8 characters with mixed case, numbers."
-      );
+    if (!validatePassword(password).isValid) {
+      setError({
+        field: "password",
+        message:
+          "Password must be at least 8 characters and include at least 2 of: an uppercase letter, a lowercase letter, a number, or a symbol.",
+      });
       return false;
     }
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError({
+        field: "confirmPassword",
+        message: "Passwords do not match.",
+      });
       return false;
     }
-    // if (!acceptTerms) {
-    //   setError("Please accept the terms and conditions.");
-    //   return false;
-    // }
     return true;
   };
 
@@ -137,112 +212,55 @@ export default function Register() {
     if (!validate()) return;
 
     try {
-      setSubmitting(true);
+      setPending("email");
       // Set persistence according to Remember Me
       await setPersistence(
         auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
+        remember ? browserLocalPersistence : browserSessionPersistence,
       );
       await signUp(email.trim(), password, displayName.trim());
-
-      await navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(mapAuthError(err.code || ""));
+      navigate(from, { replace: true });
+    } catch (err) {
+      setError(mapAuthError(authErrorCode(err)));
     } finally {
-      setSubmitting(false);
+      setPending(null);
     }
   };
 
   const handleGoogle = async () => {
     setError(null);
-    // if (!acceptTerms) {
-    //   setError("Please accept the terms and conditions.");
-    //   return;
-    // }
-
     try {
-      setSubmitting(true);
+      setPending("google");
       await setPersistence(
         auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
+        remember ? browserLocalPersistence : browserSessionPersistence,
       );
       await signInWithGoogle();
-
-      // var payload: UserType = {
-      //   email: auth.currentUser?.email || "",
-      //   firebaseUid: auth.currentUser?.uid || "",
-      //   authProvider: auth.currentUser?.providerData[0]?.providerId || "",
-      // };
-
-      // await registerAsync(payload);
-
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(mapAuthError(err.code || ""));
+    } catch (err) {
+      setError(mapAuthError(authErrorCode(err)));
     } finally {
-      setSubmitting(false);
+      setPending(null);
     }
   };
 
-  const PasswordStrengthIndicator = () => (
-    <div className="mt-2 space-y-1">
-      <div className="flex gap-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className={`h-1 flex-1 rounded-full transition-colors ${
-              i < passwordValidation.score
-                ? passwordValidation.score >= 4
-                  ? "bg-primary"
-                  : passwordValidation.score >= 3
-                  ? "bg-tip"
-                  : "bg-destructive"
-                : "bg-muted"
-            }`}
-          />
-        ))}
-      </div>
-      {password && (
-        <div className="grid grid-cols-2 gap-1 text-xs">
-          {Object.entries({
-            "8+ chars": passwordValidation.checks.length,
-            Uppercase: passwordValidation.checks.uppercase,
-            Number: passwordValidation.checks.number,
-            "Special char": passwordValidation.checks.special,
-          }).map(([label, valid]) => (
-            <div
-              key={label}
-              className={`flex items-center gap-1 ${
-                valid ? "text-primary" : "text-muted-foreground"
-              }`}
-            >
-              {valid ? (
-                <CheckCircle className="h-3 w-3" />
-              ) : (
-                <XCircle className="h-3 w-3" />
-              )}
-              {label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center mx-auto p-6 w-md bg-background">
-      <div className="mb-6 flex flex-col items-center gap-2">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+      <div className="flex flex-col items-center gap-2">
         <LogoMark size={40} />
         <span className="text-xl font-semibold text-foreground">
           When IELTS?
         </span>
       </div>
-      <Card className="w-full max-w-md border-0 shadow-xl bg-card/80 backdrop-blur-sm">
+
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-center text-3xl font-bold text-primary">
-            Create Account
+          <CardTitle asChild>
+            <h1 className="text-center text-3xl font-bold text-primary">
+              Create Account
+            </h1>
           </CardTitle>
-          <p className="text-center text-foreground font-medium">
+          <p className="text-center text-muted-foreground">
             Join us to start your IELTS journey
           </p>
         </CardHeader>
@@ -252,38 +270,14 @@ export default function Register() {
             <Button
               type="button"
               variant="outline"
-              disabled={submitting}
+              disabled={busy}
               onClick={handleGoogle}
-              className="w-full flex items-center justify-center gap-2"
+              className="w-full"
             >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {pending === "google" ? (
+                <Loader2 className="animate-spin" />
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  x="0px"
-                  y="0px"
-                  width="100"
-                  height="100"
-                  viewBox="0 0 48 48"
-                >
-                  <path
-                    fill="#fbc02d"
-                    d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12	s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20	s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
-                  ></path>
-                  <path
-                    fill="#e53935"
-                    d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039	l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
-                  ></path>
-                  <path
-                    fill="#4caf50"
-                    d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36	c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
-                  ></path>
-                  <path
-                    fill="#1565c0"
-                    d="M43.611,20.083L43.595,20L42,20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571	c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
-                  ></path>
-                </svg>
+                <GoogleIcon />
               )}
               <span>Continue with Google</span>
             </Button>
@@ -294,9 +288,9 @@ export default function Register() {
             </div>
           </div>
 
-          <form onSubmit={handleEmailSignUp} className="space-y-4">
+          <form onSubmit={handleEmailSignUp} className="space-y-4" noValidate>
             {/* Display Name Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="displayName"
                 className="text-sm font-medium text-card-foreground"
@@ -309,11 +303,13 @@ export default function Register() {
                   id="displayName"
                   type="text"
                   autoComplete="name"
-                  disabled={submitting}
+                  disabled={busy}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="John Doe"
+                  placeholder="Your name"
                   className="pl-10"
+                  aria-invalid={error?.field === "displayName"}
+                  aria-describedby={error ? "register-error" : undefined}
                   required
                   minLength={2}
                 />
@@ -321,7 +317,7 @@ export default function Register() {
             </div>
 
             {/* Email Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="email"
                 className="text-sm font-medium text-card-foreground"
@@ -334,19 +330,20 @@ export default function Register() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  disabled={submitting}
+                  disabled={busy}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="pl-10"
-                  aria-invalid={!!error && !emailRegex.test(email)}
+                  aria-invalid={error?.field === "email"}
+                  aria-describedby={error ? "register-error" : undefined}
                   required
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="password"
                 className="text-sm font-medium text-card-foreground"
@@ -359,11 +356,13 @@ export default function Register() {
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  disabled={submitting}
+                  disabled={busy}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-11"
+                  aria-invalid={error?.field === "password"}
+                  aria-describedby={error ? "register-error" : undefined}
                   required
                   minLength={8}
                 />
@@ -372,11 +371,10 @@ export default function Register() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((s) => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-card-foreground transition"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
-                      tabIndex={0}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -390,11 +388,11 @@ export default function Register() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              <PasswordStrengthIndicator />
+              <PasswordStrength password={password} />
             </div>
 
             {/* Confirm Password Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="confirmPassword"
                 className="text-sm font-medium text-card-foreground"
@@ -407,11 +405,16 @@ export default function Register() {
                   id="confirmPassword"
                   type={showConfirmPassword ? "text" : "password"}
                   autoComplete="new-password"
-                  disabled={submitting}
+                  disabled={busy}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-11"
+                  aria-invalid={
+                    error?.field === "confirmPassword" ||
+                    (!!confirmPassword && password !== confirmPassword)
+                  }
+                  aria-describedby="confirmPassword-hint"
                   required
                   minLength={8}
                 />
@@ -420,11 +423,10 @@ export default function Register() {
                     <button
                       type="button"
                       onClick={() => setShowConfirmPassword((s) => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-card-foreground transition"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                       aria-label={
                         showConfirmPassword ? "Hide password" : "Show password"
                       }
-                      tabIndex={0}
                     >
                       {showConfirmPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -438,85 +440,61 @@ export default function Register() {
                   </TooltipContent>
                 </Tooltip>
               </div>
-              {confirmPassword && password !== confirmPassword && (
-                <p className="text-xs text-destructive">
-                  Passwords do not match
-                </p>
-              )}
+              <p
+                id="confirmPassword-hint"
+                className="text-xs text-destructive empty:hidden"
+                aria-live="polite"
+              >
+                {confirmPassword && password !== confirmPassword
+                  ? "Passwords do not match"
+                  : ""}
+              </p>
             </div>
 
-            {/* Terms & Remember Me */}
-            <div className="space-y-3">
-              {/* <label className="flex items-start gap-2 text-sm cursor-pointer select-none">
+            {/* Remember Me */}
+            <div className="flex items-center justify-between gap-4">
+              <label
+                htmlFor="remember"
+                className="flex items-center gap-2 text-sm cursor-pointer select-none"
+              >
                 <Checkbox
-                  checked={acceptTerms}
-                  onChange={(e) => setAcceptTerms(e.target.checked)}
-                  id="terms"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  disabled={busy}
+                  id="remember"
                 />
-                <span className="text-foreground font-medium leading-relaxed">
-                  I agree to the{" "}
-                  <Link
-                    to="/terms"
-                    className="text-tip hover:underline"
-                  >
-                    Terms of Service
-                  </Link>{" "}
-                  and{" "}
-                  <Link
-                    to="/privacy"
-                    className="text-tip hover:underline"
-                  >
-                    Privacy Policy
-                  </Link>
-                </span>
-              </label> */}
-
-              <label className="flex items-center justify-between text-sm cursor-pointer select-none">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={remember}
-                    onChange={(e) => setRemember(e.target.checked)}
-                    id="remember"
-                  />
-                  <span className="text-foreground font-medium">
-                    Remember me
-                  </span>
-                </div>
-                <Link
-                  to="/login"
-                  className="text-xs font-medium text-tip hover:underline"
-                >
-                  Have an account?
-                </Link>
+                <span className="text-foreground font-medium">Remember me</span>
               </label>
+              <Link
+                to="/login"
+                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Have an account?
+              </Link>
             </div>
 
             {error && (
               <div
-                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-2"
+                id="register-error"
+                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2"
                 role="alert"
                 aria-live="assertive"
               >
-                {error}
+                {error.message}
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+            <Button type="submit" disabled={busy} className="w-full font-semibold">
+              {pending === "email" ? (
+                <Loader2 className="animate-spin" />
               ) : (
-                <span className="flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" /> Create Account
-                </span>
+                <UserPlus />
               )}
+              Create Account
             </Button>
           </form>
 
-          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
+          <p className="text-xs text-center text-muted-foreground leading-relaxed">
             By creating an account, you agree to our terms and privacy policy.
             <span className="mx-1 font-medium">Remember me</span> controls
             session persistence.

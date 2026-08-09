@@ -22,7 +22,7 @@ const ErrorPage = ({
 
   return (
     <div className="flex items-center justify-center min-h-[400px] px-4">
-      <Card className="w-full max-w-md border-0 shadow-lg bg-card backdrop-blur-sm">
+      <Card className="w-full max-w-md" role="alert">
         <CardContent className="p-8 text-center">
           <div className="mb-6">
             <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
@@ -33,44 +33,32 @@ const ErrorPage = ({
               {title}
             </h2>
 
-            <p className="text-foreground font-medium text-sm leading-relaxed">
+            <p className="text-sm text-muted-foreground leading-relaxed">
               {message}
             </p>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             {showBackButton && (
-              <Button
-                variant="outline"
-                onClick={() => navigate(-1)}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+              <Button variant="outline" onClick={() => navigate(-1)}>
+                <ArrowLeft />
                 Go Back
               </Button>
             )}
 
-            {showRetryButton && onRetry && (
-              <Button
-                onClick={onRetry}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-            )}
+            {showRetryButton &&
+              (onRetry ? (
+                <Button onClick={onRetry}>
+                  <RefreshCw />
+                  Try Again
+                </Button>
+              ) : (
+                <Button onClick={() => window.location.reload()}>
+                  <RefreshCw />
+                  Reload Page
+                </Button>
+              ))}
           </div>
-
-          {!onRetry && showRetryButton && (
-            <div className="mt-4">
-              <Button
-                onClick={() => window.location.reload()}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground border-0"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Reload Page
-              </Button>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

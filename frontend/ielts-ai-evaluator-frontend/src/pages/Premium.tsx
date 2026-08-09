@@ -1,7 +1,3 @@
-import { Check, Crown, Sparkles } from "lucide-react";
-import { toast } from "sonner";
-import { useApi } from "@/hooks/use-api";
-import { User } from "@/types/User";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +7,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { useApi } from "@/hooks/use-api";
+import { User } from "@/types/User";
+import { Check, Crown, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
 const FREE_FEATURES = [
   "10 writing evaluations per day",
@@ -34,7 +34,10 @@ const Premium = () => {
   const FeatureList = ({ features }: { features: string[] }) => (
     <ul className="space-y-3">
       {features.map((f) => (
-        <li key={f} className="flex items-start gap-2 text-sm text-card-foreground">
+        <li
+          key={f}
+          className="flex items-start gap-2 text-sm text-card-foreground"
+        >
           <Check className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
           {f}
         </li>
@@ -56,14 +59,20 @@ const Premium = () => {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <Sparkles className="h-5 w-5 text-secondary" />
+                <Sparkles className="h-5 w-5 text-muted-foreground" />
                 Free
               </CardTitle>
               {plan === "Free" && <Badge variant="secondary">Your plan</Badge>}
             </div>
-            <CardDescription>Everything you need to start practicing</CardDescription>
+            <CardDescription>
+              Everything you need to start practicing
+            </CardDescription>
             <p className="text-3xl font-bold text-card-foreground pt-2">
-              $0<span className="text-sm font-medium text-muted-foreground"> / forever</span>
+              $0
+              <span className="text-sm font-medium text-muted-foreground">
+                {" "}
+                / forever
+              </span>
             </p>
           </CardHeader>
           <CardContent>
@@ -80,7 +89,9 @@ const Premium = () => {
               </CardTitle>
               {plan != null && plan !== "Free" && <Badge>Your plan</Badge>}
             </div>
-            <CardDescription>Unlimited practice for serious preparation</CardDescription>
+            <CardDescription>
+              Unlimited practice for serious preparation
+            </CardDescription>
             <p className="text-3xl font-bold text-card-foreground pt-2">
               Coming soon
             </p>
@@ -91,7 +102,8 @@ const Premium = () => {
               className="w-full"
               onClick={() =>
                 toast.info("Payments are coming soon", {
-                  description: "Premium upgrades aren't available yet — enjoy Free in the meantime!",
+                  description:
+                    "Premium upgrades aren't available yet — enjoy Free in the meantime!",
                 })
               }
             >

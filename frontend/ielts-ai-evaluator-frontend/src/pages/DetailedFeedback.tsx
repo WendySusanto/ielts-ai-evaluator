@@ -50,7 +50,7 @@ const DetailedFeedback = () => {
   const hasImprovedExcerpt = feedback.improvedExcerpt.trim().length > 0;
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex items-start gap-4">
@@ -58,12 +58,14 @@ const DetailedFeedback = () => {
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
+          {/* The layout header owns the h1 ("Writing Feedback"). */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {TASK_LABELS[evaluationData.taskType] ?? evaluationData.taskType} ·{" "}
+              {TASK_LABELS[evaluationData.taskType] ?? evaluationData.taskType}
+            </p>
+            <p className="text-2xl font-bold text-balance">
               {evaluationData.topic}
             </p>
-            <h1 className="text-3xl font-bold">Writing feedback</h1>
           </div>
         </div>
         <div className="text-right">
@@ -106,7 +108,8 @@ const DetailedFeedback = () => {
           <CardTitle>Your essay, annotated</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+          {/* Capped measure: the card runs to 1152px, well past a readable line. */}
+          <div className="max-w-[68ch] whitespace-pre-wrap text-sm leading-relaxed text-foreground">
             {evaluationData.essayText}
           </div>
 

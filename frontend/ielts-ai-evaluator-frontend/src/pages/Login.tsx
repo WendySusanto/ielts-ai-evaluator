@@ -1,5 +1,6 @@
 // src/pages/Login.tsx
 import { LogoMark } from "@/components/AppSidebar";
+import { GoogleIcon } from "@/components/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,28 +20,32 @@ import { Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { authErrorCode } from "../lib/auth";
 import { auth } from "../lib/firebase";
 
 // Simple email regex for client-side validation
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
 
+// Which field an error belongs to, so only that input is marked invalid.
+type AuthError = { field?: "email" | "password"; message: string };
+
 // Map Firebase error codes to user friendly messages
-const mapAuthError = (code: string): string => {
+const mapAuthError = (code: string): AuthError => {
   switch (code) {
     case "auth/invalid-email":
-      return "Invalid email format.";
+      return { field: "email", message: "Invalid email format." };
     case "auth/user-disabled":
-      return "Account disabled. Contact support.";
+      return { message: "Account disabled. Contact support." };
     case "auth/user-not-found":
     case "auth/wrong-password":
     case "auth/invalid-credential":
-      return "Incorrect email or password.";
+      return { message: "Incorrect email or password." };
     case "auth/too-many-requests":
-      return "Too many attempts. Please try again later.";
+      return { message: "Too many attempts. Please try again later." };
     case "auth/popup-closed-by-user":
-      return "Google sign-in was closed.";
+      return { message: "Google sign-in was closed." };
     default:
-      return "Authentication failed. Please try again.";
+      return { message: "Authentication failed. Please try again." };
   }
 };
 
@@ -50,12 +55,16 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true); // default checked for convenience
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  // Which sign-in is in flight, so only that button shows a spinner.
+  const [pending, setPending] = useState<"email" | "google" | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as any)?.from?.pathname || "/";
+  const from =
+    (location.state as { from?: { pathname?: string } } | null)?.from
+      ?.pathname || "/";
+
+  const busy = pending !== null;
 
   // If already authenticated redirect
   useEffect(() => {
@@ -67,15 +76,18 @@ export default function Login() {
   const validate = (): boolean => {
     setError(null);
     if (!email) {
-      setError("Email is required.");
+      setError({ field: "email", message: "Email is required." });
       return false;
     }
     if (!emailRegex.test(email)) {
-      setError("Please enter a valid email address.");
+      setError({
+        field: "email",
+        message: "Please enter a valid email address.",
+      });
       return false;
     }
     if (!password) {
-      setError("Password is required.");
+      setError({ field: "password", message: "Password is required." });
       return false;
     }
     return true;
@@ -83,10 +95,9 @@ export default function Login() {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setResetMessage(null);
     if (!validate()) return;
     try {
-      setSubmitting(true);
+      setPending("email");
       // Set persistence according to Remember Me
       await setPersistence(
         auth,
@@ -94,18 +105,17 @@ export default function Login() {
       );
       await signIn(email.trim(), password);
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(mapAuthError(err.code || ""));
+    } catch (err) {
+      setError(mapAuthError(authErrorCode(err)));
     } finally {
-      setSubmitting(false);
+      setPending(null);
     }
   };
 
   const handleGoogle = async () => {
     setError(null);
-    setResetMessage(null);
     try {
-      setSubmitting(true);
+      setPending("google");
       // Google sign-in uses LOCAL to persist unless user unchecks remember
       await setPersistence(
         auth,
@@ -113,27 +123,30 @@ export default function Login() {
       );
       await signInWithGoogle();
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(mapAuthError(err.code || ""));
+    } catch (err) {
+      setError(mapAuthError(authErrorCode(err)));
     } finally {
-      setSubmitting(false);
+      setPending(null);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center mx-auto p-6 w-md bg-background">
-      <div className="mb-6 flex flex-col items-center gap-2">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
+      <div className="flex flex-col items-center gap-2">
         <LogoMark size={40} />
         <span className="text-xl font-semibold text-foreground">
           When IELTS?
         </span>
       </div>
-      <Card className="w-full max-w-md border-0 shadow-xl bg-card/80 backdrop-blur-sm">
+
+      <Card className="w-full max-w-md shadow-lg">
         <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-center text-3xl font-bold text-primary">
-            Welcome back
+          <CardTitle asChild>
+            <h1 className="text-center text-3xl font-bold text-primary">
+              Welcome back
+            </h1>
           </CardTitle>
-          <p className="text-center text-foreground font-medium">
+          <p className="text-center text-muted-foreground">
             Sign in to continue
           </p>
         </CardHeader>
@@ -143,38 +156,14 @@ export default function Login() {
             <Button
               type="button"
               variant="outline"
-              disabled={submitting}
+              disabled={busy}
               onClick={handleGoogle}
-              className="w-full flex items-center justify-center gap-2"
+              className="w-full"
             >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+              {pending === "google" ? (
+                <Loader2 className="animate-spin" />
               ) : (
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  x="0px"
-                  y="0px"
-                  width="100"
-                  height="100"
-                  viewBox="0 0 48 48"
-                >
-                  <path
-                    fill="#fbc02d"
-                    d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12	s5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20	s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"
-                  ></path>
-                  <path
-                    fill="#e53935"
-                    d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039	l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"
-                  ></path>
-                  <path
-                    fill="#4caf50"
-                    d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36	c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"
-                  ></path>
-                  <path
-                    fill="#1565c0"
-                    d="M43.611,20.083L43.595,20L42,20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571	c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"
-                  ></path>
-                </svg>
+                <GoogleIcon />
               )}
               <span>Continue with Google</span>
             </Button>
@@ -185,9 +174,9 @@ export default function Login() {
             </div>
           </div>
 
-          <form onSubmit={handleEmailSignIn} className="space-y-5">
+          <form onSubmit={handleEmailSignIn} className="space-y-5" noValidate>
             {/* Email Field */}
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               <label
                 htmlFor="email"
                 className="text-sm font-medium text-card-foreground"
@@ -200,46 +189,39 @@ export default function Login() {
                   id="email"
                   type="email"
                   autoComplete="email"
-                  disabled={submitting}
+                  disabled={busy}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                   className="pl-10"
-                  aria-invalid={!!error && !emailRegex.test(email)}
+                  aria-invalid={error?.field === "email"}
+                  aria-describedby={error ? "login-error" : undefined}
                   required
                 />
               </div>
             </div>
 
             {/* Password Field */}
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <label
-                  htmlFor="password"
-                  className="text-sm font-medium text-card-foreground"
-                >
-                  Password
-                </label>
-                {/* <button
-                  type="button"
-                  onClick={handleForgotPassword}
-                  className="text-xs text-tip hover:underline"
-                  disabled={submitting}
-                >
-                  Forgot password?
-                </button> */}
-              </div>
+            <div className="space-y-1.5">
+              <label
+                htmlFor="password"
+                className="text-sm font-medium text-card-foreground"
+              >
+                Password
+              </label>
               <div className="relative">
                 <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
                   autoComplete="current-password"
-                  disabled={submitting}
+                  disabled={busy}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="pl-10 pr-10"
+                  className="pl-10 pr-11"
+                  aria-invalid={error?.field === "password"}
+                  aria-describedby={error ? "login-error" : undefined}
                   required
                   minLength={6}
                 />
@@ -248,11 +230,10 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setShowPassword((s) => !s)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-card-foreground transition"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                       aria-label={
                         showPassword ? "Hide password" : "Show password"
                       }
-                      tabIndex={0}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4" />
@@ -269,20 +250,22 @@ export default function Login() {
             </div>
 
             {/* Remember Me */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+            <div className="flex items-center justify-between gap-4">
+              <label
+                htmlFor="remember"
+                className="flex items-center gap-2 text-sm cursor-pointer select-none"
+              >
                 <Checkbox
                   checked={remember}
-                  onChange={(e) => {
-                    setRemember(e.target.checked);
-                  }}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  disabled={busy}
                   id="remember"
                 />
                 <span className="text-foreground font-medium">Remember me</span>
               </label>
               <Link
                 to="/register"
-                className="text-xs font-medium text-tip hover:underline"
+                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
               >
                 Create account
               </Link>
@@ -290,39 +273,26 @@ export default function Login() {
 
             {error && (
               <div
-                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive p-2"
+                id="login-error"
+                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2"
                 role="alert"
                 aria-live="assertive"
               >
-                {error}
-              </div>
-            )}
-            {resetMessage && (
-              <div
-                className="text-sm rounded-md border border-primary/40 bg-primary/10 text-primary p-2"
-                role="status"
-                aria-live="polite"
-              >
-                {resetMessage}
+                {error.message}
               </div>
             )}
 
-            <Button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
-            >
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+            <Button type="submit" disabled={busy} className="w-full font-semibold">
+              {pending === "email" ? (
+                <Loader2 className="animate-spin" />
               ) : (
-                <span className="flex items-center gap-2">
-                  <KeyRound className="h-4 w-4" /> Sign In
-                </span>
+                <KeyRound />
               )}
+              Sign In
             </Button>
           </form>
 
-          <p className="text-[11px] text-center text-muted-foreground leading-relaxed">
+          <p className="text-xs text-center text-muted-foreground leading-relaxed">
             This site uses cookies only for authentication persistence when you
             select
             <span className="mx-1 font-medium">Remember me</span>. No tracking

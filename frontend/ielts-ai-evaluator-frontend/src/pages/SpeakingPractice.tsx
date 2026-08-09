@@ -283,7 +283,8 @@ const SpeakingPractice = () => {
   const busy = callState === "thinking";
 
   return (
-    <div className="flex h-[calc(100vh-1.5rem)] flex-col gap-4 p-6 animate-fade-in">
+    // 8rem of layout chrome: the 4rem sticky header plus MainLayout's py-8.
+    <div className="flex h-[calc(100vh-8rem)] flex-col gap-4">
       {/* Top bar */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -296,11 +297,12 @@ const SpeakingPractice = () => {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
+          {/* The layout header owns the h1 ("Speaking"). */}
+          <div className="min-w-0">
             <p className="text-xs uppercase tracking-wider text-primary font-semibold">
-              {PART_LABEL[prompt.part] ?? prompt.part} &middot; {prompt.topic}
+              {PART_LABEL[prompt.part] ?? prompt.part}
             </p>
-            <h1 className="text-2xl font-bold">Speaking practice</h1>
+            <p className="text-2xl font-bold truncate">{prompt.topic}</p>
           </div>
         </div>
         <Badge variant="secondary" className="gap-2 py-1.5 px-3">
@@ -424,7 +426,7 @@ const SpeakingPractice = () => {
               )}
             </button>
             <Button variant="ghost" className="h-11" onClick={() => setManualTypedMode(true)}>
-              <Keyboard className="h-4 w-4 mr-2" />
+              <Keyboard />
               Type instead
             </Button>
           </div>

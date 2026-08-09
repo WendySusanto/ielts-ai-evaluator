@@ -87,12 +87,13 @@ const Dashboard = () => {
         <CardContent>
           <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="space-y-4 md:max-w-xl">
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground text-balance break-words">
+              {/* h2: the layout header owns the page's h1 ("Dashboard"). */}
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground text-balance break-words">
                 Welcome back, {name}
-              </h1>
+              </h2>
 
               {averageBand != null && totalEvals > 0 && targetScore == null ? (
-                <p className="text-foreground/80">
+                <p className="text-muted-foreground">
                   You're averaging {averageBand.toFixed(1)}.{" "}
                   <Link
                     to="/profile"
@@ -103,7 +104,7 @@ const Dashboard = () => {
                   to track your progress.
                 </p>
               ) : (
-                <p className="text-foreground/80">{progressLine()}</p>
+                <p className="text-muted-foreground">{progressLine()}</p>
               )}
 
               {progressPct != null && (
@@ -116,7 +117,11 @@ const Dashboard = () => {
                       {averageBand!.toFixed(1)} / {targetScore}
                     </span>
                   </div>
-                  <Progress value={progressPct} className="h-2" />
+                  <Progress
+                    value={progressPct}
+                    className="h-2"
+                    aria-label={`Current average band ${averageBand!.toFixed(1)} of target ${targetScore}`}
+                  />
                 </div>
               )}
 
@@ -129,11 +134,11 @@ const Dashboard = () => {
 
             <div className="flex flex-col gap-3 md:w-56 md:shrink-0">
               <Button onClick={() => navigate("/writing")}>
-                <PenTool className="h-4 w-4 mr-2" />
+                <PenTool />
                 Start Writing Practice
               </Button>
               <Button variant="outline" onClick={() => navigate("/speaking")}>
-                <Mic className="h-4 w-4 mr-2" />
+                <Mic />
                 Practice Speaking
               </Button>
             </div>
@@ -200,7 +205,7 @@ const Dashboard = () => {
                           ? "Writing Task 1"
                           : "Writing Task 2"}
                     </p>
-                    <p className="text-sm text-foreground font-medium truncate">
+                    <p className="text-sm text-muted-foreground truncate">
                       {item.topic}
                     </p>
                   </div>

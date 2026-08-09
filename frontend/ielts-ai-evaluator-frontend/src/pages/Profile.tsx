@@ -14,7 +14,6 @@ import {
   Target,
   Mail,
   Calendar,
-  Award,
   Settings,
   Save,
   Loader2,
@@ -34,6 +33,12 @@ import {
 import { useApi } from "@/hooks/use-api";
 import { ProfileSkeleton } from "@/components/skeleton/ProfileSkeleton";
 import ErrorPage from "./ErrorPage";
+
+// View mode is the page's resting state, so its fields must stay readable.
+// The base input dims disabled controls to 50% opacity — well under AA.
+const READ_ONLY_FIELD = "read-only:bg-muted read-only:text-foreground";
+const VIEW_MODE_CONTROL =
+  "disabled:opacity-100 disabled:bg-muted disabled:text-foreground";
 
 interface ProfileFormValues {
   fullName: string;
@@ -124,23 +129,15 @@ const Profile = () => {
 
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-primary mb-2">My Profile</h1>
-        <p className="text-foreground font-medium text-lg">
-          Manage your account settings and IELTS goals
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Profile Form */}
         <div className="lg:col-span-2">
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div>
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1.5">
                   <CardTitle className="flex items-center gap-2 text-card-foreground">
-                    <UserIcon className="h-5 w-5 text-secondary" />
+                    <UserIcon className="h-5 w-5 text-muted-foreground" />
                     Personal Information
                   </CardTitle>
                   <CardDescription>
@@ -148,13 +145,18 @@ const Profile = () => {
                   </CardDescription>
                 </div>
                 {!isEditing ? (
-                  <Button variant="outline" onClick={() => setIsEditing(true)}>
-                    <Settings className="h-4 w-4 mr-2" />
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsEditing(true)}
+                    className="sm:shrink-0"
+                  >
+                    <Settings />
                     Edit Profile
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 sm:shrink-0">
                     <Button
+                      type="button"
                       variant="outline"
                       onClick={handleCancel}
                       disabled={isSaving}
@@ -162,23 +164,29 @@ const Profile = () => {
                       Cancel
                     </Button>
                     <Button
-                      onClick={handleSubmit(handleSaveProfile)}
+                      type="submit"
+                      form="profile-form"
                       disabled={isSaving || !isDirty}
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
                     >
                       {isSaving ? (
-                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <Loader2 className="animate-spin" />
                       ) : (
-                        <Save className="h-4 w-4 mr-2" />
+                        <Save />
                       )}
-                      {isSaving ? "Saving..." : "Save Changes"}
+                      {isSaving ? "Saving…" : "Save Changes"}
                     </Button>
                   </div>
                 )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <form className="space-y-4">
+              {/* Submitting via the form (not an onClick) so Enter saves instead
+                  of triggering a native GET reload that would drop the edits. */}
+              <form
+                id="profile-form"
+                onSubmit={handleSubmit(handleSaveProfile)}
+                className="space-y-4"
+              >
                 {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -190,8 +198,8 @@ const Profile = () => {
                       <Input
                         id="fullName"
                         {...register("fullName")}
-                        disabled={!isEditing}
-                        className="pl-10"
+                        readOnly={!isEditing}
+                        className={`pl-10 ${READ_ONLY_FIELD}`}
                         placeholder="Your full name"
                       />
                     </div>
@@ -206,33 +214,18 @@ const Profile = () => {
                       <Input
                         id="email"
                         value={userProfile?.email || ""}
-                        disabled={true} // Email should not be editable
-                        className="pl-10 bg-muted"
+                        readOnly // Email is set by the sign-in provider
+                        className={`pl-10 ${READ_ONLY_FIELD}`}
                         placeholder="your@email.com"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="plan" className="text-sm font-medium">
-                    Current Plan
-                  </Label>
-                  <div className="relative">
-                    <Award className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="plan"
-                      value={userProfile?.plan || "Free"}
-                      disabled={true}
-                      className="pl-10 bg-muted"
-                    />
-                  </div>
-                </div>
-
                 {/* IELTS Goals */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-                    <Target className="h-5 w-5 text-secondary" />
+                    <Target className="h-5 w-5 text-muted-foreground" />
                     IELTS Goals
                   </h3>
 
@@ -253,7 +246,10 @@ const Profile = () => {
                         }
                         disabled={!isEditing}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger
+                          id="ieltsTargetScore"
+                          className={`w-full ${VIEW_MODE_CONTROL}`}
+                        >
                           <SelectValue placeholder="Select target score" />
                         </SelectTrigger>
                         <SelectContent>
@@ -277,12 +273,14 @@ const Profile = () => {
                       </Label>
                       <div className="relative">
                         <Calendar className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                        {/* date inputs ignore readOnly for the native picker,
+                            so this one stays disabled outside edit mode. */}
                         <Input
                           id="targetTestDate"
                           type="date"
                           {...register("targetTestDate")}
                           disabled={!isEditing}
-                          className="pl-10"
+                          className={`pl-10 ${VIEW_MODE_CONTROL}`}
                         />
                       </div>
                     </div>
@@ -293,57 +291,39 @@ const Profile = () => {
           </Card>
         </div>
 
-        {/* Account Status */}
+        {/* Account Status — only what the form beside it does not already show */}
         <div className="space-y-6">
-          <Card className="border-0 shadow-lg bg-card backdrop-blur-sm">
+          <Card>
             <CardHeader className="pb-4">
               <CardTitle className="flex items-center gap-2 text-card-foreground">
-                <CheckCircle className="h-5 w-5 text-secondary" />
+                <CheckCircle className="h-5 w-5 text-muted-foreground" />
                 Account Status
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-foreground font-medium">Plan</span>
-                <Badge
-                  variant={
-                    userProfile?.plan === "Free" ? "secondary" : "default"
-                  }
-                >
-                  {userProfile?.plan || "Free"}
-                </Badge>
-              </div>
+            <CardContent>
+              <dl className="space-y-3">
+                <div className="flex justify-between items-center gap-4">
+                  <dt className="text-sm text-muted-foreground">Plan</dt>
+                  <dd>
+                    <Badge
+                      variant={
+                        userProfile?.plan === "Free" ? "secondary" : "default"
+                      }
+                    >
+                      {userProfile?.plan || "Free"}
+                    </Badge>
+                  </dd>
+                </div>
 
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-foreground font-medium">
-                  Target Score
-                </span>
-                <span className="text-sm font-medium text-card-foreground">
-                  {userProfile?.ieltsTargetScore ?? "Not set"}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-foreground font-medium">
-                  Target Date
-                </span>
-                <span className="text-sm font-medium text-card-foreground">
-                  {userProfile?.targetTestDate
-                    ? new Date(userProfile.targetTestDate).toLocaleDateString()
-                    : "Not set"}
-                </span>
-              </div>
-
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-foreground font-medium">
-                  Member Since
-                </span>
-                <span className="text-sm font-medium text-card-foreground">
-                  {userProfile?.createdAt
-                    ? new Date(userProfile.createdAt).toLocaleDateString()
-                    : "-"}
-                </span>
-              </div>
+                <div className="flex justify-between items-center gap-4">
+                  <dt className="text-sm text-muted-foreground">Member since</dt>
+                  <dd className="text-sm font-medium text-card-foreground">
+                    {userProfile?.createdAt
+                      ? new Date(userProfile.createdAt).toLocaleDateString()
+                      : "—"}
+                  </dd>
+                </div>
+              </dl>
             </CardContent>
           </Card>
         </div>

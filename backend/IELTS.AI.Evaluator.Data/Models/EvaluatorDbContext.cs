@@ -17,6 +17,8 @@ namespace IELTS.AI.Evaluator.Data.Models
         public DbSet<SpeakingPrompt> SpeakingPrompts => Set<SpeakingPrompt>();
         public DbSet<WritingEvaluation> WritingEvaluations => Set<WritingEvaluation>();
         public DbSet<SpeakingSession> SpeakingSessions => Set<SpeakingSession>();
+        public DbSet<SpeechTokenIssue> SpeechTokenIssues => Set<SpeechTokenIssue>();
+        public DbSet<ExaminerTurnUsage> ExaminerTurnUsages => Set<ExaminerTurnUsage>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -51,6 +53,22 @@ namespace IELTS.AI.Evaluator.Data.Models
                 e.Property(x => x.Pronunciation).HasColumnType("jsonb");
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.SpeakingPrompt).WithMany().HasForeignKey(x => x.SpeakingPromptId).OnDelete(DeleteBehavior.Restrict);
+                e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            });
+
+            modelBuilder.Entity<SpeechTokenIssue>(e =>
+            {
+                e.HasKey(x => x.SpeechTokenIssueId);
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+                // ponytail: one row per issuance, which the 30/hour cap bounds at ~720/user/day.
+                // Roll up into a per-user-per-day counter only if the table's size ever shows up.
+                e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            });
+
+            modelBuilder.Entity<ExaminerTurnUsage>(e =>
+            {
+                e.HasKey(x => x.ExaminerTurnUsageId);
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasIndex(x => new { x.UserId, x.CreatedAt });
             });
 

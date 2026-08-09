@@ -50,16 +50,11 @@ const Speaking = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Speaking practice
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Browse speaking topics and start a practice session with instant
-          feedback.
-        </p>
-      </div>
+      {/* The layout header owns the h1 ("Speaking"). */}
+      <p className="text-muted-foreground">
+        Browse speaking topics and start a practice session with instant
+        feedback.
+      </p>
 
       {/* Filter row */}
       <Tabs

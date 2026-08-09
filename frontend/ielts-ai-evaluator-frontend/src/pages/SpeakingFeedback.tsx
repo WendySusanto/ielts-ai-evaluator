@@ -63,7 +63,7 @@ const SpeakingFeedback = () => {
     : [];
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between flex-wrap gap-4">
         <div className="flex items-start gap-4">
@@ -71,11 +71,12 @@ const SpeakingFeedback = () => {
             <ArrowLeft className="h-4 w-4" />
             Back
           </Button>
+          {/* The layout header owns the h1 ("Speaking Feedback"). */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {PART_LABELS[detail.part] ?? detail.part} · {detail.topic}
+              {PART_LABELS[detail.part] ?? detail.part}
             </p>
-            <h1 className="text-3xl font-bold">Speaking feedback</h1>
+            <p className="text-2xl font-bold text-balance">{detail.topic}</p>
           </div>
         </div>
         <div className="text-right">

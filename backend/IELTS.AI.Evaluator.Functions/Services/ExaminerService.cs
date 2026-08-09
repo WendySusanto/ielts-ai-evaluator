@@ -12,7 +12,9 @@ public interface IExaminerService
 }
 
 /// <summary>Live examiner-turn endpoint: not quota-gated (only the final evaluation endpoint is),
-/// but hard-capped on examiner turn count so a runaway conversation can't rack up Gemini calls.</summary>
+/// but hard-capped on examiner turn count so a runaway conversation can't rack up Gemini calls.
+/// Because no quota gates it, every call records its Gemini usage — that log is what makes this
+/// path visible on the admin user list.</summary>
 public class ExaminerService : IExaminerService
 {
     private const int MaxExaminerTurns = 8;
@@ -48,6 +50,17 @@ public class ExaminerService : IExaminerService
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
         var result = await _gemini.GenerateAsync<ExaminerTurnResult>(
             ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema);
+
+        // The turn itself is never persisted, so this row is the only record that the call was
+        // paid for. Written after the call so a failed one is not billed to the user.
+        _db.ExaminerTurnUsages.Add(new ExaminerTurnUsage
+        {
+            UserId = userId,
+            PromptTokens = result.PromptTokens,
+            CompletionTokens = result.CompletionTokens,
+        });
+        await _db.SaveChangesAsync();
+
         return result.Value;
     }
 

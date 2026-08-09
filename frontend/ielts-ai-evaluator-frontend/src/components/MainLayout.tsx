@@ -20,6 +20,8 @@ const TITLES: [string, string][] = [
   ["/speaking-feedback", "Speaking Feedback"],
   ["/speaking", "Speaking"],
   ["/writing", "Writing"],
+  // Trailing slash first: /feedback/:id is one evaluation, /feedback is the list.
+  ["/feedback/", "Writing Feedback"],
   ["/feedback", "Feedback History"],
   ["/premium", "Premium"],
   ["/admin", "Admin"],
@@ -28,7 +30,7 @@ const TITLES: [string, string][] = [
 
 function pageTitle(pathname: string): string {
   if (pathname === "/") return "Dashboard";
-  return TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "";
+  return TITLES.find(([prefix]) => pathname.startsWith(prefix))?.[1] ?? "Page not found";
 }
 
 function MainLayout({ children }: { children: React.ReactNode }) {
@@ -50,7 +52,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       <header className="bg-sidebar px-4 sticky top-0 h-16 w-full flex items-center gap-3 border-b border-sidebar-border flex-shrink-0 z-50">
         <SidebarTrigger className="size-11 -ml-1 shrink-0" />
-        <span className="text-lg font-semibold truncate">{pageTitle(pathname)}</span>
+        <h1 className="text-lg font-semibold truncate">{pageTitle(pathname)}</h1>
 
         <div className="flex items-center gap-1 ml-auto">
           <Button

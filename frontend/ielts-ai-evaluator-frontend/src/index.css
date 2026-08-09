@@ -50,6 +50,9 @@
 
 :root {
   --radius: 1rem;
+  /* Makes the browser theme its own chrome — date picker, scrollbars, autofill.
+     Without it those render light over the dark palette. */
+  color-scheme: light;
 
   /* When IELTS? light: warm cream canvas, white cards, teal primary, orange tips */
   --background: oklch(0.977 0.008 84);
@@ -68,7 +71,10 @@
   --accent-foreground: oklch(0.35 0.06 195);
   --destructive: oklch(0.55 0.2 27);
   --destructive-foreground: oklch(0.99 0.003 84);
-  --tip: oklch(0.62 0.15 45);                   /* warm orange */
+  /* Deepened from L .62: at .62 both text-tip on card (3.88:1) and
+     tip-foreground on bg-tip (3.82:1) failed AA for the small text that uses
+     them. At .56 they measure 4.94 and 4.87. */
+  --tip: oklch(0.56 0.15 45);                   /* warm orange */
   --tip-foreground: oklch(0.995 0.005 84);
   /* Band-trend chart series — validated (dataviz palette checker) against white card */
   --chart-writing: oklch(0.58 0.13 185);
@@ -92,6 +98,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.19 0.015 220);          /* deep charcoal-teal */
   --foreground: oklch(0.93 0.008 84);
   --card: oklch(0.235 0.017 220);
@@ -134,4 +141,10 @@
 @layer base {
   * { @apply border-border outline-ring/50; }
   body { @apply bg-background text-foreground font-sans; }
+
+  /* Overflow safety net. Must stay inside @layer base: unlayered, it outranks
+     Tailwind's utilities layer and silently kills every max-w-* in the app
+     (it did — Sheet, Dialog and the page container were all full-bleed). */
+  * { max-width: 100%; }
+  table { border-spacing: 0; }
 }

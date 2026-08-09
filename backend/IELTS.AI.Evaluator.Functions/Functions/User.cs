@@ -49,4 +49,17 @@ public class User
         var users = await _service.ListUsersAsync();
         return new OkObjectResult(users);
     }
+
+    [Function("Admin_DeleteUser")]
+    public async Task<IActionResult> DeleteUserAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "manage/users/{id:guid}")] HttpRequest req,
+        FunctionContext context,
+        Guid id)
+    {
+        if (!context.IsAdmin())
+            throw new ForbiddenException("Administrator access required.");
+
+        await _service.DeleteUserAsync(context.GetUserId()!.Value, id);
+        return new NoContentResult();
+    }
 }

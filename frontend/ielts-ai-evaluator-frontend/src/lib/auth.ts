@@ -8,8 +8,14 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
+import { FirebaseError } from "firebase/app";
 import { auth, googleProvider } from "./firebase";
 import { api } from "./api";
+
+// Firebase throws FirebaseError; anything else (network, bugs) has no code and
+// falls through to the caller's generic message.
+export const authErrorCode = (err: unknown): string =>
+  err instanceof FirebaseError ? err.code : "";
 
 export const signUpWithEmail = async (
   email: string,

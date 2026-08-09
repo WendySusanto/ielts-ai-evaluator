@@ -1,12 +1,14 @@
-import { useTheme } from "next-themes"
 import { Toaster as Sonner, ToasterProps } from "sonner"
 
+import { useThemeContext } from "@/contexts/ThemeContext"
+
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  // Follows the app's own theme, not next-themes — this project never mounts one.
+  const { theme } = useThemeContext()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       className="toaster group"
       style={
         {

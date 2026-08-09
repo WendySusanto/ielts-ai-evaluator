@@ -131,7 +131,6 @@ const WritingPractice = () => {
     if (saved) {
       setEssay(saved);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   useEffect(() => {
@@ -144,6 +143,10 @@ const WritingPractice = () => {
   const sentences = useMemo(() => sentencesOf(essay), [essay]);
   const minimumWords = writingPrompt?.minimumWords ?? 150;
   const belowMinimum = words.length < minimumWords;
+
+  // The countdown used to just stop at zero with no acknowledgement.
+  const timeUp = timeLeft !== null && timeLeft <= 0;
+  const lowTime = timeLeft !== null && timeLeft > 0 && timeLeft <= 300;
 
   const resolvedTaskType: "Task1" | "Task2" =
     writingPrompt?.taskType ?? (taskType === "Task1" ? "Task1" : "Task2");
@@ -187,62 +190,84 @@ const WritingPractice = () => {
   }
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="space-y-6">
       {/* Top bar */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
+        {/* The layout header owns the h1 ("Writing"). */}
+        <div className="space-y-1 min-w-0">
           <Button
             onClick={() => navigate(-1)}
             variant="ghost"
             className="-ml-3 h-11"
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
+            <ArrowLeft />
             Back
           </Button>
           <p className="text-xs uppercase tracking-wider text-primary font-semibold">
             {resolvedTaskType === "Task1" ? "Task 1" : "Task 2"} &middot;{" "}
             {writingPrompt.questionType}
           </p>
-          <h1 className="text-3xl font-bold">{writingPrompt.topic}</h1>
+          <p className="text-2xl font-bold text-balance">
+            {writingPrompt.topic}
+          </p>
         </div>
 
-        <Card className="flex-row items-center gap-3 px-4 py-2 w-fit">
-          <Clock className="h-5 w-5 text-primary shrink-0" />
-          <span className="text-lg font-semibold tabular-nums min-w-[3.5rem]">
-            {formatTime(timeLeft ?? writingPrompt.duration)}
+        <div className="space-y-1">
+          {/* Only the thresholds are announced — a live region on the ticking
+              digits would speak once a second. */}
+          <span role="status" className="sr-only">
+            {timeUp ? "Time is up." : lowTime ? "Five minutes left." : ""}
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11"
-            aria-label={isPaused ? "Resume timer" : "Pause timer"}
-            onClick={() => setIsPaused((p) => !p)}
-          >
-            {isPaused ? (
-              <Play className="h-4 w-4" />
-            ) : (
-              <Pause className="h-4 w-4" />
-            )}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-11 w-11"
-            aria-label="Reset timer"
-            onClick={() => {
-              setTimeLeft(writingPrompt.duration * 60);
-              setIsPaused(false);
-            }}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-        </Card>
+          <Card className="flex-row items-center gap-3 px-4 py-2 w-fit">
+            <Clock
+              className={`h-5 w-5 shrink-0 ${timeUp ? "text-destructive" : "text-primary"}`}
+            />
+            <span
+              className={`text-lg font-semibold tabular-nums min-w-[3.5rem] ${
+                timeUp ? "text-destructive" : lowTime ? "text-tip" : ""
+              }`}
+            >
+              {/* duration is minutes; formatTime takes seconds. */}
+              {formatTime(timeLeft ?? writingPrompt.duration * 60)}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              aria-label={isPaused ? "Resume timer" : "Pause timer"}
+              onClick={() => setIsPaused((p) => !p)}
+            >
+              {isPaused ? (
+                <Play className="h-4 w-4" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              aria-label="Reset timer"
+              onClick={() => {
+                setTimeLeft(writingPrompt.duration * 60);
+                setIsPaused(false);
+              }}
+            >
+              <RotateCcw className="h-4 w-4" />
+            </Button>
+          </Card>
+          {timeUp && (
+            <p className="text-sm font-medium text-destructive">
+              Time's up — you can still finish and submit.
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Workspace */}
       <div className="grid lg:grid-cols-[1fr_320px] gap-6">
         {/* Main column */}
-        <div className="space-y-6 order-1">
+        <div className="space-y-6">
           <Card className="bg-secondary">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-secondary-foreground">
@@ -254,16 +279,14 @@ const WritingPractice = () => {
               <p className="text-secondary-foreground whitespace-pre-wrap">
                 {formatText(writingPrompt.questionText)}
               </p>
-              {/* {writingPrompt.imageDescription && (
-                <p className="text-sm text-secondary-foreground/80">
-                  {writingPrompt.imageDescription}
-                </p>
-              )} */}
               {writingPrompt.imageUrl && (
                 <img
                   src={writingPrompt.imageUrl}
-                  alt="Task visual"
-                  className="w-full rounded-md object-cover"
+                  alt={
+                    writingPrompt.imageDescription ||
+                    "Chart or diagram for this task"
+                  }
+                  className="w-full rounded-md"
                 />
               )}
             </CardContent>
@@ -295,7 +318,7 @@ const WritingPractice = () => {
                   onClick={handleSaveDraft}
                   className="h-11"
                 >
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save />
                   Save draft
                 </Button>
                 <Button
@@ -304,9 +327,9 @@ const WritingPractice = () => {
                   className="h-11 min-w-[200px]"
                 >
                   {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4 mr-2" />
+                    <Send />
                   )}
                   {isSubmitting ? "Submitting..." : "Submit for AI feedback"}
                 </Button>
@@ -322,7 +345,7 @@ const WritingPractice = () => {
         </div>
 
         {/* Guidance rail */}
-        <div className="space-y-6 order-2">
+        <div className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Suggested structure</CardTitle>

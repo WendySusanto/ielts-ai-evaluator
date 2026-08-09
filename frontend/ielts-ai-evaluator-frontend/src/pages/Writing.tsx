@@ -60,15 +60,10 @@ const Writing = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">
-          Writing practice
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Browse writing prompts and start a timed practice session.
-        </p>
-      </div>
+      {/* The layout header owns the h1 ("Writing"). */}
+      <p className="text-muted-foreground">
+        Browse writing prompts and start a timed practice session.
+      </p>
 
       {/* Filter row */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
