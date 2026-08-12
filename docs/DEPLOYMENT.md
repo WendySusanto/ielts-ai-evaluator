@@ -2,20 +2,14 @@
 
 Prep reference for the first production deployment. Nothing here provisions anything.
 
-## ⚠️ Before anything else: rotate exposed keys
-
-The Gemini API key and Firebase service-account private key were committed to
-history at one point and must be treated as compromised. Rotate both in their
-consoles and use only the new values below. Never put real values in tracked files.
-
 ## Backend — Azure Functions App Settings
 
 | Setting | Purpose | Notes |
 |---|---|---|
-| `DbConnectionString` | SQL database | production connection string |
-| `GeminiApiKey` | Gemini evaluation calls | **rotated** key |
+| `DbConnectionString` | PostgreSQL database | production connection string |
+| `GeminiApiKey` | Gemini evaluation calls | secret — App Settings only |
 | `FIREBASE_PROJECT_ID` | Firebase Admin token verification | |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials | **rotated** service-account JSON |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials | secret — App Settings only |
 | `AzureSpeechKey` | Azure Speech (TTS/STT/pronunciation) | F0 tier works; app degrades to typed mode without it |
 | `AzureSpeechRegion` | Azure Speech region | e.g. `southeastasia` |
 
@@ -79,7 +73,7 @@ npm run build                    # tsc -b + vite build, expect clean
 
 ```bash
 # backend (from backend/IELTS.AI.Evaluator.Functions/)
-func start                       # :7071
+func start                       # :7103
 # frontend (from frontend/ielts-ai-evaluator-frontend/)
 npm run dev                      # :5173
 ```

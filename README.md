@@ -1,410 +1,106 @@
-# 🎯 IELTS AI Evaluator
+# When IELTS?
 
-> An intelligent AI-powered platform for IELTS writing and speaking evaluation, providing instant feedback to help test-takers improve their English proficiency.
+Scores IELTS writing and speaking practice against the official band descriptors and returns criterion-by-criterion feedback, built for self-studying test candidates who need to know where they actually stand.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
-[![React](https://img.shields.io/badge/React-19.1-61DAFB)](https://reactjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6)](https://www.typescriptlang.org/)
+[LIVE DEMO](https://orange-desert-0c2792e00.3.azurestaticapps.net/)
 
 ---
 
-## 📖 About
+## Screenshots
 
-**IELTS AI Evaluator** is a comprehensive web application designed to assist IELTS test-takers in improving their writing and speaking skills through AI-powered evaluations. Leveraging Google's Gemini API, the platform provides detailed, criterion-based feedback on essays and speaking responses, helping users understand their strengths and areas for improvement.
+![Screenshot](docs/Speaking.png)
+_Speaking practice mid-session: the examiner's opening question, the candidate's transcribed answer, and the follow-up the model generated from what was actually said. Answers can be spoken via **Use mic** or typed — the typed path is a full fallback when Azure Speech isn't configured._
 
-### ✨ Key Features
+![Screenshot](docs/FeedbackHistory.png)
+_Writing feedback detail: overall band, the four criterion scores (Task Response, Coherence and Cohesion, Lexical Resource, Grammatical Range and Accuracy), and the per-criterion notes._
 
-- **📝 Writing Evaluation**: Submit your IELTS Task 1 and Task 2 essays for instant, detailed feedback
-  - Task Achievement / Response
-  - Coherence and Cohesion
-  - Lexical Resource
-  - Grammatical Range and Accuracy
-- **💬 Speaking Assessment**: Hold a spoken Part 1 / Part 2 / Part 3 conversation with an AI examiner that asks follow-up questions in real time, then get scored on:
-  - Fluency and Coherence
-  - Lexical Resource
-  - Grammatical Range and Accuracy
-  - Pronunciation — measured by Azure Speech pronunciation assessment, not guessed by the LLM
-- **🎙️ Speech In and Out**: Azure Speech handles speech-to-text and the examiner's voice; typed input is a full fallback when Speech isn't configured
-- **📈 Progress Dashboard**: Track your band trend and recent activity over time
-- **📜 Feedback History**: Review all your previous submissions and evaluations
-- **🎫 Plans and Quotas**: Free accounts get a configurable daily evaluation quota; Premium and Admin are unlimited
-- **🛠️ Admin Panel**: Manage writing and speaking prompts, browse users, and inspect recent evaluations
-- **🔐 Secure Authentication**: Firebase authentication, with roles resolved server-side from the database
-- **👤 User Profiles**: Target band score, target test date, and per-user history
-- **🎨 Modern UI**: Clean, responsive interface built with React and Tailwind CSS, with light and dark themes
+![Screenshot](docs/Dashboard.png)
+_Dashboard: band trend over time and recent writing and speaking attempts._
 
 ---
 
-## 🛠️ Technology Stack
+## How it works
 
-### Frontend
-- **Framework**: React 19.1 with TypeScript
-- **Build Tool**: Vite 7.0
-- **Styling**: Tailwind CSS 4.1
-- **UI Components**: Radix UI (Dialog, Select, Tabs, etc.) via shadcn/ui
-- **Routing**: React Router 7.6
-- **Forms**: React Hook Form
-- **HTTP Client**: Axios
-- **Speech**: `microsoft-cognitiveservices-speech-sdk` (STT, TTS, pronunciation assessment)
-- **Authentication**: Firebase Authentication
-- **Notifications**: Sonner
-- **Icons**: Lucide React
+A candidate picks a prompt and either writes an essay or holds a spoken conversation with an AI examiner. For speaking, the browser streams audio to Azure Speech, which returns both the transcript and an acoustic pronunciation assessment, while the backend calls Gemini between turns to generate the examiner's next follow-up question. On submission, the .NET backend builds the model input server-side — prompt text, cue points, the full transcript, and the measured fluency score — and calls Gemini with `responseMimeType: application/json` plus an explicit `responseSchema`, so feedback comes back as typed JSON rather than prose that needs parsing. The service then recomputes the overall band itself as the mean of the criterion scores rounded to the nearest 0.5, ignoring whatever overall figure the model returned. The result is persisted with its token counts and rendered as a scorecard the candidate can revisit from history.
 
-### Backend
-- **Framework**: .NET 8.0
-- **Platform**: Azure Functions (isolated worker, ASP.NET Core integration)
-- **AI Provider**: Google Gemini API (structured JSON output via response schemas)
-- **Speech**: Azure Cognitive Services Speech
-- **Database**: PostgreSQL with Entity Framework Core 9 (Npgsql)
-- **Authentication**: Firebase Admin SDK
-- **Testing**: xUnit
-- **Architecture**: Thin functions over injectable services, with DTOs, domain exceptions, and middleware
+Source: [`WritingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/WritingService.cs), [`SpeakingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs), [`GeminiStructuredClient.cs`](backend/IELTS.AI.Evaluator.Functions/Services/GeminiStructuredClient.cs)
 
 ---
 
-## 📋 Prerequisites
+## Tech stack
 
-Before you begin, ensure you have the following installed:
+**Frontend** (`frontend/ielts-ai-evaluator-frontend`)
 
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
-- **.NET SDK 8.0** or higher
-- **Azure Functions Core Tools** (for local backend development)
-- **PostgreSQL** (local instance or hosted)
-- **Firebase Project** (for authentication)
-- **Google Gemini API Key** (for AI evaluations)
-- **Azure Speech resource** *(optional — without it the app falls back to typed speaking practice)*
+- React 19.1 / TypeScript 5.8 / Vite 7.0
+- Tailwind CSS 4.1, Radix UI primitives, Lucide icons
+- React Router 7.6, React Hook Form 7.61, Axios 1.11
+- Firebase JS SDK 12.1 (auth)
+- microsoft-cognitiveservices-speech-sdk 1.50 (STT, TTS, pronunciation assessment)
+- Node 22.x
+
+**Backend** (`backend/`)
+
+- .NET 8 Azure Functions, isolated worker (Worker + Http.AspNetCore 2.0.0)
+- PostgreSQL via Npgsql 9.0.4 / EF Core 9.0.7 with migrations
+- FirebaseAdmin 3.3.0 (server-side token verification)
+- Google Gemini API (structured JSON output)
+- xUnit 2.9.3 — 13 test classes, run as a deploy gate
+
+**Hosting** — Azure Static Web Apps (frontend), Azure Functions (API), both deployed from GitHub Actions on push to `main`.
 
 ---
 
-## 🚀 Getting Started
+## Engineering decisions
 
-### 1️⃣ Clone the Repository
+**No AI provider key ever reaches the browser.** The Gemini key is read server-side from configuration in [`GeminiStructuredClient.cs:34`](backend/IELTS.AI.Evaluator.Functions/Services/GeminiStructuredClient.cs#L34) and sent as an `x-goog-api-key` header from the Function App; the frontend only ever talks to our own API. Azure Speech needs to run in the browser to capture audio, so it gets the same treatment one level down — [`SpeechTokenService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/SpeechTokenService.cs) exchanges the subscription key for a 10-minute STS token and hands the client only that. The client holds a short-lived, scoped credential instead of a permanent one.
 
-```bash
-git clone https://github.com/WendySusanto/ielts-ai-evaluator.git
-cd ielts-ai-evaluator
-```
+**Scores are recomputed server-side, never accepted from the client.** The pronunciation band is derived from Azure's raw score in [`SpeakingService.cs:77`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L77) rather than read off the request, and the overall band is averaged from the criteria in [`SpeakingService.cs:87-91`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L87-L91) rather than taken from Gemini's own `overallBand` field. A tampered request cannot inflate a band, and the model cannot contradict its own criterion scores.
 
-### 2️⃣ Frontend Setup
+**Rate limiting is shaped by what each endpoint costs, not by one global number.** [`RateLimitMiddleware.cs:19-29`](backend/IELTS.AI.Evaluator.Functions/Middleware/RateLimitMiddleware.cs#L19-L29) sets 60/hour on the examiner-turn endpoint (one paid Gemini call per turn, ~20 per real session), 30/hour on Speech token issuance (a leaked token is spendable against the Speech resource outside the app), and 300/hour everywhere else. The counter is per-instance in `IMemoryCache`, which is a deliberate accuracy-for-simplicity trade: it stops a scripted loop without adding Redis to the deployment, and the code says so in a comment. Daily per-user evaluation quotas sit on top, enforced against the database.
 
-Navigate to the frontend directory:
+**Pronunciation is measured, not inferred.** Gemini only ever receives text, so it scores three criteria; pronunciation comes from Azure's acoustic assessment and is averaged in as a fourth. When no audio was assessed, [`SpeakingService.cs:171-173`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L171-L173) states that explicitly in the prompt so the model scores fluency knowing the signal is absent, and the pronunciation criterion is dropped rather than guessed.
+
+**No state management library.** Server state runs through a ~100-line [`use-api.ts`](frontend/ielts-ai-evaluator-frontend/src/hooks/use-api.ts) hook (`data`/`isLoading`/`error` + `refetch`/`mutate`); the only global state is auth and theme, each a React Context. There is no Redux, Zustand, or React Query in `src/`. Errors are mapped to plain-language strings in [`friendly-error.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/friendly-error.ts) — no HTTP codes shown to users, who are mostly ESL — including a specific message for 429.
+
+**Azure was the objective, not the default.** I built this to work through a full end-to-end Azure deployment while preparing for AZ-204, so the platform choice came first and the architecture followed. That was the point of the exercise, and it put real surface area under my hands: Static Web Apps hosting the SPA, Functions on the isolated worker model behind it, Cognitive Services for speech, app settings and GitHub Secrets as the credential store, and two Actions pipelines that gate on `dotnet test` and run `dotnet ef database update` before publishing. Routing fallback and the security header set — CSP, HSTS, `nosniff`, `frame-ancestors 'none'`, and a `Permissions-Policy` granting `microphone=(self)` while denying camera and geolocation — are declared in [`staticwebapp.config.json`](frontend/ielts-ai-evaluator-frontend/public/staticwebapp.config.json) rather than in a separate CDN or reverse-proxy config. Vercel plus a managed Postgres would have been fewer moving parts; it would also have skipped everything I was trying to learn.
+
+---
+
+## Running locally
+
+Requires Node 22.x, .NET SDK 8.0, Azure Functions Core Tools, and a PostgreSQL instance.
+
+**Frontend**
 
 ```bash
 cd frontend/ielts-ai-evaluator-frontend
-```
-
-Install dependencies:
-
-```bash
 npm install
+cp .env.sample .env      # fill in the values
+npm run dev              # http://localhost:5173
 ```
 
-Create environment configuration:
+Variables needed in `.env`:
+`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_MEASUREMENT_ID`, `VITE_API_BASE_URL`
+
+**Backend**
 
 ```bash
-cp .env.sample .env
-```
-
-Edit `.env` and add your configuration:
-
-```env
-VITE_FIREBASE_API_KEY=your_firebase_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-VITE_FIREBASE_APP_MEASUREMENT_ID=your_measurement_id
-VITE_API_BASE_URL=http://localhost:7103
-```
-
-Start the development server:
-
-```bash
-npm run dev
-```
-
-The frontend will be available at `http://localhost:5173`
-
-### 3️⃣ Backend Setup
-
-Navigate to the backend directory:
-
-```bash
-cd backend/IELTS.AI.Evaluator.Functions
-```
-
-Restore dependencies:
-
-```bash
-dotnet restore
-```
-
-Create `local.settings.json` for local development (it is git-ignored — never commit it):
-
-```json
-{
-  "IsEncrypted": false,
-  "Values": {
-    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
-    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
-
-    "DbConnectionString": "Host=localhost;Port=5432;Database=IELTSEvaluator;Username=postgres;Password=your_password",
-
-    "GeminiApiKey": "your_gemini_api_key",
-    "GeminiApiEndpoint": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-
-    "FIREBASE_PROJECT_ID": "your_firebase_project_id",
-    "FIREBASE_SERVICE_ACCOUNT_JSON": "{\"type\":\"service_account\", ...}",
-
-    "AzureSpeechKey": "your_azure_speech_key",
-    "AzureSpeechRegion": "southeastasia",
-    "ExaminerVoice": "en-GB-RyanNeural",
-
-    "DailyWritingQuota": "10",
-    "DailySpeakingQuota": "10"
-  },
-  "Host": {
-    "CORS": "http://localhost:5173",
-    "CORSCredentials": true
-  }
-}
-```
-
-Apply the database schema:
-
-```bash
-cd ../..
 dotnet ef database update --project backend/IELTS.AI.Evaluator.Data
-```
-
-Build and run the backend:
-
-```bash
 cd backend/IELTS.AI.Evaluator.Functions
 dotnet build
-func start
+func start               # http://localhost:7103
 ```
 
-The backend API will be available at `http://localhost:7103`
+Settings needed in `local.settings.json` (git-ignored):
+`DbConnectionString`, `GeminiApiKey`, `GeminiApiEndpoint`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `AzureSpeechKey`, `AzureSpeechRegion`, `ExaminerVoice`, `DailyWritingQuota`, `DailySpeakingQuota`
 
-### 4️⃣ First Run
+Azure Speech is optional — without it, speaking practice falls back to typed input and omits the pronunciation criterion.
 
-The database ships with **no seed prompts**, so a fresh install has nothing to practise on. To get going:
+**Tests**
 
-1. Register through the app — this creates your user row with the `Free` plan.
-2. Promote yourself to admin (there is deliberately no endpoint for this):
-   ```sql
-   UPDATE users SET plan = 'Admin' WHERE email = 'you@example.com';
-   ```
-3. Sign out and back in, then open **Admin** in the sidebar and add writing and speaking prompts.
-
----
-
-## 📁 Project Structure
-
-```
-ielts-ai-evaluator/
-│
-├── frontend/
-│   └── ielts-ai-evaluator-frontend/
-│       ├── src/
-│       │   ├── components/       # UI components (ui/, admin/, dashboard/, feedback/, skeleton/)
-│       │   ├── pages/            # Route-level pages
-│       │   ├── contexts/         # Auth and theme providers
-│       │   ├── hooks/            # useApi, useSpeech, useSpeechRecognition, ...
-│       │   ├── lib/              # api client, axios instance, firebase, helpers
-│       │   └── types/            # TypeScript type definitions
-│       ├── public/
-│       │   └── staticwebapp.config.json   # SPA fallback + security headers
-│       ├── package.json
-│       └── vite.config.ts
-│
-├── backend/
-│   ├── IELTS.AI.Evaluator.Functions/
-│   │   ├── Functions/          # HTTP endpoints (thin: deserialize → service → return)
-│   │   ├── Services/           # Business logic
-│   │   ├── DTOs/               # Feedback contracts + Gemini response schemas
-│   │   ├── Middleware/         # Exception handling, Firebase auth, rate limiting
-│   │   ├── Exceptions/         # Domain exceptions mapped to HTTP status codes
-│   │   └── Extensions/         # FunctionContext helpers (GetUserId, IsAdmin, ...)
-│   │
-│   ├── IELTS.AI.Evaluator.Data/
-│   │   ├── Models/             # EF Core entities and DbContext
-│   │   └── Migrations/         # EF Core migrations
-│   │
-│   └── IELTS.AI.Evaluator.Tests/   # xUnit test suite
-│
-├── .github/workflows/          # Azure Functions + Static Web Apps deployment
-├── docs/DEPLOYMENT.md          # Production settings, CORS, roles, rate limits
-├── PRODUCT.md
-└── README.md
+```bash
+cd backend && dotnet test IELTS.AI.Evaluator.sln
 ```
 
----
-
-## 🎯 Usage
-
-**Writing**
-
-1. **Register/Login**: Create an account or sign in using Firebase authentication
-2. **Select Writing Task**: Choose between Task 1 or Task 2
-3. **Pick a Prompt**: Select from available writing prompts
-4. **Write Your Essay**: Compose your response in the text editor
-5. **Submit for Evaluation**: Get instant AI-powered feedback
-6. **Review Feedback**: Analyze detailed scores and suggestions
-
-**Speaking**
-
-1. **Pick a Part and Topic**: Part 1, Part 2 (cue card), or Part 3
-2. **Talk to the Examiner**: Answer aloud; the AI examiner asks follow-ups as the conversation goes
-3. **Finish the Session**: Get band scores per criterion, plus word-level pronunciation detail
-4. **Track Progress**: Monitor your improvement over time in the dashboard
-
----
-
-## 🧪 Tests
-
-xUnit, in `backend/IELTS.AI.Evaluator.Tests`.
-
-```sh
-cd backend
-dotnet test IELTS.AI.Evaluator.sln                                  # everything
-dotnet test IELTS.AI.Evaluator.sln --filter "FullyQualifiedName~RateLimit"
-```
-
-They also gate deployment — the workflow runs `dotnet test` before publishing.
-
-These are unit tests, and nothing starts the Functions host: no `func start`, no
-Azurite, no HTTP. That works because the `[Function]` classes are thin
-(deserialize → call service → return) and the logic lives in `Services/`, which
-are plain DI classes a test can construct directly. Middleware is the exception
-— it takes host-owned types — so the part worth testing is pulled out into an
-`internal static` method (`ExceptionHandlingMiddleware.Map`,
-`RateLimitMiddleware.TryConsume`, `FirebaseAuthenticationMiddleware.ResolveAccountStateAsync`)
-and tested there.
-
-Doubles are hand-written, not mocked: `FakeStructuredClient` stands in for
-Gemini, a `CapturingHandler : HttpMessageHandler` for outbound HTTP, and EF
-Core's in-memory provider for the database (a fresh one per test). Don't add a
-mocking library for this.
-
-Two things the suite can't catch, because they only exist at runtime: broken
-HTTP routes, and middleware registered in the wrong order in `Program.cs`. The
-in-memory provider is also not relational — it won't reject a constraint
-violation that Postgres would.
-
----
-
-## 🔒 Security Notes
-
-- **Authentication is fail-closed.** `FirebaseAuthenticationMiddleware` runs before every
-  function, so a new endpoint is protected by default rather than by remembering to add a check.
-- **Roles come from the database, not the token.** Firebase custom claims are cached in the ID
-  token for up to an hour, so the backend re-reads `users.plan` (memoised 60s per user) instead
-  of trusting the claim. A demotion takes effect within a minute, with no sign-out required.
-- **Rate limiting** is per-user and in-process: 60/h for the examiner-turn endpoint, 30/h for
-  Azure Speech tokens, 300/h for everything else. This bounds the paid Gemini and Speech calls
-  the daily evaluation quotas don't reach.
-- **Security headers** (CSP, HSTS, `nosniff`, `frame-ancestors`) are set in
-  `public/staticwebapp.config.json`.
-- **CSRF protection is not used, deliberately.** Auth is a bearer token in the `Authorization`
-  header with no cookies, and browsers do not attach that header cross-site.
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the production checklist, including locking
-down the Function App's CORS origins.
-
----
-
-## 🔧 Configuration
-
-### Firebase Setup
-
-1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
-2. Enable Authentication (Email/Password and Google)
-3. Obtain your Firebase web configuration from Project Settings → add it to the frontend `.env`
-4. Generate a service account key (Project Settings → Service Accounts) → add the JSON to the backend as `FIREBASE_SERVICE_ACCOUNT_JSON`
-
-### Gemini API Setup
-
-1. Get your API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Add `GeminiApiKey` and `GeminiApiEndpoint` to your backend `local.settings.json`
-
-### Azure Speech Setup (Optional)
-
-1. Create a Speech resource in the Azure portal
-2. Add `AzureSpeechKey` and `AzureSpeechRegion` to the backend
-3. Optionally set `ExaminerVoice` (defaults to `en-GB-RyanNeural`)
-
-Without these, speaking practice still works — the app falls back to typed input and omits the
-pronunciation criterion.
-
-### Database
-
-PostgreSQL. Set `DbConnectionString` on the backend and apply migrations with
-`dotnet ef database update --project backend/IELTS.AI.Evaluator.Data`. Schema changes go through
-EF Core migrations; the deploy workflow runs `database update` before publishing.
-
-### Azure Deployment
-
-Both halves deploy from GitHub Actions on push to `main`:
-- Backend → Azure Functions (`.github/workflows/azure-functions.yml`)
-- Frontend → Azure Static Web Apps (`.github/workflows/azure-staticwebapp.yml`)
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the required app settings and secrets.
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
----
-
-## 👥 Authors
-
-- **Wendy Susanto** - [GitHub Profile](https://github.com/WendySusanto)
-
----
-
-## 🙏 Acknowledgments
-
-- Google Gemini API for AI-powered evaluations
-- Azure Cognitive Services Speech for speech recognition and pronunciation assessment
-- Firebase for authentication services
-- The React and .NET communities for excellent tools and documentation
-- All IELTS test-takers who inspired this project
-
----
-
-## 📧 Contact & Support
-
-For questions, suggestions, or issues:
-- Open an issue on [GitHub Issues](https://github.com/WendySusanto/ielts-ai-evaluator/issues)
-- Contact the maintainer via GitHub
-
----
-
-## 🌟 Show Your Support
-
-If you find this project helpful, please consider giving it a ⭐️ on GitHub!
-
----
-
-<div align="center">
-  Made with ❤️ for IELTS test-takers worldwide
-</div>
+The database ships with no seed prompts. Register, then promote yourself with
+`UPDATE users SET plan = 'Admin' WHERE email = '...';` to add prompts through the admin panel.
