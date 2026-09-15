@@ -6,7 +6,7 @@ public record SpeechTokenDto(string Token, string Region, string Voice);
 
 public interface ISpeechTokenService
 {
-    Task<SpeechTokenDto> GetTokenAsync();
+    Task<SpeechTokenDto> GetTokenAsync(CancellationToken ct = default);
 }
 
 public class SpeechTokenService : ISpeechTokenService
@@ -22,7 +22,7 @@ public class SpeechTokenService : ISpeechTokenService
         _config = config;
     }
 
-    public async Task<SpeechTokenDto> GetTokenAsync()
+    public async Task<SpeechTokenDto> GetTokenAsync(CancellationToken ct = default)
     {
         var key = _config["AzureSpeechKey"];
         var region = _config["AzureSpeechRegion"];
@@ -36,8 +36,8 @@ public class SpeechTokenService : ISpeechTokenService
             $"https://{region}.api.cognitive.microsoft.com/sts/v1.0/issueToken");
         request.Headers.Add("Ocp-Apim-Subscription-Key", key);
 
-        using var response = await _http.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
+        using var response = await _http.SendAsync(request, ct);
+        var body = await response.Content.ReadAsStringAsync(ct);
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException($"Azure Speech token request failed with status {(int)response.StatusCode}");
 

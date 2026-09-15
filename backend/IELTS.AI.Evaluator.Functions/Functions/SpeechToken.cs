@@ -26,14 +26,15 @@ public class SpeechToken
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "speech/token")] HttpRequest req,
         FunctionContext context)
     {
-        var dto = await _service.GetTokenAsync();
+        var dto = await _service.GetTokenAsync(context.CancellationToken);
 
         // Audit, not business logic — the token works directly against Azure, so this row is the
         // only trace that this user could spend. Written after the token is issued so a failed
         // Azure call doesn't leave a phantom entry, and deliberately not swallowed: an audit that
-        // fails silently is worse than a failed request.
+        // fails silently is worse than a failed request. No cancellation token for the same reason:
+        // once a spendable token has left the building, the audit row has to land.
         _db.SpeechTokenIssues.Add(new SpeechTokenIssue { UserId = context.GetUserId()!.Value });
-        await _db.SaveChangesAsync();
+        await _db.SaveChangesAsync(CancellationToken.None);
 
         return new OkObjectResult(dto);
     }

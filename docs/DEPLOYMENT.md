@@ -49,6 +49,46 @@ loosens the effective cap N-fold — if the Function App runs on a plan that
 scales aggressively, either pin `functionAppScaleLimit` or move the counters
 to Redis.
 
+## Database migrations — and what running them from CI costs
+
+`azure-functions.yml` runs `dotnet ef database update` on the GitHub-hosted
+runner, after `dotnet test` and after the publish, but **before** the deploy —
+so a failed migration blocks the release instead of shipping code against an
+older schema. It is a no-op when the database is already current.
+
+The price of doing it there: the runner has to reach Postgres, and
+GitHub-hosted runners come from a large, rotating public IP range. There is no
+useful IP allowlist for them, so in practice this means the Postgres server
+accepts public connections (TLS + credentials as the only gate) rather than
+sitting behind a private endpoint. That is the widest part of this deployment's
+attack surface, and it exists to save a self-hosted runner.
+
+Keep it only while the database holds throwaway data. Non-negotiable while it
+stays this way:
+
+- `sslmode=require` (or stricter) in `DbConnectionString` — a public server
+  reached over plaintext is a different problem entirely.
+- A dedicated migration login with DDL rights on this database only, not the
+  server admin account, and not the login the Function App runs as.
+- `az postgres flexible-server firewall-rule list` reviewed after any change;
+  `0.0.0.0–255.255.255.255` is not an allowlist.
+
+When the data starts mattering, pick one — in rough order of effort:
+
+| Option | What changes | Trade-off |
+|---|---|---|
+| Self-hosted runner (or an Azure Container Apps job) inside the VNet | Migration step moves to a runner with a private route to Postgres; public access can be switched off | One more thing to patch and keep alive |
+| Migrate on worker startup, guarded by `pg_advisory_lock` | No external network path needed at all; the lock serialises concurrent cold starts | Failures surface as cold-start errors rather than a red pipeline, and every instance pays the check |
+| Apply migrations by hand from a jump box | Nothing automated to secure | Someone has to remember; the pipeline stops being the source of truth |
+
+**Rollback is not automated, deliberately.** CI only ever rolls *forward*:
+`dotnet ef database update` with no target. Undoing a bad migration means
+deploying the previous code and then applying a *new* migration that reverses
+it — `database update <PreviousMigration>` is a manual, destructive step and
+should be treated as one. Keep migrations additive (add a nullable column,
+backfill, then tighten) so that code one version behind the schema still runs;
+that property is what makes the migrate-then-deploy order safe.
+
 ## Frontend — Vite build-time env (`.env.production`)
 
 | Variable | Purpose |

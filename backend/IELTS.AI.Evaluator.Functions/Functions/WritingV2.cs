@@ -22,9 +22,12 @@ public class WritingV2
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v2/writing/evaluations")] HttpRequest req,
         FunctionContext context)
     {
-        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        // The worker's token: cancelled when the invocation is cancelled or the host is shutting
+        // down, which is what keeps an abandoned request from paying for a Gemini call.
+        var ct = context.CancellationToken;
+        var body = await new StreamReader(req.Body).ReadToEndAsync(ct);
         var request = JsonSerializer.Deserialize<WritingEvaluateRequest>(body, Web)!;
-        var dto = await _writingService.EvaluateAsync(context.GetUserId()!.Value, context.GetUserRole()!, request);
+        var dto = await _writingService.EvaluateAsync(context.GetUserId()!.Value, context.GetUserRole()!, request, ct);
         return new OkObjectResult(dto);
     }
 

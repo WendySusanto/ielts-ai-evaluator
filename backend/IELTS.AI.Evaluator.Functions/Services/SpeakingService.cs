@@ -17,7 +17,10 @@ public record SpeakingSessionDetailDto(Guid SpeakingSessionId, string Part, stri
 
 public interface ISpeakingService
 {
-    Task<SpeakingSessionDto> EvaluateAsync(Guid userId, string role, SpeakingEvaluateRequest request);
+    /// <summary>Same token contract as IWritingService.EvaluateAsync: it aborts before Gemini is
+    /// paid, never after.</summary>
+    Task<SpeakingSessionDto> EvaluateAsync(Guid userId, string role, SpeakingEvaluateRequest request,
+        CancellationToken ct = default);
     Task<List<SpeakingSessionHistoryItemDto>> GetHistoryAsync(Guid userId);
     Task<SpeakingSessionDetailDto> GetDetailAsync(Guid userId, Guid id);
 }
@@ -39,7 +42,8 @@ public class SpeakingService : ISpeakingService
         _config = config;
     }
 
-    public async Task<SpeakingSessionDto> EvaluateAsync(Guid userId, string role, SpeakingEvaluateRequest request)
+    public async Task<SpeakingSessionDto> EvaluateAsync(Guid userId, string role, SpeakingEvaluateRequest request,
+        CancellationToken ct = default)
     {
         if (request.SpeakingPromptId == Guid.Empty || string.IsNullOrWhiteSpace(request.Part) || request.Turns is not { Count: > 0 })
             throw new ValidationException("Speaking prompt, part, and turns are required.");
@@ -56,7 +60,7 @@ public class SpeakingService : ISpeakingService
         // Gemini call by BuildUserContent, so the candidate-only cap above isn't enough on its own.
         ValidateConversationCap(request.Turns);
 
-        var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId)
+        var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId, ct)
             ?? throw new NotFoundException("Speaking prompt not found.");
 
         var isUnlimitedPlan = role.Equals("Premium", StringComparison.OrdinalIgnoreCase)
@@ -67,7 +71,7 @@ public class SpeakingService : ISpeakingService
             var todayUtc = DateTime.UtcNow.Date;
             // ponytail: COUNT-then-proceed is racy under concurrency; acceptable at this scale — move to a per-user lock or unique-per-day constraint if abuse appears.
             var usedToday = await _db.SpeakingSessions
-                .CountAsync(s => s.UserId == userId && s.CreatedAt >= todayUtc);
+                .CountAsync(s => s.UserId == userId && s.CreatedAt >= todayUtc, ct);
             if (usedToday >= dailyLimit)
                 throw new QuotaExceededException("Daily speaking evaluation quota reached. Upgrade to Premium for unlimited evaluations.");
         }
@@ -80,7 +84,7 @@ public class SpeakingService : ISpeakingService
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns, pronunciation);
         var result = await _gemini.GenerateAsync<SpeakingFeedback>(
-            SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema);
+            SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema, ct);
 
         // Overall band is the average of the three Gemini-assessed criteria plus, when present, the
         // Azure PA band, rounded to the nearest 0.5 — not whatever Gemini put in its own overallBand field.
@@ -106,7 +110,9 @@ public class SpeakingService : ISpeakingService
         };
 
         _db.SpeakingSessions.Add(session);
-        await _db.SaveChangesAsync();
+        // Deliberately not ct — same reason as WritingService: the Gemini call is already billed,
+        // and a whole spoken session's feedback is not worth discarding over a closed tab.
+        await _db.SaveChangesAsync(CancellationToken.None);
 
         return new SpeakingSessionDto(session.SpeakingSessionId, session.OverallBand, feedback);
     }

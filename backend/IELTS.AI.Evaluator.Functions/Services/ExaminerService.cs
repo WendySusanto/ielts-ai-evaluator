@@ -8,7 +8,9 @@ namespace IELTS.AI.Evaluator.Functions.Services;
 
 public interface IExaminerService
 {
-    Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request);
+    /// <summary>Same token contract as the evaluation services: it aborts before Gemini is paid,
+    /// never after — the usage row must land even if the caller has gone.</summary>
+    Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request, CancellationToken ct = default);
 }
 
 /// <summary>Live examiner-turn endpoint: not quota-gated (only the final evaluation endpoint is),
@@ -30,7 +32,8 @@ public class ExaminerService : IExaminerService
         _db = db;
     }
 
-    public async Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request)
+    public async Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request,
+        CancellationToken ct = default)
     {
         if (request.SpeakingPromptId == Guid.Empty || string.IsNullOrWhiteSpace(request.Part) || request.Turns is null)
             throw new ValidationException("Speaking prompt, part, and turns are required.");
@@ -39,7 +42,7 @@ public class ExaminerService : IExaminerService
 
         SpeakingService.ValidateConversationCap(request.Turns);
 
-        var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId)
+        var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId, ct)
             ?? throw new NotFoundException("Speaking prompt not found.");
 
         var examinerTurnCount = request.Turns.Count(t => t.Role.Equals("examiner", StringComparison.OrdinalIgnoreCase));
@@ -49,7 +52,7 @@ public class ExaminerService : IExaminerService
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
         var result = await _gemini.GenerateAsync<ExaminerTurnResult>(
-            ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema);
+            ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema, ct);
 
         // The turn itself is never persisted, so this row is the only record that the call was
         // paid for. Written after the call so a failed one is not billed to the user.
@@ -59,7 +62,9 @@ public class ExaminerService : IExaminerService
             PromptTokens = result.PromptTokens,
             CompletionTokens = result.CompletionTokens,
         });
-        await _db.SaveChangesAsync();
+        // Deliberately not ct: this row is the *only* record that the call was paid for, so dropping
+        // it on a cancellation would make the spend invisible on the admin list.
+        await _db.SaveChangesAsync(CancellationToken.None);
 
         return result.Value;
     }

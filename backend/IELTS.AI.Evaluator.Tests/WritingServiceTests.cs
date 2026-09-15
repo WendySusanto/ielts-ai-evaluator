@@ -20,7 +20,8 @@ public class FakeStructuredClient : IGeminiStructuredClient
 
     public FakeStructuredClient(object canned) => _canned = canned;
 
-    public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson)
+    public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
+        CancellationToken ct = default)
     {
         Calls++;
         LastUserContent = userContent;

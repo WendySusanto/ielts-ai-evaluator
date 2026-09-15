@@ -16,7 +16,11 @@ public record WritingEvaluationDetailDto(Guid WritingEvaluationId, string TaskTy
 
 public interface IWritingService
 {
-    Task<WritingEvaluationDto> EvaluateAsync(Guid userId, string role, WritingEvaluateRequest request);
+    /// <summary>The token aborts the work *before* Gemini is paid; once the call returns, the row is
+    /// written regardless — see the SaveChangesAsync call. Only the paid paths take a token: a
+    /// cancelled history read saves an indexed query and nothing else.</summary>
+    Task<WritingEvaluationDto> EvaluateAsync(Guid userId, string role, WritingEvaluateRequest request,
+        CancellationToken ct = default);
     Task<List<WritingHistoryItemDto>> GetHistoryAsync(Guid userId);
     Task<WritingEvaluationDetailDto> GetDetailAsync(Guid userId, Guid id);
 }
@@ -37,14 +41,15 @@ public class WritingService : IWritingService
         _config = config;
     }
 
-    public async Task<WritingEvaluationDto> EvaluateAsync(Guid userId, string role, WritingEvaluateRequest request)
+    public async Task<WritingEvaluationDto> EvaluateAsync(Guid userId, string role, WritingEvaluateRequest request,
+        CancellationToken ct = default)
     {
         if (request.WritingPromptId == Guid.Empty || string.IsNullOrWhiteSpace(request.EssayText))
             throw new ValidationException("Essay text and writing prompt are required.");
         if (request.EssayText.Length > MaxEssayLength)
             throw new ValidationException("Essay exceeds the maximum length of 10,000 characters.");
 
-        var prompt = await _db.WritingPrompts.FirstOrDefaultAsync(p => p.WritingPromptId == request.WritingPromptId)
+        var prompt = await _db.WritingPrompts.FirstOrDefaultAsync(p => p.WritingPromptId == request.WritingPromptId, ct)
             ?? throw new NotFoundException("Writing prompt not found.");
 
         var isUnlimitedPlan = role.Equals("Premium", StringComparison.OrdinalIgnoreCase)
@@ -55,14 +60,14 @@ public class WritingService : IWritingService
             var todayUtc = DateTime.UtcNow.Date;
             // ponytail: COUNT-then-proceed is racy under concurrency; acceptable at this scale — move to a per-user lock or unique-per-day constraint if abuse appears.
             var usedToday = await _db.WritingEvaluations
-                .CountAsync(e => e.UserId == userId && e.CreatedAt >= todayUtc);
+                .CountAsync(e => e.UserId == userId && e.CreatedAt >= todayUtc, ct);
             if (usedToday >= dailyLimit)
                 throw new QuotaExceededException("Daily writing evaluation quota reached. Upgrade to Premium for unlimited evaluations.");
         }
 
         var userContent = BuildUserContent(prompt, request.EssayText);
         var result = await _gemini.GenerateAsync<WritingFeedback>(
-            WritingFeedbackPrompts.SystemPrompt, userContent, WritingFeedbackPrompts.GeminiSchema);
+            WritingFeedbackPrompts.SystemPrompt, userContent, WritingFeedbackPrompts.GeminiSchema, ct);
 
         var wordCount = request.EssayText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
         var evaluation = new WritingEvaluation
@@ -80,7 +85,10 @@ public class WritingService : IWritingService
         };
 
         _db.WritingEvaluations.Add(evaluation);
-        await _db.SaveChangesAsync();
+        // Deliberately not ct: Gemini has already been called and billed. Honouring a cancellation
+        // here would throw away feedback the user paid for and leave the spend with no row to show
+        // for it — the one place where finishing the write beats reacting to the disconnect.
+        await _db.SaveChangesAsync(CancellationToken.None);
 
         return new WritingEvaluationDto(evaluation.WritingEvaluationId, evaluation.OverallBand, result.Value);
     }

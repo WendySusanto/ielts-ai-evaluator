@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -10,13 +11,26 @@ public record GeminiResult<T>(T Value, string Model, int PromptTokens, int Compl
 public interface IGeminiStructuredClient
 {
     /// <summary>Calls Gemini generateContent with responseMimeType=application/json and the given
-    /// responseSchema (Gemini schema JSON as a string), deserializing the reply into T.</summary>
-    Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson);
+    /// responseSchema (Gemini schema JSON as a string), deserializing the reply into T. Retries
+    /// transient rejections; see <see cref="GeminiStructuredClient.RetryDelays"/>.</summary>
+    Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
+        CancellationToken ct = default);
 }
 
 public class GeminiStructuredClient : IGeminiStructuredClient
 {
     private static readonly JsonSerializerOptions CamelCase = new(JsonSerializerDefaults.Web);
+
+    /// <summary>Gemini answers 429 (quota) and 503 (model overloaded) routinely under load, and
+    /// both clear on their own within seconds — so a single attempt turns a vendor hiccup into a
+    /// lost evaluation. Every other status is deterministic (400 schema, 401/403 key), and
+    /// retrying those only makes the user wait longer for the same failure.</summary>
+    // ponytail: fixed backoff, no jitter, Retry-After header ignored. One request per user action,
+    // so there is no thundering herd to spread out — add jitter if evaluations ever run in batches.
+    internal static readonly TimeSpan[] RetryDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3)];
+
+    private static bool IsTransient(HttpStatusCode status) =>
+        status is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable;
 
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
@@ -29,7 +43,8 @@ public class GeminiStructuredClient : IGeminiStructuredClient
         _logger = logger;
     }
 
-    public async Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson)
+    public async Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
+        CancellationToken ct = default)
     {
         var apiKey = _config["GeminiApiKey"];
         var endpoint = _config["GeminiApiEndpoint"];
@@ -47,21 +62,38 @@ public class GeminiStructuredClient : IGeminiStructuredClient
                 responseSchema = schema.RootElement,
             },
         };
+        // Serialized once: every attempt posts the same body, and HttpRequestMessage is single-use.
+        var payloadJson = JsonSerializer.Serialize(payload);
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        for (var attempt = 0; ; attempt++)
         {
-            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json"),
-        };
-        request.Headers.Add("x-goog-api-key", apiKey);
+            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            {
+                Content = new StringContent(payloadJson, Encoding.UTF8, "application/json"),
+            };
+            request.Headers.Add("x-goog-api-key", apiKey);
 
-        using var response = await _http.SendAsync(request);
-        var body = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-        {
+            using var response = await _http.SendAsync(request, ct);
+            var body = await response.Content.ReadAsStringAsync(ct);
+
+            if (response.IsSuccessStatusCode)
+                return Parse<T>(body);
+
+            if (IsTransient(response.StatusCode) && attempt < RetryDelays.Length)
+            {
+                _logger.LogWarning("Gemini returned {Status}; retrying in {Delay}s", (int)response.StatusCode,
+                    RetryDelays[attempt].TotalSeconds);
+                await Task.Delay(RetryDelays[attempt], ct);
+                continue;
+            }
+
             _logger.LogError("Gemini call failed: {Status} {Body}", (int)response.StatusCode, body);
             throw new HttpRequestException($"Gemini call failed with status {(int)response.StatusCode}");
         }
+    }
 
+    private static GeminiResult<T> Parse<T>(string body)
+    {
         using var doc = JsonDocument.Parse(body);
         var text = doc.RootElement.GetProperty("candidates")[0]
             .GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString()

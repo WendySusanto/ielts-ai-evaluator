@@ -28,9 +28,10 @@ public class SpeakingV2
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v2/speaking/sessions")] HttpRequest req,
         FunctionContext context)
     {
-        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var ct = context.CancellationToken;
+        var body = await new StreamReader(req.Body).ReadToEndAsync(ct);
         var request = JsonSerializer.Deserialize<SpeakingEvaluateRequest>(body, Web)!;
-        var dto = await _speakingService.EvaluateAsync(context.GetUserId()!.Value, context.GetUserRole()!, request);
+        var dto = await _speakingService.EvaluateAsync(context.GetUserId()!.Value, context.GetUserRole()!, request, ct);
         return new OkObjectResult(dto);
     }
 
@@ -58,9 +59,10 @@ public class SpeakingV2
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "speaking/examiner-turn")] HttpRequest req,
         FunctionContext context)
     {
-        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var ct = context.CancellationToken;
+        var body = await new StreamReader(req.Body).ReadToEndAsync(ct);
         var request = JsonSerializer.Deserialize<ExaminerTurnRequest>(body, Web)!;
-        var result = await _examinerService.NextTurnAsync(context.GetUserId()!.Value, request);
+        var result = await _examinerService.NextTurnAsync(context.GetUserId()!.Value, request, ct);
         return new OkObjectResult(result);
     }
 }

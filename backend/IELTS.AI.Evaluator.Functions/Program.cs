@@ -31,8 +31,14 @@ var host = new HostBuilder()
         services.AddDbContext<EvaluatorDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>();
-        services.AddHttpClient<ISpeechTokenService, SpeechTokenService>();
+        // 45s per attempt, not HttpClient's default 100s: GeminiStructuredClient retries twice on
+        // 429/503, so the worst case is 45+1+45+3+45 ≈ 139s — still inside the Functions host's own
+        // 230s HTTP limit, which a 100s timeout would blow past on the second attempt.
+        services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>(
+            c => c.Timeout = TimeSpan.FromSeconds(45));
+        // STS token issuance is one small POST; if it hasn't answered in 10s it isn't going to.
+        services.AddHttpClient<ISpeechTokenService, SpeechTokenService>(
+            c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IWritingService, WritingService>();
         services.AddScoped<ISpeakingService, SpeakingService>();
         services.AddScoped<IExaminerService, ExaminerService>();
