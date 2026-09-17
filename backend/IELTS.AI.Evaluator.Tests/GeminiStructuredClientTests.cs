@@ -21,7 +21,7 @@ public class GeminiStructuredClientTests
                 Content = new StringContent(
                     """
                     {"candidates":[{"content":{"parts":[{"text":"{\"grade\":\"A\",\"score\":9}"}]}}],
-                     "modelVersion":"gemini-test","usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7}}
+                     "modelVersion":"gemini-test","usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":7,"thoughtsTokenCount":5}}
                     """)
             };
         }
@@ -47,13 +47,27 @@ public class GeminiStructuredClientTests
         Assert.Equal(9, result.Value.Score);
         Assert.Equal("gemini-test", result.Model);
         Assert.Equal(11, result.PromptTokens);
-        Assert.Equal(7, result.CompletionTokens);
+        Assert.Equal(12, result.CompletionTokens); // candidates + thoughts: thinking is billed as output
 
         using var sent = JsonDocument.Parse(handler.Body!);
         var genCfg = sent.RootElement.GetProperty("generationConfig");
         Assert.Equal("application/json", genCfg.GetProperty("responseMimeType").GetString());
         Assert.True(genCfg.TryGetProperty("responseSchema", out _));
+        Assert.False(genCfg.TryGetProperty("thinkingConfig", out _)); // model default unless asked
         Assert.Equal("sys", sent.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task GenerateAsync_WithThinkingBudget_SendsThinkingConfig()
+    {
+        var handler = new CapturingHandler();
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""", thinkingBudget: 0);
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        var thinking = sent.RootElement.GetProperty("generationConfig").GetProperty("thinkingConfig");
+        Assert.Equal(0, thinking.GetProperty("thinkingBudget").GetInt32());
     }
 
     /// <summary>Answers with the scripted statuses in order, then OK forever. Counts attempts.</summary>

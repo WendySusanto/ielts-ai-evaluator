@@ -29,6 +29,9 @@ const PART_LABEL: Record<string, string> = {
 
 const PREP_SECONDS = 60;
 const TALK_SECONDS = 120;
+// Quiet time after the candidate's last word before the turn is sent. Long enough for a
+// mid-answer thinking pause; the mic button still stops a turn early.
+const SILENCE_MS = 3000;
 
 type CallState = "idle" | "examinerSpeaking" | "yourTurn" | "listening" | "thinking";
 
@@ -76,15 +79,18 @@ const SpeakingPractice = () => {
   const typedMode = forcedTypedMode || manualTypedMode;
   const candidateTurnCount = turns.filter((t) => t.role === "candidate").length;
 
-  // Degrade to typed mode once, on unsupported SDK or a speech error. Ponytail: one toast total,
-  // not one per error — repeated Azure hiccups shouldn't spam the user.
+  // Degrade to typed mode on unsupported SDK or a speech error. Ponytail: one toast until the
+  // user opts back into voice ("Use mic" re-arms it) — repeated Azure hiccups shouldn't spam.
+  const degradeToTyped = () => {
+    setForcedTypedMode(true);
+    if (degradedToastRef.current) return;
+    degradedToastRef.current = true;
+    toast.error("Voice isn't available right now — switched to typed answers.");
+  };
+
   useEffect(() => {
-    if ((speech.supported === false || speech.error) && !degradedToastRef.current) {
-      degradedToastRef.current = true;
-      setForcedTypedMode(true);
-      toast.error("Voice isn't available right now — switched to typed answers.");
-    }
-  }, [speech.supported, speech.error]);
+    if (speech.supported === false || speech.error) degradeToTyped();
+  },[speech.supported, speech.error]);
 
   // Greet once the prompt has loaded (guarded against StrictMode's double-invoke).
   useEffect(() => {
@@ -93,8 +99,17 @@ const SpeakingPractice = () => {
     setTurns([{ role: "examiner", text: prompt.questionText }]);
     setCallState("examinerSpeaking");
     if (speech.supported && !forcedTypedMode) {
+      // Part 2: read the cue card aloud like a real examiner; the chat keeps just the question
+      // since the card is already on screen.
+      const cues =
+        prompt.part === "Part2" && prompt.cuepoints
+          ? prompt.cuepoints.split("\n").map((c) => c.trim()).filter(Boolean)
+          : [];
+      const spoken = cues.length
+        ? `${prompt.questionText} You should say: ${cues.join(", ")}.`
+        : prompt.questionText;
       speech
-        .speak(prompt.questionText)
+        .speak(spoken)
         .catch(() => {})
         .finally(() => setCallState("yourTurn"));
     } else {
@@ -176,12 +191,38 @@ const SpeakingPractice = () => {
     }
     if (callState !== "yourTurn") return;
     try {
-      await speech.startListening();
+      await speech.startListening({ onSilence: () => onSilenceRef.current(), silenceMs: SILENCE_MS });
       setCallState("listening");
     } catch {
-      // speech.error effect above already toasts once and falls back to typed mode.
+      degradeToTyped();
     }
   };
+
+  // Silence ends the turn exactly like pressing stop. Kept in a ref so the recognizer's timer
+  // always calls the latest render's handler, not the one captured when listening started.
+  const onSilenceRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    onSilenceRef.current = () => {
+      if (callState === "listening") handleMicClick();
+    };
+  });
+
+  // Hands-free: open the mic as soon as it's the candidate's turn. Part 2's first long turn is
+  // left to the prep countdown, which starts listening itself (without a silence cutoff).
+  useEffect(() => {
+    if (
+      callState !== "yourTurn" ||
+      !speech.supported ||
+      typedMode ||
+      partComplete ||
+      pendingRetryTurns ||
+      isSubmittingFinal ||
+      (prompt?.part === "Part2" && candidateTurnCount === 0)
+    )
+      return;
+    handleMicClick();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [callState, typedMode, partComplete, pendingRetryTurns, isSubmittingFinal, candidateTurnCount]);
 
   const handleTypedSend = async () => {
     const text = typedText.trim();
@@ -203,8 +244,9 @@ const SpeakingPractice = () => {
     if (!prompt || isSubmittingFinal || candidateTurnCount === 0) return;
     setIsSubmittingFinal(true);
     speech.stopSpeaking();
-    // Release the mic if a turn was mid-recording; that partial turn is discarded, not submitted.
-    if (callState === "listening") await speech.stopListening();
+    // Release the mic if a turn was mid-recording (or the hands-free start is still in flight);
+    // that partial turn is discarded, not submitted. A no-op when nothing is listening.
+    await speech.stopListening();
     const payload: SpeakingEvaluateRequest = {
       speakingPromptId: prompt.speakingPromptId,
       part: prompt.part,
@@ -401,8 +443,17 @@ const SpeakingPractice = () => {
             >
               <Send className="h-4 w-4" />
             </Button>
-            {!forcedTypedMode && (
-              <Button variant="ghost" className="h-11 shrink-0" onClick={() => setManualTypedMode(false)}>
+            {speech.supported && (
+              <Button
+                variant="ghost"
+                className="h-11 shrink-0"
+                onClick={() => {
+                  // Also recovers from a speech error: one hiccup shouldn't cost voice for the session.
+                  degradedToastRef.current = false;
+                  setForcedTypedMode(false);
+                  setManualTypedMode(false);
+                }}
+              >
                 Use mic
               </Button>
             )}

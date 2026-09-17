@@ -12,9 +12,10 @@ public interface IGeminiStructuredClient
 {
     /// <summary>Calls Gemini generateContent with responseMimeType=application/json and the given
     /// responseSchema (Gemini schema JSON as a string), deserializing the reply into T. Retries
-    /// transient rejections; see <see cref="GeminiStructuredClient.RetryDelays"/>.</summary>
+    /// transient rejections; see <see cref="GeminiStructuredClient.RetryDelays"/>. A non-null
+    /// thinkingBudget is sent as thinkingConfig (0 turns thinking off for latency-sensitive calls).</summary>
     Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default);
+        CancellationToken ct = default, int? thinkingBudget = null);
 }
 
 public class GeminiStructuredClient : IGeminiStructuredClient
@@ -44,7 +45,7 @@ public class GeminiStructuredClient : IGeminiStructuredClient
     }
 
     public async Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default)
+        CancellationToken ct = default, int? thinkingBudget = null)
     {
         var apiKey = _config["GeminiApiKey"];
         var endpoint = _config["GeminiApiEndpoint"];
@@ -52,15 +53,18 @@ public class GeminiStructuredClient : IGeminiStructuredClient
             throw new InvalidOperationException("Gemini configuration missing");
 
         using var schema = JsonDocument.Parse(responseSchemaJson);
+        var generationConfig = new Dictionary<string, object>
+        {
+            ["responseMimeType"] = "application/json",
+            ["responseSchema"] = schema.RootElement,
+        };
+        if (thinkingBudget is not null)
+            generationConfig["thinkingConfig"] = new { thinkingBudget };
         var payload = new
         {
             systemInstruction = new { parts = new[] { new { text = systemInstruction } } },
             contents = new[] { new { role = "user", parts = new[] { new { text = userContent } } } },
-            generationConfig = new
-            {
-                responseMimeType = "application/json",
-                responseSchema = schema.RootElement,
-            },
+            generationConfig,
         };
         // Serialized once: every attempt posts the same body, and HttpRequestMessage is single-use.
         var payloadJson = JsonSerializer.Serialize(payload);
@@ -106,6 +110,8 @@ public class GeminiStructuredClient : IGeminiStructuredClient
         var usage = doc.RootElement.TryGetProperty("usageMetadata", out var u) ? u : default;
         int Tok(string name) => usage.ValueKind == JsonValueKind.Object && usage.TryGetProperty(name, out var t) ? t.GetInt32() : 0;
 
-        return new GeminiResult<T>(value, model, Tok("promptTokenCount"), Tok("candidatesTokenCount"));
+        // Thinking tokens are billed as output, so they count toward completion spend.
+        return new GeminiResult<T>(value, model, Tok("promptTokenCount"),
+            Tok("candidatesTokenCount") + Tok("thoughtsTokenCount"));
     }
 }

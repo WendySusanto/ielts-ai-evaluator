@@ -52,7 +52,8 @@ public class ExaminerService : IExaminerService
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
         var result = await _gemini.GenerateAsync<ExaminerTurnResult>(
-            ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema, ct);
+            ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema, ct,
+            thinkingBudget: 0); // a follow-up question needs no reasoning; thinking only adds turn latency
 
         // The turn itself is never persisted, so this row is the only record that the call was
         // paid for. Written after the call so a failed one is not billed to the user.

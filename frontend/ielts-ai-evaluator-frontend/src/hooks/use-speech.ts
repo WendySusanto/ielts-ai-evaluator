@@ -32,6 +32,25 @@ async function getSpeechToken(): Promise<SpeechToken> {
   return value;
 }
 
+const escapeXml = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]!);
+
+/** Wraps examiner text in SSML. Standard neural voices get a slightly slower, examiner-like pace
+ * and a short beat between sentences. HD voices (":DragonHD…") pace themselves and ignore
+ * <prosody>/<break>, so they get the plain text. Voice comes from the ExaminerVoice setting. */
+function toSsml(text: string, voice: string): string {
+  const lang = voice.split("-").slice(0, 2).join("-");
+  const escaped = escapeXml(text);
+  const body = voice.includes(":DragonHD")
+    ? escaped
+    : // ponytail: naive sentence split — "Mr." gets a pause too; harmless at 300ms.
+      `<prosody rate="-8%">${escaped.replace(/([.?!])\s+(?=\S)/g, '$1<break time="300ms"/> ')}</prosody>`;
+  return (
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(lang)}">` +
+    `<voice name="${escapeXml(voice)}">${body}</voice></speak>`
+  );
+}
+
 /** Word-count-weights the five PA scores across turns/segments and concatenates their words
  * (capped at MAX_WORDS). Used both to merge recognized segments within one candidate turn and,
  * by callers, to merge turns into the single aggregate the backend expects. */
@@ -65,11 +84,17 @@ function safeClose(obj: { close: () => void } | null): void {
   }
 }
 
+interface ListenOptions {
+  /** Called once when the candidate has said something and then gone quiet for silenceMs. */
+  onSilence?: () => void;
+  silenceMs?: number;
+}
+
 interface UseSpeechResult {
   supported: boolean;
   speak: (text: string) => Promise<void>;
   stopSpeaking: () => void;
-  startListening: () => Promise<void>;
+  startListening: (opts?: ListenOptions) => Promise<void>;
   stopListening: () => Promise<{ transcript: string; assessment: TurnAssessment | null }>;
   interimTranscript: string;
   error: string | null;
@@ -90,10 +115,21 @@ export function useSpeech(): UseSpeechResult {
   const disposedRef = useRef(false);
   const segmentsRef = useRef<string[]>([]);
   const segmentAssessmentsRef = useRef<TurnAssessment[]>([]);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [supported] = useState(
     () => typeof navigator !== "undefined" && !!navigator.mediaDevices,
   );
+
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  };
+
+  // Fetch the token up front so the examiner's greeting doesn't wait on it.
+  useEffect(() => {
+    if (supported) getSpeechToken().catch(() => {});
+  }, [supported]);
 
   const stopSpeaking = useCallback(() => {
     const player = playerRef.current;
@@ -135,8 +171,8 @@ export function useSpeech(): UseSpeechResult {
         const localSynthesizer = synthesizer;
         await new Promise<void>((resolve, reject) => {
           localPlayer.onAudioEnd = () => resolve();
-          localSynthesizer.speakTextAsync(
-            text,
+          localSynthesizer.speakSsmlAsync(
+            toSsml(text, voice),
             (result) => {
               if (result.reason !== ResultReason.SynthesizingAudioCompleted) {
                 const details = CancellationDetails.fromResult(result);
@@ -154,6 +190,7 @@ export function useSpeech(): UseSpeechResult {
           );
         });
       } catch (e) {
+        cachedToken = null; // a rejected token must not be reused on the retry
         setError(toMessage(e));
         throw e;
       } finally {
@@ -168,7 +205,7 @@ export function useSpeech(): UseSpeechResult {
     [stopSpeaking],
   );
 
-  const startListening = useCallback(async () => {
+  const startListening = useCallback(async (opts?: ListenOptions) => {
     // ponytail: re-entrant start is a no-op — one recognizer per hook is all the
     // examiner-call UI needs, and it can't orphan a live mic.
     if (recognizerRef.current || startPromiseRef.current) return;
@@ -177,6 +214,20 @@ export function useSpeech(): UseSpeechResult {
     setInterimTranscript("");
     segmentsRef.current = [];
     segmentAssessmentsRef.current = [];
+    clearSilenceTimer();
+
+    // Armed only once speech is heard, so thinking time before the first word never ends the
+    // turn; every recognizer event pushes it back. Fires at most once per listen.
+    let silenceFired = false;
+    const bumpSilenceTimer = () => {
+      if (!opts?.onSilence || silenceFired) return;
+      clearSilenceTimer();
+      silenceTimerRef.current = setTimeout(() => {
+        silenceTimerRef.current = null;
+        silenceFired = true;
+        opts.onSilence?.();
+      }, opts.silenceMs ?? 3000);
+    };
 
     const startPromise = (async () => {
       const { token, region } = await getSpeechToken();
@@ -194,11 +245,13 @@ export function useSpeech(): UseSpeechResult {
 
       recognizer.recognizing = (_sender, e) => {
         setInterimTranscript(e.result.text);
+        bumpSilenceTimer();
       };
       recognizer.recognized = (_sender, e) => {
         if (e.result.reason !== ResultReason.RecognizedSpeech) return;
         const text = e.result.text.trim();
         if (!text) return;
+        bumpSilenceTimer();
 
         segmentsRef.current.push(text);
         const pa = PronunciationAssessmentResult.fromResult(e.result);
@@ -247,6 +300,7 @@ export function useSpeech(): UseSpeechResult {
     try {
       await startPromise;
     } catch (e) {
+      cachedToken = null;
       setError(toMessage(e));
       throw e;
     } finally {
@@ -255,6 +309,7 @@ export function useSpeech(): UseSpeechResult {
   }, []);
 
   const stopListening = useCallback(async () => {
+    clearSilenceTimer();
     // A stop issued during startup waits for the start to land, then stops it.
     if (startPromiseRef.current) {
       try {
@@ -292,6 +347,7 @@ export function useSpeech(): UseSpeechResult {
     disposedRef.current = false;
     return () => {
       disposedRef.current = true;
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       safeClose(recognizerRef.current);
       stopSpeaking(); // pauses playback; a bare close() would let it finish the sentence
     };
