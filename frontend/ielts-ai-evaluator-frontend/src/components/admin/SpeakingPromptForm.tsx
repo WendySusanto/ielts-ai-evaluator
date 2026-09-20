@@ -92,16 +92,18 @@ export const SpeakingPromptForm = ({ prompt, onSubmit, onCancel }: SpeakingPromp
         <Label htmlFor="questionText">Question / Cue Card Text</Label>
         <Textarea
           {...register("questionText", { required: true })}
-          placeholder="Enter the main question or cue card text"
+          placeholder="Part 1/3: the examiner's lead-in. Part 2: the cue card text."
         />
         <FieldError show={!!errors.questionText} label="Question text" />
       </div>
 
       <div>
-        <Label htmlFor="cuepoints">Cue Points (optional, one per line — mainly Part 2)</Label>
+        <Label htmlFor="cuepoints">
+          One per line — Part 1/3: the questions, asked one at a time. Part 2: the cue card bullets.
+        </Label>
         <Textarea
           {...register("cuepoints")}
-          placeholder={"what it is\nwhy it matters\nhow you use it"}
+          placeholder={"Do you enjoy reading?\nWhat kind of books do you read?\nDid your parents read to you as a child?"}
         />
       </div>
 

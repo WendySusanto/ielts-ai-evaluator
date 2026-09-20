@@ -9,7 +9,7 @@ import { friendlyError } from "@/lib/friendly-error";
 import { getRelativeTime } from "@/lib/utils";
 import { DashboardData } from "@/types/dashboard";
 import type { User } from "@/types/User";
-import { BookOpen, Clock, Mic, PenTool } from "lucide-react";
+import { BookOpen, CalendarDays, Clock, Mic, PenTool } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
@@ -62,6 +62,26 @@ const Dashboard = () => {
     averageBand != null && targetScore != null
       ? Math.min((averageBand / targetScore) * 100, 100)
       : null;
+
+  // Test day: the stored instant's UTC calendar date is the day the user picked, so read
+  // it off the ISO string and count whole days from today's local midnight.
+  const testDate = profile.targetTestDate
+    ? new Date(`${profile.targetTestDate.slice(0, 10)}T00:00:00`)
+    : null;
+  const daysLeft =
+    testDate != null
+      ? Math.round(
+          (testDate.getTime() - new Date().setHours(0, 0, 0, 0)) / 86_400_000,
+        )
+      : null;
+
+  const countdownLine = () => {
+    if (daysLeft == null) return null;
+    if (daysLeft < 0) return "test day has passed";
+    if (daysLeft === 0) return "that's today";
+    if (daysLeft === 1) return "tomorrow";
+    return `${daysLeft} days to go`;
+  };
 
   const progressLine = () => {
     if (totalEvals === 0) {
@@ -123,6 +143,34 @@ const Dashboard = () => {
                     aria-label={`Current average band ${averageBand!.toFixed(1)} of target ${targetScore}`}
                   />
                 </div>
+              )}
+
+              {testDate != null && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <CalendarDays className="h-4 w-4 shrink-0" />
+                  <span>
+                    Target test date{" "}
+                    <span className="font-medium text-card-foreground">
+                      {testDate.toLocaleDateString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>{" "}
+                    — {countdownLine()}
+                    {daysLeft != null && daysLeft < 0 && (
+                      <>
+                        .{" "}
+                        <Link
+                          to="/profile"
+                          className="font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          Set a new one
+                        </Link>
+                      </>
+                    )}
+                  </span>
+                </p>
               )}
 
               {totalEvals > 0 && (

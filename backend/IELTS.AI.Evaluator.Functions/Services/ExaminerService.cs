@@ -77,7 +77,14 @@ public class ExaminerService : IExaminerService
         sb.AppendLine($"Topic: {prompt.Topic}");
         sb.AppendLine($"Question: {prompt.QuestionText}");
         if (!string.IsNullOrWhiteSpace(prompt.Cuepoints))
-            sb.AppendLine($"Cue points: {prompt.Cuepoints}");
+        {
+            // Cuepoints carries two different things: Part 2's cue card bullets, and Part 1/3's
+            // scripted question list (one per line). Labelling them apart is what lets the model
+            // ask a Part 1/3 prompt one question at a time instead of improvising the whole set.
+            sb.AppendLine(part.Equals("Part2", StringComparison.OrdinalIgnoreCase)
+                ? $"Cue points: {prompt.Cuepoints}"
+                : $"Scripted questions (one per line, ask in this order):\n{prompt.Cuepoints}");
+        }
         sb.AppendLine("Conversation so far:");
         foreach (var turn in turns)
         {

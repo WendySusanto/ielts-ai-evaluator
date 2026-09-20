@@ -22,7 +22,8 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
         // ExaminerService is per-request only. A real Part1→Part3 session uses ~20.
         ["SpeakingV2_ExaminerTurn"] = (60, 60),
         // Azure STS tokens last 10 min and work against the Speech resource directly, so a
-        // leaked loop here is spendable outside the app entirely. A session needs ~4.
+        // leaked loop here is spendable outside the app entirely. The client shares one
+        // in-flight request and caches for 8 min, so a session needs 1 plus 1 per 8 minutes.
         ["SpeechToken_Get"] = (30, 60),
     };
 

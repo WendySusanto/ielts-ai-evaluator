@@ -4,7 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
-import { aggregateAssessments, useSpeech, type TurnAssessment } from "@/hooks/use-speech";
+import {
+  aggregateAssessments,
+  useSpeech,
+  type TurnAssessment,
+} from "@/hooks/use-speech";
 import { ApiError, api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import type {
@@ -33,7 +37,12 @@ const TALK_SECONDS = 120;
 // mid-answer thinking pause; the mic button still stops a turn early.
 const SILENCE_MS = 3000;
 
-type CallState = "idle" | "examinerSpeaking" | "yourTurn" | "listening" | "thinking";
+type CallState =
+  | "idle"
+  | "examinerSpeaking"
+  | "yourTurn"
+  | "listening"
+  | "thinking";
 
 const STATE_LABEL: Record<CallState, string> = {
   idle: "Idle",
@@ -61,14 +70,18 @@ const SpeakingPractice = () => {
   const [assessments, setAssessments] = useState<TurnAssessment[]>([]);
   const [callState, setCallState] = useState<CallState>("idle");
   const [partComplete, setPartComplete] = useState(false);
-  const [pendingRetryTurns, setPendingRetryTurns] = useState<SpeakingTurn[] | null>(null);
+  const [pendingRetryTurns, setPendingRetryTurns] = useState<
+    SpeakingTurn[] | null
+  >(null);
   const [manualTypedMode, setManualTypedMode] = useState(false);
   const [forcedTypedMode, setForcedTypedMode] = useState(false);
   const [typedText, setTypedText] = useState("");
   const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
 
   // Part 2 cue-card phase: only relevant before the first candidate turn.
-  const [part2Phase, setPart2Phase] = useState<"idle" | "prep" | "talk" | "done">("idle");
+  const [part2Phase, setPart2Phase] = useState<
+    "idle" | "prep" | "talk" | "done"
+  >("idle");
   const [prepLeft, setPrepLeft] = useState(PREP_SECONDS);
   const [talkLeft, setTalkLeft] = useState(TALK_SECONDS);
 
@@ -90,24 +103,34 @@ const SpeakingPractice = () => {
 
   useEffect(() => {
     if (speech.supported === false || speech.error) degradeToTyped();
-  },[speech.supported, speech.error]);
+  }, [speech.supported, speech.error]);
 
   // Greet once the prompt has loaded (guarded against StrictMode's double-invoke).
   useEffect(() => {
     if (!prompt || greetedRef.current) return;
     greetedRef.current = true;
-    setTurns([{ role: "examiner", text: prompt.questionText }]);
+    const cues = prompt.cuepoints
+      ? prompt.cuepoints
+          .split("\n")
+          .map((c) => c.trim())
+          .filter(Boolean)
+      : [];
+    // Part 1/3 hold their scripted questions in cuepoints and are asked one at a time like the
+    // real test, so the opener is the lead-in plus the first question only — the examiner
+    // endpoint works down the rest of the list. Part 2's cue card is delivered whole.
+    const opening =
+      prompt.part === "Part2"
+        ? prompt.questionText
+        : [prompt.questionText, cues[0]].filter(Boolean).join(" ");
+    setTurns([{ role: "examiner", text: opening }]);
     setCallState("examinerSpeaking");
     if (speech.supported && !forcedTypedMode) {
       // Part 2: read the cue card aloud like a real examiner; the chat keeps just the question
       // since the card is already on screen.
-      const cues =
-        prompt.part === "Part2" && prompt.cuepoints
-          ? prompt.cuepoints.split("\n").map((c) => c.trim()).filter(Boolean)
-          : [];
-      const spoken = cues.length
-        ? `${prompt.questionText} You should say: ${cues.join(", ")}.`
-        : prompt.questionText;
+      const spoken =
+        prompt.part === "Part2" && cues.length
+          ? `${prompt.questionText} ${cues.join(", ")}.`
+          : opening;
       speech
         .speak(spoken)
         .catch(() => {})
@@ -121,7 +144,10 @@ const SpeakingPractice = () => {
 
   // Auto-scroll to the latest turn / interim transcript.
   useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
+    chatRef.current?.scrollTo({
+      top: chatRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [turns, speech.interimTranscript]);
 
   // Kick off Part 2's prep countdown once the cue card has been presented and it's the
@@ -139,14 +165,20 @@ const SpeakingPractice = () => {
     }
   }, [prompt, candidateTurnCount, callState, part2Phase, typedMode]);
 
-  const submitCandidateTurn = async (rawText: string, assessment: TurnAssessment | null) => {
+  const submitCandidateTurn = async (
+    rawText: string,
+    assessment: TurnAssessment | null,
+  ) => {
     const text = rawText.trim();
     if (!text) {
       toast.error("Didn't catch that — try again.");
       setCallState("yourTurn");
       return;
     }
-    const updatedTurns = [...turns, { role: "candidate", text } as SpeakingTurn];
+    const updatedTurns = [
+      ...turns,
+      { role: "candidate", text } as SpeakingTurn,
+    ];
     setTurns(updatedTurns);
     if (assessment) setAssessments((prev) => [...prev, assessment]);
     await postExaminerTurn(updatedTurns);
@@ -162,12 +194,18 @@ const SpeakingPractice = () => {
         part: prompt.part,
         turns: updatedTurns,
       };
-      const result = await api.post<ExaminerTurnResult>("/api/speaking/examiner-turn", body);
+      const result = await api.post<ExaminerTurnResult>(
+        "/api/speaking/examiner-turn",
+        body,
+      );
       if (result.partComplete) setPartComplete(true);
       // Backend's turn-cap short-circuit returns partComplete with an empty nextQuestion —
       // nothing to render or speak (speak("") may never fire onAudioEnd).
       if (result.nextQuestion) {
-        setTurns((prev) => [...prev, { role: "examiner", text: result.nextQuestion }]);
+        setTurns((prev) => [
+          ...prev,
+          { role: "examiner", text: result.nextQuestion },
+        ]);
         setCallState("examinerSpeaking");
         if (speech.supported && !forcedTypedMode) {
           await speech.speak(result.nextQuestion).catch(() => {});
@@ -175,7 +213,10 @@ const SpeakingPractice = () => {
       }
       setCallState("yourTurn");
     } catch (e) {
-      const err = e instanceof ApiError ? e : new ApiError(0, e instanceof Error ? e.message : "Request failed");
+      const err =
+        e instanceof ApiError
+          ? e
+          : new ApiError(0, e instanceof Error ? e.message : "Request failed");
       toast.error(`Couldn't reach the examiner: ${err.message}`);
       setPendingRetryTurns(updatedTurns);
       setCallState("yourTurn");
@@ -191,12 +232,27 @@ const SpeakingPractice = () => {
     }
     if (callState !== "yourTurn") return;
     try {
-      await speech.startListening({ onSilence: () => onSilenceRef.current(), silenceMs: SILENCE_MS });
+      await speech.startListening({
+        onSilence: () => onSilenceRef.current(),
+        silenceMs: SILENCE_MS,
+        phrases: phrasesRef.current,
+      });
       setCallState("listening");
     } catch {
       degradeToTyped();
     }
   };
+
+  // Vocabulary the recognizer should expect this turn: the task itself plus whatever the
+  // examiner just asked. A ref for the same reason as onSilenceRef — the Part 2 prep effect
+  // starts listening without re-running on every turn.
+  const phrasesRef = useRef<string[]>([]);
+  phrasesRef.current = [
+    prompt?.topic ?? "",
+    prompt?.questionText ?? "",
+    ...(prompt?.cuepoints?.split("\n") ?? []),
+    ...turns.filter((t) => t.role === "examiner").slice(-1).map((t) => t.text),
+  ];
 
   // Silence ends the turn exactly like pressing stop. Kept in a ref so the recognizer's timer
   // always calls the latest render's handler, not the one captured when listening started.
@@ -222,7 +278,14 @@ const SpeakingPractice = () => {
       return;
     handleMicClick();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [callState, typedMode, partComplete, pendingRetryTurns, isSubmittingFinal, candidateTurnCount]);
+  }, [
+    callState,
+    typedMode,
+    partComplete,
+    pendingRetryTurns,
+    isSubmittingFinal,
+    candidateTurnCount,
+  ]);
 
   const handleTypedSend = async () => {
     const text = typedText.trim();
@@ -252,14 +315,21 @@ const SpeakingPractice = () => {
       part: prompt.part,
       turns,
     };
-    if (assessments.length > 0) payload.pronunciation = aggregateAssessments(assessments);
+    if (assessments.length > 0)
+      payload.pronunciation = aggregateAssessments(assessments);
 
     try {
-      const result = await api.post<SpeakingSessionDto>("/api/v2/speaking/sessions", payload);
+      const result = await api.post<SpeakingSessionDto>(
+        "/api/v2/speaking/sessions",
+        payload,
+      );
       toast.success("Speaking response analyzed successfully!");
       navigate(`/speaking-feedback/${result.speakingSessionId}`);
     } catch (e) {
-      const err = e instanceof ApiError ? e : new ApiError(0, e instanceof Error ? e.message : "Request failed");
+      const err =
+        e instanceof ApiError
+          ? e
+          : new ApiError(0, e instanceof Error ? e.message : "Request failed");
       toast.error(`Error analyzing response: ${err.message}`);
       setIsSubmittingFinal(false);
     }
@@ -279,7 +349,7 @@ const SpeakingPractice = () => {
       // First mic use happens here (permission prompt / Azure token), so commit to the
       // talk view only once the recognizer is actually live — the talk view has no
       // mic/typed controls to recover with if the start fails.
-      speech.startListening().then(
+      speech.startListening({ phrases: phrasesRef.current }).then(
         () => {
           setTalkLeft(TALK_SECONDS);
           setPart2Phase("talk");
@@ -295,7 +365,13 @@ const SpeakingPractice = () => {
     }
     const t = setTimeout(() => setPrepLeft((s) => s - 1), 1000);
     return () => clearTimeout(t);
-  }, [part2Phase, prepLeft, speech.supported, speech.startListening, forcedTypedMode]);
+  }, [
+    part2Phase,
+    prepLeft,
+    speech.supported,
+    speech.startListening,
+    forcedTypedMode,
+  ]);
 
   // Part 2 talk countdown -> auto-submits once it hits zero.
   useEffect(() => {
@@ -361,7 +437,10 @@ const SpeakingPractice = () => {
         {turns.map((turn, i) => (
           <div
             key={i}
-            className={cn("flex flex-col", turn.role === "candidate" ? "items-end" : "items-start")}
+            className={cn(
+              "flex flex-col",
+              turn.role === "candidate" ? "items-end" : "items-start",
+            )}
           >
             <p className="text-xs text-muted-foreground mb-1">
               {turn.role === "candidate" ? "You" : "Examiner"}
@@ -401,7 +480,9 @@ const SpeakingPractice = () => {
             )}
             {part2Phase === "prep" && (
               <Badge variant="outline">
-                {prepLeft <= 0 ? "Starting mic…" : `Prep time: ${formatClock(prepLeft)}`}
+                {prepLeft <= 0
+                  ? "Starting mic…"
+                  : `Prep time: ${formatClock(prepLeft)}`}
               </Badge>
             )}
             {part2Phase === "talk" && (
@@ -415,13 +496,22 @@ const SpeakingPractice = () => {
       <div className="sticky bottom-0 space-y-3 border-t border-border bg-background pt-3">
         {part2Phase === "talk" ? (
           <div className="flex justify-center">
-            <Button variant="outline" className="h-11" onClick={finishPart2Talk} disabled={busy}>
+            <Button
+              variant="outline"
+              className="h-11"
+              onClick={finishPart2Talk}
+              disabled={busy}
+            >
               Finish early
             </Button>
           </div>
         ) : pendingRetryTurns ? (
           <div className="flex justify-center">
-            <Button className="h-11" onClick={() => postExaminerTurn(pendingRetryTurns)} disabled={busy}>
+            <Button
+              className="h-11"
+              onClick={() => postExaminerTurn(pendingRetryTurns)}
+              disabled={busy}
+            >
               Retry
             </Button>
           </div>
@@ -464,10 +554,14 @@ const SpeakingPractice = () => {
               type="button"
               onClick={handleMicClick}
               disabled={micDisabled}
-              aria-label={callState === "listening" ? "Stop and send" : "Start recording"}
+              aria-label={
+                callState === "listening" ? "Stop and send" : "Start recording"
+              }
               className={cn(
                 "flex size-14 items-center justify-center rounded-full transition-transform duration-200 disabled:opacity-40",
-                callState === "listening" ? "bg-destructive animate-pulse" : "bg-primary hover:bg-primary/90",
+                callState === "listening"
+                  ? "bg-destructive animate-pulse"
+                  : "bg-primary hover:bg-primary/90",
               )}
             >
               {callState === "listening" ? (
@@ -476,7 +570,11 @@ const SpeakingPractice = () => {
                 <Mic className="h-5 w-5 text-primary-foreground" />
               )}
             </button>
-            <Button variant="ghost" className="h-11" onClick={() => setManualTypedMode(true)}>
+            <Button
+              variant="ghost"
+              className="h-11"
+              onClick={() => setManualTypedMode(true)}
+            >
               <Keyboard />
               Type instead
             </Button>

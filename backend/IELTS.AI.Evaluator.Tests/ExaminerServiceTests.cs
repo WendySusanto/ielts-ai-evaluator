@@ -14,7 +14,8 @@ public class ExaminerServiceTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options);
 
-    private static (ExaminerService svc, FakeStructuredClient gemini, Guid userId, SpeakingPrompt prompt) Setup(string part = "Part1")
+    private static (ExaminerService svc, FakeStructuredClient gemini, Guid userId, SpeakingPrompt prompt) Setup(
+        string part = "Part1", string? cuepoints = null)
     {
         var db = NewDb();
         var userId = Guid.NewGuid();
@@ -26,6 +27,7 @@ public class ExaminerServiceTests
             Preview = "P",
             Part = part,
             QuestionText = "Tell me about your hometown.",
+            Cuepoints = cuepoints,
             Duration = 60,
             Level = "Academic",
         };
@@ -105,6 +107,21 @@ public class ExaminerServiceTests
         var ex = await Assert.ThrowsAsync<ValidationException>(() => svc.NextTurnAsync(userId, request));
         Assert.Equal("Conversation exceeds the maximum length of 30,000 characters.", ex.Message);
         Assert.Equal(0, gemini.Calls);
+    }
+
+    // Part 1/3 reuse Cuepoints for their scripted question list, Part 2 for cue card bullets.
+    // Mislabelling either is what makes the examiner dump every question in one turn.
+    [Theory]
+    [InlineData("Part1", "Scripted questions (one per line, ask in this order):")]
+    [InlineData("Part3", "Scripted questions (one per line, ask in this order):")]
+    [InlineData("Part2", "Cue points:")]
+    public async Task Cuepoints_AreLabelledByPart(string part, string expectedLabel)
+    {
+        var (svc, gemini, userId, prompt) = Setup(part, "First question?\nSecond question?");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, part,
+            new List<SpeakingTurn> { new("examiner", "First question?"), new("candidate", "An answer.") });
+        await svc.NextTurnAsync(userId, request);
+        Assert.Contains(expectedLabel, gemini.LastUserContent);
     }
 
     [Fact]
