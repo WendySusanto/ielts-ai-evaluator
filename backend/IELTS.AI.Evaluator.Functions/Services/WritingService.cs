@@ -10,7 +10,7 @@ namespace IELTS.AI.Evaluator.Functions.Services;
 
 public record WritingEvaluateRequest(Guid WritingPromptId, string EssayText);
 public record WritingEvaluationDto(Guid WritingEvaluationId, decimal OverallBand, WritingFeedback Feedback);
-public record WritingHistoryItemDto(Guid WritingEvaluationId, string TaskType, string Topic, decimal OverallBand, int WordCount, DateTime CreatedAt);
+public record WritingHistoryItemDto(Guid WritingEvaluationId, string TaskType, string Topic, decimal OverallBand, int WordCount, DateTime CreatedAt, Guid WritingPromptId);
 public record WritingEvaluationDetailDto(Guid WritingEvaluationId, string TaskType, string Topic, string QuestionText,
     string EssayText, int WordCount, decimal OverallBand, WritingFeedback Feedback, DateTime CreatedAt);
 
@@ -101,7 +101,7 @@ public class WritingService : IWritingService
             .Where(e => e.UserId == userId)
             .OrderByDescending(e => e.CreatedAt)
             .Select(e => new WritingHistoryItemDto(
-                e.WritingEvaluationId, e.WritingPrompt.TaskType, e.WritingPrompt.Topic, e.OverallBand, e.WordCount, e.CreatedAt))
+                e.WritingEvaluationId, e.WritingPrompt.TaskType, e.WritingPrompt.Topic, e.OverallBand, e.WordCount, e.CreatedAt, e.WritingPromptId))
             .ToListAsync();
     }
 

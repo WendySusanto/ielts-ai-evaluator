@@ -1,9 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, Mic } from "lucide-react";
+import { CircleCheck, Clock, Mic } from "lucide-react";
 import { useState } from "react";
-import type { SpeakingPart, SpeakingPrompt } from "@/types/Speaking";
+import type {
+  SpeakingPart,
+  SpeakingPrompt,
+  SpeakingSessionHistoryItem,
+} from "@/types/Speaking";
 import { useApi } from "@/hooks/use-api";
 import { SpeakingSkeleton } from "@/components/skeleton/SpeakingSkeleton";
 import { useNavigate } from "react-router";
@@ -28,6 +32,10 @@ const Speaking = () => {
     error,
     refetch,
   } = useApi<SpeakingPrompt[]>("/api/speaking-prompts");
+  // A failed history fetch just hides the "done" badges; the topics still work.
+  const { data: history } = useApi<SpeakingSessionHistoryItem[]>(
+    "/api/v2/speaking/sessions"
+  );
 
   if (isLoadingPrompts) {
     return <SpeakingSkeleton />;
@@ -44,6 +52,10 @@ const Speaking = () => {
   }
 
   const prompts = speakingPrompts ?? [];
+  // History is newest-first, so the first session seen per prompt is the latest.
+  const lastBand = new Map<string, number>();
+  for (const h of history ?? [])
+    if (!lastBand.has(h.speakingPromptId)) lastBand.set(h.speakingPromptId, h.overallBand);
   const topics = prompts.filter(
     (prompt) => partFilter === "all" || prompt.part === partFilter
   );
@@ -106,6 +118,12 @@ const Speaking = () => {
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1 text-sm text-muted-foreground">
                 <Badge variant="secondary">{PART_LABEL[topic.part]}</Badge>
+                {lastBand.has(topic.speakingPromptId) && (
+                  <Badge variant="outline" className="gap-1">
+                    <CircleCheck className="h-3.5 w-3.5 text-primary" />
+                    Done · Band {lastBand.get(topic.speakingPromptId)!.toFixed(1)}
+                  </Badge>
+                )}
                 <span className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
                   {Math.round(topic.duration / 60)} min

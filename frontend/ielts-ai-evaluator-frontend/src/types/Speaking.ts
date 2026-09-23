@@ -36,6 +36,29 @@ export interface SpeakingPromptUpsertRequest {
 export interface SpeakingTurn {
   role: "examiner" | "candidate";
   text: string;
+  /** Candidate turns only, and only when spoken: Azure's raw lexical recognition with
+   * [pause N.Ns] markers. `text` is display text — punctuated and tidied — so it alone
+   * hides both the hesitations and the grammar the candidate actually produced. */
+  lexical?: string;
+  /** Spoken candidate turns only: first word to last, pauses included. The server derives the
+   * speech rate from this and `lexical`; the client never sends a rate of its own. */
+  durationSeconds?: number;
+}
+
+/** One of the candidate's own sentences, and how a stronger speaker would say it. */
+export interface SpeakingRewrite {
+  original: string;
+  improved: string;
+  explanation: string;
+}
+
+/** A C1/C2 word or phrase, shown inside a sentence the candidate actually said. */
+export interface SpeakingVocabularyUpgrade {
+  phrase: string;
+  level: string;
+  replaces: string;
+  original: string;
+  improved: string;
 }
 
 /** One of the three Gemini-scored IELTS speaking criteria (pronunciation is separate). */
@@ -45,12 +68,16 @@ export interface SpeakingCriterion {
   justification: string;
   examples: string[];
   improvements: string[];
+  /** Absent on sessions marked before rewrites existed. */
+  rewrites?: SpeakingRewrite[] | null;
 }
 
 export interface SpeakingFeedback {
   overallBand: number;
   summary: string;
   criteria: SpeakingCriterion[];
+  /** Absent on sessions marked before it existed. */
+  vocabulary?: SpeakingVocabularyUpgrade[] | null;
 }
 
 // Body for POST /api/v2/speaking/sessions
@@ -77,6 +104,7 @@ export interface SpeakingSessionHistoryItem {
   topic: string;
   overallBand: number;
   createdAt: string;
+  speakingPromptId: string;
 }
 
 // GET /api/v2/speaking/sessions/{id}
@@ -117,6 +145,9 @@ export interface PronunciationResult {
   prosodyScore: number;
   completenessScore: number;
   words: PronunciationWord[];
+  /** Server-computed from the turns, like band. Null when there was too little speech, or on
+   * sessions recorded before it existed. */
+  wordsPerMinute?: number | null;
 }
 
 // Body for POST /api/speaking/examiner-turn

@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using IELTS.AI.Evaluator.Data.Models;
 using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Exceptions;
@@ -11,7 +12,7 @@ namespace IELTS.AI.Evaluator.Functions.Services;
 public record SpeakingEvaluateRequest(Guid SpeakingPromptId, string Part, List<SpeakingTurn> Turns,
     PronunciationResult? Pronunciation = null); // Band on input is ignored — the service always recomputes it.
 public record SpeakingSessionDto(Guid SpeakingSessionId, decimal OverallBand, SpeakingFeedback Feedback);
-public record SpeakingSessionHistoryItemDto(Guid SpeakingSessionId, string Part, string Topic, decimal OverallBand, DateTime CreatedAt);
+public record SpeakingSessionHistoryItemDto(Guid SpeakingSessionId, string Part, string Topic, decimal OverallBand, DateTime CreatedAt, Guid SpeakingPromptId);
 public record SpeakingSessionDetailDto(Guid SpeakingSessionId, string Part, string Topic, string QuestionText,
     List<SpeakingTurn> Turns, decimal OverallBand, SpeakingFeedback Feedback, PronunciationResult? Pronunciation, DateTime CreatedAt);
 
@@ -29,6 +30,11 @@ public class SpeakingService : ISpeakingService
 {
     private const int MaxTranscriptLength = 20_000;
     private const int MaxConversationLength = 30_000;
+    // A Part 2 long turn is two minutes; anything past fifteen is not a real answer.
+    private const decimal MaxTurnSeconds = 900;
+    // Below this, a rate is one short answer's noise — "yes I do" in half a second reads as 360 wpm.
+    private const decimal MinSecondsForSpeechRate = 10;
+    private static readonly Regex PauseMarker = new(@"\[pause [^\]]*\]", RegexOptions.Compiled);
     private static readonly JsonSerializerOptions CamelCase = new(JsonSerializerDefaults.Web);
 
     private readonly IGeminiStructuredClient _gemini;
@@ -56,6 +62,10 @@ public class SpeakingService : ISpeakingService
         if (transcriptLength > MaxTranscriptLength)
             throw new ValidationException("Transcript exceeds the maximum length of 20,000 characters.");
 
+        // Client-measured, so bounded here: it feeds the speech rate the scorer is shown.
+        if (request.Turns.Any(t => t.DurationSeconds is < 0 or > MaxTurnSeconds))
+            throw new ValidationException("Invalid turn duration.");
+
         // All turns (including examiner) are client-controlled and get rendered verbatim into the paid
         // Gemini call by BuildUserContent, so the candidate-only cap above isn't enough on its own.
         ValidateConversationCap(request.Turns);
@@ -78,7 +88,9 @@ public class SpeakingService : ISpeakingService
 
         // Pronunciation (Azure PA) is client-aggregated but never client-scored: the band is always
         // recomputed here from the raw pronunciationScore, never trusted from the wire.
-        var pronunciation = request.Pronunciation is { } pa ? pa with { Band = RoundToHalf(pa.PronunciationScore / 100 * 9) } : null;
+        var pronunciation = request.Pronunciation is { } pa
+            ? pa with { Band = RoundToHalf(pa.PronunciationScore / 100 * 9), WordsPerMinute = SpeechRate(candidateTurns) }
+            : null;
         if (pronunciation is not null)
             ValidatePronunciation(pronunciation);
 
@@ -125,7 +137,7 @@ public class SpeakingService : ISpeakingService
             .Where(s => s.UserId == userId)
             .OrderByDescending(s => s.CreatedAt)
             .Select(s => new SpeakingSessionHistoryItemDto(
-                s.SpeakingSessionId, s.Part, s.SpeakingPrompt.Topic, s.OverallBand, s.CreatedAt))
+                s.SpeakingSessionId, s.Part, s.SpeakingPrompt.Topic, s.OverallBand, s.CreatedAt, s.SpeakingPromptId))
             .ToListAsync();
     }
 
@@ -148,6 +160,21 @@ public class SpeakingService : ISpeakingService
 
     private static decimal RoundToHalf(decimal value) => Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
 
+    /// <summary>Words per minute across every spoken candidate turn: total words over total
+    /// speaking time, not an average of per-turn rates, which would let a three-word answer weigh
+    /// as much as a two-minute one. Words come from the raw lexical text — the display text drops
+    /// repetitions the candidate really spoke. Null when there is too little speech to mean anything.</summary>
+    internal static decimal? SpeechRate(IEnumerable<SpeakingTurn> candidateTurns)
+    {
+        var spoken = candidateTurns.Where(t => t.DurationSeconds > 0 && !string.IsNullOrWhiteSpace(t.Lexical)).ToList();
+        var seconds = spoken.Sum(t => t.DurationSeconds!.Value);
+        if (seconds < MinSecondsForSpeechRate)
+            return null;
+        var words = spoken.Sum(t => PauseMarker.Replace(t.Lexical!, " ")
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries).Length);
+        return Math.Round(words / seconds * 60);
+    }
+
     private static void ValidatePronunciation(PronunciationResult pa)
     {
         var scores = new[] { pa.PronunciationScore, pa.AccuracyScore, pa.FluencyScore, pa.ProsodyScore, pa.CompletenessScore };
@@ -160,7 +187,10 @@ public class SpeakingService : ISpeakingService
     /// regardless of which endpoint is building the prompt from client-controlled turns.</summary>
     internal static void ValidateConversationCap(List<SpeakingTurn> turns)
     {
-        var conversationLength = turns.Sum(t => t.Text?.Length ?? 0);
+        // Lexical counts too: it is client-controlled and BuildUserContent renders it verbatim
+        // into the same paid call, so leaving it out would let a caller smuggle in a second
+        // unbounded transcript past a cap that only ever looked at Text.
+        var conversationLength = turns.Sum(t => (t.Text?.Length ?? 0) + (t.Lexical?.Length ?? 0));
         if (conversationLength > MaxConversationLength)
             throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
     }
@@ -178,11 +208,27 @@ public class SpeakingService : ISpeakingService
         sb.AppendLine(pronunciation is null
             ? "Measured speech fluency: not available (no spoken audio was assessed for this session)."
             : $"Measured speech fluency (0-100, from pause length, pause placement and speech rate): {pronunciation.FluencyScore:F0}");
-        sb.AppendLine("Transcript:");
+        sb.AppendLine(pronunciation?.WordsPerMinute is { } wpm
+            ? $"Measured speech rate: {wpm:F0} words per minute (speaking time only, pauses included)"
+            : "Measured speech rate: not available.");
+        sb.AppendLine("Transcript (display text — punctuation and sentence breaks added by the recognizer):");
         foreach (var turn in turns)
         {
             var speaker = turn.Role.Equals("examiner", StringComparison.OrdinalIgnoreCase) ? "Examiner" : "Candidate";
             sb.AppendLine($"{speaker}: {turn.Text}");
+        }
+
+        // The same candidate speech, unpolished. Only spoken turns have it, so the block is
+        // omitted entirely for a typed session rather than printed empty — an empty heading
+        // reads to the model like the candidate said nothing.
+        var rawTurns = turns.Where(t => !string.IsNullOrWhiteSpace(t.Lexical)).ToList();
+        if (rawTurns.Count > 0)
+        {
+            sb.AppendLine();
+            sb.AppendLine("Raw recognition of the same candidate answers (verbatim, lowercase, no punctuation; "
+                + "[pause N.Ns] marks a silence of at least one second):");
+            foreach (var turn in rawTurns)
+                sb.AppendLine($"Candidate: {turn.Lexical}");
         }
         return sb.ToString();
     }

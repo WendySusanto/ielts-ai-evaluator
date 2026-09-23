@@ -1,4 +1,5 @@
 import { api } from "@/lib/api";
+import { buildLexicalTranscript, speakingSeconds, type TimedWord } from "@/lib/lexical";
 import type { PronunciationResult, PronunciationWord, SpeechToken } from "@/types/Speaking";
 import {
   AudioConfig,
@@ -19,9 +20,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const TOKEN_TTL_MS = 8 * 60 * 1000;
 const MAX_WORDS = 400;
 
+/** Azure's detailed recognition JSON, of which we want only the raw text and the word timings. */
+interface DetailedPhrase {
+  NBest?: { Lexical?: string; Words?: TimedWord[] }[];
+}
+
 /** Per-turn pronunciation assessment: same shape as PronunciationResult minus the
- * server-computed band, so it doubles as the input aggregateAssessments merges across turns. */
-export type TurnAssessment = Omit<PronunciationResult, "band">;
+ * server-computed fields, so it doubles as the input aggregateAssessments merges across turns. */
+export type TurnAssessment = Omit<PronunciationResult, "band" | "wordsPerMinute">;
 
 let cachedToken: { value: SpeechToken; expiresAt: number } | null = null;
 // The in-flight request, shared by every concurrent caller. Caching only the *resolved* value
@@ -108,7 +114,14 @@ interface UseSpeechResult {
   speak: (text: string) => Promise<void>;
   stopSpeaking: () => void;
   startListening: (opts?: ListenOptions) => Promise<void>;
-  stopListening: () => Promise<{ transcript: string; assessment: TurnAssessment | null }>;
+  stopListening: () => Promise<{
+    transcript: string;
+    /** Raw lexical text with pause markers; "" when the recognizer returned no detailed JSON. */
+    lexical: string;
+    /** Speaking time of the turn, pauses included; 0 when no word timings came through. */
+    durationSeconds: number;
+    assessment: TurnAssessment | null;
+  }>;
   interimTranscript: string;
   error: string | null;
 }
@@ -128,6 +141,8 @@ export function useSpeech(): UseSpeechResult {
   const disposedRef = useRef(false);
   const segmentsRef = useRef<string[]>([]);
   const segmentAssessmentsRef = useRef<TurnAssessment[]>([]);
+  // Raw recognition per segment, kept beside the display text rather than replacing it.
+  const lexicalSegmentsRef = useRef<{ lexical: string; words: TimedWord[] }[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [supported] = useState(
@@ -227,6 +242,7 @@ export function useSpeech(): UseSpeechResult {
     setInterimTranscript("");
     segmentsRef.current = [];
     segmentAssessmentsRef.current = [];
+    lexicalSegmentsRef.current = [];
     clearSilenceTimer();
 
     // Armed only once speech is heard, so thinking time before the first word never ends the
@@ -270,6 +286,19 @@ export function useSpeech(): UseSpeechResult {
         bumpSilenceTimer();
 
         segmentsRef.current.push(text);
+        // Same JSON the PA result is read from, taken directly because the SDK's DetailResult
+        // typing exposes neither Lexical nor the per-word offsets. A malformed or absent payload
+        // must never cost the candidate their turn, so this degrades to display text alone.
+        try {
+          const best = (JSON.parse(e.result.json) as DetailedPhrase).NBest?.[0];
+          if (best)
+            lexicalSegmentsRef.current.push({
+              lexical: best.Lexical ?? "",
+              words: best.Words ?? [],
+            });
+        } catch {
+          // no detailed JSON for this segment; display text still stands
+        }
         const pa = PronunciationAssessmentResult.fromResult(e.result);
         const words: PronunciationWord[] = pa.detailResult.Words.map((w) => ({
           word: w.Word,
@@ -336,7 +365,7 @@ export function useSpeech(): UseSpeechResult {
     }
 
     const recognizer = recognizerRef.current;
-    if (!recognizer) return { transcript: "", assessment: null };
+    if (!recognizer) return { transcript: "", lexical: "", durationSeconds: 0, assessment: null };
     recognizerRef.current = null; // claim it so a concurrent stop can't double-dispose
 
     try {
@@ -351,11 +380,21 @@ export function useSpeech(): UseSpeechResult {
     }
 
     const transcript = segmentsRef.current.join(" ").trim();
+    // One pass over every word of the turn: absolute offsets mean the silences between
+    // segments — the long ones Azure ends a phrase on — are measured the same way as the
+    // hesitations inside one. Falls back to bare lexical text when no timings came through.
+    const timedWords = lexicalSegmentsRef.current.flatMap((s) => s.words);
+    const lexical = timedWords.length
+      ? buildLexicalTranscript(timedWords)
+      : lexicalSegmentsRef.current
+          .map((s) => s.lexical)
+          .join(" ")
+          .trim();
     const assessment =
       segmentAssessmentsRef.current.length > 0
         ? aggregateAssessments(segmentAssessmentsRef.current)
         : null;
-    return { transcript, assessment };
+    return { transcript, lexical, durationSeconds: speakingSeconds(timedWords), assessment };
   }, []);
 
   // Dispose any live SDK objects (they hold the mic/speaker) if the component unmounts mid-turn.

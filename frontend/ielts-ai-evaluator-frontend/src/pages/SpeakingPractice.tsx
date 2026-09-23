@@ -2,6 +2,7 @@ import { WritingPracticeSkeleton } from "@/components/skeleton/WritingPracticeSk
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
 import {
@@ -36,6 +37,36 @@ const TALK_SECONDS = 120;
 // Quiet time after the candidate's last word before the turn is sent. Long enough for a
 // mid-answer thinking pause; the mic button still stops a turn early.
 const SILENCE_MS = 3000;
+// Mirrors ExaminerService's hard cap on examiner turns per part — the examiner can't ask more
+// than this, so it's what the progress bar counts against.
+const MAX_QUESTIONS: Record<string, number> = { Part2: 3 };
+const MAX_QUESTIONS_DEFAULT = 8;
+// A resumable session goes stale after a day — past that, restoring a half-forgotten
+// conversation is more confusing than starting clean.
+const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+
+type SpeakingDraft = {
+  turns: SpeakingTurn[];
+  assessments: TurnAssessment[];
+  partComplete: boolean;
+  savedAt: number;
+};
+
+const readDraft = (key: string): SpeakingDraft | null => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as SpeakingDraft;
+    if (Date.now() - draft.savedAt > DRAFT_TTL_MS || !draft.turns?.length) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return draft;
+  } catch {
+    localStorage.removeItem(key);
+    return null;
+  }
+};
 
 type CallState =
   | "idle"
@@ -91,6 +122,7 @@ const SpeakingPractice = () => {
 
   const typedMode = forcedTypedMode || manualTypedMode;
   const candidateTurnCount = turns.filter((t) => t.role === "candidate").length;
+  const draftKey = prompt ? `draft:speaking:${prompt.speakingPromptId}` : null;
 
   // Degrade to typed mode on unsupported SDK or a speech error. Ponytail: one toast until the
   // user opts back into voice ("Use mic" re-arms it) — repeated Azure hiccups shouldn't spam.
@@ -109,6 +141,27 @@ const SpeakingPractice = () => {
   useEffect(() => {
     if (!prompt || greetedRef.current) return;
     greetedRef.current = true;
+    // A session left behind by a reload, a closed tab, or a failed final submit resumes where it
+    // stopped instead of greeting from scratch — the transcript is the expensive part.
+    const key = `draft:speaking:${prompt.speakingPromptId}`;
+    const draft = readDraft(key);
+    if (draft) {
+      setTurns(draft.turns);
+      setAssessments(draft.assessments);
+      setPartComplete(draft.partComplete);
+      if (prompt.part === "Part2") setPart2Phase("done");
+      setCallState("yourTurn");
+      toast.info("Resumed your previous session.", {
+        action: {
+          label: "Start over",
+          onClick: () => {
+            localStorage.removeItem(key);
+            window.location.reload();
+          },
+        },
+      });
+      return;
+    }
     const cues = prompt.cuepoints
       ? prompt.cuepoints
           .split("\n")
@@ -142,6 +195,23 @@ const SpeakingPractice = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prompt, speech.supported, speech.speak]);
 
+  // Persist after every turn so the conversation survives a reload or a failed final submit.
+  useEffect(() => {
+    if (!draftKey || turns.length === 0) return;
+    const draft: SpeakingDraft = {
+      turns,
+      assessments,
+      partComplete,
+      savedAt: Date.now(),
+    };
+    // ponytail: best-effort — a full/blocked quota shouldn't break a live session.
+    try {
+      localStorage.setItem(draftKey, JSON.stringify(draft));
+    } catch {
+      /* ignore */
+    }
+  }, [draftKey, turns, assessments, partComplete]);
+
   // Auto-scroll to the latest turn / interim transcript.
   useEffect(() => {
     chatRef.current?.scrollTo({
@@ -168,6 +238,7 @@ const SpeakingPractice = () => {
   const submitCandidateTurn = async (
     rawText: string,
     assessment: TurnAssessment | null,
+    spoken?: Pick<SpeakingTurn, "lexical" | "durationSeconds">,
   ) => {
     const text = rawText.trim();
     if (!text) {
@@ -177,7 +248,7 @@ const SpeakingPractice = () => {
     }
     const updatedTurns = [
       ...turns,
-      { role: "candidate", text } as SpeakingTurn,
+      { role: "candidate", text, ...spoken } as SpeakingTurn,
     ];
     setTurns(updatedTurns);
     if (assessment) setAssessments((prev) => [...prev, assessment]);
@@ -192,7 +263,10 @@ const SpeakingPractice = () => {
       const body: ExaminerTurnRequest = {
         speakingPromptId: prompt.speakingPromptId,
         part: prompt.part,
-        turns: updatedTurns,
+        // The examiner only needs to read the conversation; the raw lexical text is for
+        // scoring. Dropping it keeps this per-turn call — the one the candidate waits on —
+        // from carrying a second copy of every answer, and it counts against the same cap.
+        turns: updatedTurns.map(({ role, text }) => ({ role, text })),
       };
       const result = await api.post<ExaminerTurnResult>(
         "/api/speaking/examiner-turn",
@@ -226,8 +300,13 @@ const SpeakingPractice = () => {
   const handleMicClick = async () => {
     if (callState === "listening") {
       setCallState("thinking");
-      const { transcript, assessment } = await speech.stopListening();
-      await submitCandidateTurn(transcript, assessment);
+      const { transcript, lexical, durationSeconds, assessment } =
+        await speech.stopListening();
+      await submitCandidateTurn(
+        transcript,
+        assessment,
+        lexical ? { lexical, durationSeconds } : undefined,
+      );
       return;
     }
     if (callState !== "yourTurn") return;
@@ -311,6 +390,7 @@ const SpeakingPractice = () => {
         "/api/v2/speaking/sessions",
         payload,
       );
+      if (draftKey) localStorage.removeItem(draftKey);
       toast.success("Speaking response analyzed successfully!");
       navigate(`/speaking-feedback/${result.speakingSessionId}`);
     } catch (e) {
@@ -318,7 +398,10 @@ const SpeakingPractice = () => {
         e instanceof ApiError
           ? e
           : new ApiError(0, e instanceof Error ? e.message : "Request failed");
-      toast.error(`Error analyzing response: ${err.message}`);
+      // The transcript is saved locally, so "try again" is a real instruction, not a platitude.
+      toast.error(
+        `Error analyzing response: ${err.message}. Your session is saved — try again.`,
+      );
       setIsSubmittingFinal(false);
     }
   };
@@ -385,6 +468,11 @@ const SpeakingPractice = () => {
     ? prompt.cuepoints.split("\n").filter((c) => c.trim().length > 0)
     : [];
   const showCueCard = prompt.part === "Part2" && candidateTurnCount === 0;
+  const questionCap = MAX_QUESTIONS[prompt.part] ?? MAX_QUESTIONS_DEFAULT;
+  // The examiner can wrap up early, so a completed part shows a full bar regardless of count.
+  const questionsAsked = partComplete
+    ? questionCap
+    : Math.min(turns.filter((t) => t.role === "examiner").length, questionCap);
   const micDisabled = callState !== "yourTurn" && callState !== "listening";
   const busy = callState === "thinking";
 
@@ -415,6 +503,17 @@ const SpeakingPractice = () => {
           <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
           {STATE_LABEL[callState]}
         </Badge>
+      </div>
+
+      {/* Question progress */}
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Questions</span>
+          <span className="font-medium tabular-nums">
+            {questionsAsked}/{questionCap}
+          </span>
+        </div>
+        <Progress value={(questionsAsked / questionCap) * 100} />
       </div>
 
       {/* Conversation */}

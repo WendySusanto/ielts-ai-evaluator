@@ -6,6 +6,7 @@ export interface WritingHistoryItem {
   overallBand: number;
   wordCount: number;
   createdAt: string;
+  writingPromptId: string;
 }
 
 export type EvaluationType = "Writing" | "Speaking" | "all";

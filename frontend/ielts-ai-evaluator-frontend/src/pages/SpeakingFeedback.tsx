@@ -7,6 +7,9 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { BandScore } from "@/components/feedback/BandScore";
 import { CriterionCard } from "@/components/feedback/CriterionCard";
+import { PausedTranscript } from "@/components/feedback/PausedTranscript";
+import { VocabularyCard } from "@/components/feedback/VocabularyCard";
+import { LONG_PAUSE_SECONDS } from "@/lib/lexical";
 import { SpeakingFeedbackSkeleton } from "@/components/skeleton/SpeakingFeedbackSkeleton";
 import type { SpeakingSessionDetail } from "@/types/Speaking";
 import ErrorPage from "./ErrorPage";
@@ -19,6 +22,13 @@ const PRONUNCIATION_METERS = [
 ] as const;
 
 const MAX_PROBLEM_WORDS = 20;
+
+// ponytail: rough conversational norms, not IELTS thresholds — the band descriptors name slow
+// speech as a symptom and set no target rate. Same ranges the scoring prompt is given.
+const SLOW_WPM = 100;
+const FAST_WPM = 170;
+const paceLabel = (wpm: number) =>
+  wpm < SLOW_WPM ? "slow" : wpm > FAST_WPM ? "fast" : "natural";
 
 const PART_LABELS: Record<string, string> = {
   Part1: "Part 1",
@@ -109,6 +119,7 @@ const SpeakingFeedback = () => {
             justification={criterion.justification}
             examples={criterion.examples}
             improvements={criterion.improvements}
+            rewrites={criterion.rewrites}
           />
         ))}
 
@@ -139,6 +150,25 @@ const SpeakingFeedback = () => {
                 ))}
               </div>
 
+              {pronunciation.wordsPerMinute != null && (
+                <div className="space-y-1 border-t border-border pt-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Speaking pace</span>
+                    <span>
+                      <span className="font-medium tabular-nums">
+                        {Math.round(pronunciation.wordsPerMinute)}
+                      </span>{" "}
+                      words/min · {paceLabel(pronunciation.wordsPerMinute)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Natural conversation is roughly {SLOW_WPM}–{FAST_WPM}. IELTS
+                    doesn't score speed itself, but slow speech is a sign of
+                    hesitation.
+                  </p>
+                </div>
+              )}
+
               {problemWords.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-card-foreground">
@@ -152,9 +182,24 @@ const SpeakingFeedback = () => {
                     ))}
                   </div>
                   {problemWords.length > MAX_PROBLEM_WORDS && (
-                    <p className="text-xs text-muted-foreground">
-                      +{problemWords.length - MAX_PROBLEM_WORDS} more
-                    </p>
+                    // ponytail: native <details>, no useState toggle
+                    <details className="group space-y-2">
+                      <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
+                        +{problemWords.length - MAX_PROBLEM_WORDS} more
+                        <span className="group-open:hidden"> — show</span>
+                        <span className="hidden group-open:inline"> — hide</span>
+                      </summary>
+                      <div className="flex flex-wrap gap-2">
+                        {problemWords.slice(MAX_PROBLEM_WORDS).map((word, i) => (
+                          <Badge
+                            key={`${word.word}-more-${i}`}
+                            variant="secondary"
+                          >
+                            {word.word} · {Math.round(word.accuracyScore)}%
+                          </Badge>
+                        ))}
+                      </div>
+                    </details>
                   )}
                 </div>
               )}
@@ -177,6 +222,10 @@ const SpeakingFeedback = () => {
           </Card>
         )}
       </div>
+
+      {feedback.vocabulary && feedback.vocabulary.length > 0 && (
+        <VocabularyCard items={feedback.vocabulary} />
+      )}
 
       {/* Transcript */}
       <Card>
@@ -203,6 +252,26 @@ const SpeakingFeedback = () => {
               >
                 {turn.text}
               </div>
+              {/* The bubble shows display text, which the recognizer punctuates and tidies.
+                  Spoken answers can show what was actually said, and where it stopped.
+                  ponytail: native <details>, no useState toggle */}
+              {turn.lexical && (
+                <details className="group mt-1 max-w-[85%]">
+                  <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
+                    <span className="group-open:hidden">Show pauses</span>
+                    <span className="hidden group-open:inline">Hide pauses</span>
+                  </summary>
+                  <div className="mt-2 rounded-2xl border border-dashed px-4 py-2">
+                    <PausedTranscript lexical={turn.lexical} />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="mr-1 inline-block h-2 w-4 rounded-full bg-chart-4 align-middle" />
+                      under {LONG_PAUSE_SECONDS}s
+                      <span className="ml-3 mr-1 inline-block h-2 w-4 rounded-full bg-destructive align-middle" />
+                      longer
+                    </p>
+                  </div>
+                </details>
+              )}
             </div>
           ))}
         </CardContent>

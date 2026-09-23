@@ -37,6 +37,13 @@ public class GeminiStructuredClient : IGeminiStructuredClient
     private static bool IsTransient(HttpStatusCode status) =>
         status is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable;
 
+    /// <summary>The 45s HttpClient timeout surfaces as TaskCanceledException, and a dropped
+    /// connection as HttpRequestException — both are the same kind of vendor hiccup as a 503 and
+    /// used to end a whole evaluation on the first occurrence. A cancellation the caller actually
+    /// asked for is not transient, so ct is checked before retrying.</summary>
+    private static bool IsTransient(Exception ex, CancellationToken ct) =>
+        !ct.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException;
+
     private readonly HttpClient _http;
     private readonly IConfiguration _config;
     private readonly ILogger<GeminiStructuredClient> _logger;
@@ -83,22 +90,38 @@ public class GeminiStructuredClient : IGeminiStructuredClient
             };
             request.Headers.Add("x-goog-api-key", apiKey);
 
-            using var response = await _http.SendAsync(request, ct);
-            var body = await response.Content.ReadAsStringAsync(ct);
-
-            if (response.IsSuccessStatusCode)
-                return Parse<T>(body);
-
-            if (IsTransient(response.StatusCode) && attempt < RetryDelays.Length)
+            HttpResponseMessage response;
+            try
             {
-                _logger.LogWarning("Gemini returned {Status}; retrying in {Delay}s", (int)response.StatusCode,
+                response = await _http.SendAsync(request, ct);
+            }
+            // Only SendAsync is guarded: the throws below are deliberate verdicts, not hiccups.
+            catch (Exception ex) when (IsTransient(ex, ct) && attempt < RetryDelays.Length)
+            {
+                _logger.LogWarning("Gemini call faulted ({Error}); retrying in {Delay}s", ex.Message,
                     RetryDelays[attempt].TotalSeconds);
                 await Task.Delay(RetryDelays[attempt], ct);
                 continue;
             }
 
-            _logger.LogError("Gemini call failed: {Status} {Body}", (int)response.StatusCode, body);
-            throw new HttpRequestException($"Gemini call failed with status {(int)response.StatusCode}");
+            using (response)
+            {
+                var body = await response.Content.ReadAsStringAsync(ct);
+
+                if (response.IsSuccessStatusCode)
+                    return Parse<T>(body);
+
+                if (IsTransient(response.StatusCode) && attempt < RetryDelays.Length)
+                {
+                    _logger.LogWarning("Gemini returned {Status}; retrying in {Delay}s", (int)response.StatusCode,
+                        RetryDelays[attempt].TotalSeconds);
+                    await Task.Delay(RetryDelays[attempt], ct);
+                    continue;
+                }
+
+                _logger.LogError("Gemini call failed: {Status} {Body}", (int)response.StatusCode, body);
+                throw new HttpRequestException($"Gemini call failed with status {(int)response.StatusCode}");
+            }
         }
     }
 

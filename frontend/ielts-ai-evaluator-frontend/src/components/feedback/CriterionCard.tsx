@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowUpRight } from "lucide-react";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { BandScore } from "./BandScore";
 
 export function CriterionCard({
@@ -8,13 +8,17 @@ export function CriterionCard({
   justification,
   examples,
   improvements,
+  rewrites,
 }: {
   name: string;
   band: number;
   justification: string;
   examples: string[];
   improvements: string[];
+  /** Speaking only, and absent on older sessions: the candidate's sentence and a better one. */
+  rewrites?: { original: string; improved: string; explanation: string }[] | null;
 }) {
+  const hasRewrites = !!rewrites && rewrites.length > 0;
   return (
     <Card>
       <CardHeader>
@@ -26,18 +30,39 @@ export function CriterionCard({
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">{justification}</p>
 
-        {examples.length > 0 && (
+        {(examples.length > 0 || hasRewrites) && (
           <div className="space-y-2">
             <p className="text-sm font-medium text-card-foreground">
               From your answer
             </p>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {examples.map((example, i) => (
                 <li
-                  key={i}
+                  key={`example-${i}`}
                   className="border-l-2 border-border pl-3 italic text-sm text-muted-foreground"
                 >
                   {example}
+                </li>
+              ))}
+              {/* Same quote styling as the examples above, so what they said reads the same
+                  whether or not it came with a fix — the fix is what the arrow adds. */}
+              {rewrites?.map((rewrite, i) => (
+                <li key={`rewrite-${i}`} className="space-y-1 text-sm">
+                  <p className="border-l-2 border-border pl-3 italic text-muted-foreground">
+                    {rewrite.original}
+                  </p>
+                  <p className="flex items-start gap-2">
+                    <ArrowRight
+                      className="h-4 w-4 mt-0.5 shrink-0 text-primary"
+                      aria-label="Better:"
+                    />
+                    <span className="font-medium text-foreground">
+                      {rewrite.improved}
+                    </span>
+                  </p>
+                  <p className="pl-6 text-xs text-muted-foreground">
+                    {rewrite.explanation}
+                  </p>
                 </li>
               ))}
             </ul>

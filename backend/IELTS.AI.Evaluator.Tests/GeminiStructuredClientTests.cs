@@ -218,4 +218,64 @@ public class GeminiStructuredClientTests
 
         Assert.Equal("https://example.test/v1beta/models/gemini:generateContent", handler.Uri!.ToString());
     }
+
+    /// <summary>Throws the scripted exceptions in order, then answers OK. Counts attempts.</summary>
+    private sealed class FaultingHandler : HttpMessageHandler
+    {
+        private readonly Queue<Exception> _faults;
+
+        public int Attempts { get; private set; }
+
+        /// <summary>Fires as each attempt is served — lets a test cancel mid-flight.</summary>
+        public Action? OnRequest;
+
+        public FaultingHandler(params Exception[] faults) => _faults = new Queue<Exception>(faults);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Attempts++;
+            OnRequest?.Invoke();
+            if (_faults.Count > 0)
+                throw _faults.Dequeue();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """
+                    {"candidates":[{"content":{"parts":[{"text":"{\"grade\":\"A\",\"score\":9}"}]}}]}
+                    """),
+            });
+        }
+    }
+
+    /// <summary>The 45s HttpClient timeout surfaces as TaskCanceledException and a dropped
+    /// connection as HttpRequestException. Both used to end the evaluation on first occurrence,
+    /// losing a whole spoken session to a hiccup that clears in seconds.</summary>
+    [Fact]
+    public async Task GenerateAsync_RetriesTimeoutAndConnectionFault_ThenSucceeds()
+    {
+        var handler = new FaultingHandler(new TaskCanceledException("timeout"), new HttpRequestException("reset"));
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        var result = await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""");
+
+        Assert.Equal("A", result.Value.Grade);
+        Assert.Equal(3, handler.Attempts);
+    }
+
+    /// <summary>A caller-requested cancellation is the same exception type as a timeout, so only the
+    /// token tells them apart. Retrying an abandoned request spends on the paid endpoint for a user
+    /// who is already gone.</summary>
+    [Fact]
+    public async Task GenerateAsync_CancelledDuringSend_IsNotRetried()
+    {
+        using var cts = new CancellationTokenSource();
+        var handler = new FaultingHandler(new TaskCanceledException(), new TaskCanceledException());
+        handler.OnRequest = cts.Cancel;
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""", cts.Token));
+
+        Assert.Equal(1, handler.Attempts);
+    }
 }
