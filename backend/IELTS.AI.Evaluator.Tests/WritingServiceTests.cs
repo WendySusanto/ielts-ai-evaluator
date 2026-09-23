@@ -17,14 +17,20 @@ public class FakeStructuredClient : IGeminiStructuredClient
 
     public int Calls { get; private set; }
     public string? LastUserContent { get; private set; }
+    public string? LastEndpoint { get; private set; }
+    public int? LastThinkingBudget { get; private set; }
+    public double? LastTemperature { get; private set; }
 
     public FakeStructuredClient(object canned) => _canned = canned;
 
     public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default, int? thinkingBudget = null)
+        CancellationToken ct = default, int? thinkingBudget = null, double? temperature = null, string? endpoint = null)
     {
         Calls++;
         LastUserContent = userContent;
+        LastEndpoint = endpoint;
+        LastThinkingBudget = thinkingBudget;
+        LastTemperature = temperature;
         var json = JsonSerializer.Serialize(_canned, CamelCase);
         var value = JsonSerializer.Deserialize<T>(json, CamelCase)!;
         return Task.FromResult(new GeminiResult<T>(value, "gemini-test", 100, 200));
@@ -235,5 +241,17 @@ public class WritingServiceTests
         var upgradeRequired = root.GetProperty("properties").GetProperty("vocabularyUpgrades").GetProperty("items").GetProperty("required")
             .EnumerateArray().Select(e => e.GetString()).ToList();
         Assert.Equal(new[] { "original", "upgrade", "context" }, upgradeRequired);
+    }
+
+    /// <summary>A band is a score, not a draft. Gemini samples at its own default temperature, so
+    /// without pinning it to 0 the same submission can come back half a band apart on two runs —
+    /// the one thing a scoring product must never do. Asserted here rather than only in the client
+    /// because the requirement is that THIS service sends it, not merely that the client could.</summary>
+    [Fact]
+    public async Task Evaluate_PinsTemperatureToZero_SoBandsDoNotDrift()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+        Assert.Equal(0, gemini.LastTemperature);
     }
 }

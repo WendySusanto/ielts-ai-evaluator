@@ -13,9 +13,13 @@ public interface IGeminiStructuredClient
     /// <summary>Calls Gemini generateContent with responseMimeType=application/json and the given
     /// responseSchema (Gemini schema JSON as a string), deserializing the reply into T. Retries
     /// transient rejections; see <see cref="GeminiStructuredClient.RetryDelays"/>. A non-null
-    /// thinkingBudget is sent as thinkingConfig (0 turns thinking off for latency-sensitive calls).</summary>
+    /// thinkingBudget is sent as thinkingConfig (0 turns thinking off for latency-sensitive calls).
+    /// A non-null temperature is sent as-is; leaving it null keeps the model default. Scoring calls
+    /// pass 0 so the same answer does not drift half a band between runs. A non-blank endpoint
+    /// replaces the configured one, which is how the examiner turn reaches a different model than
+    /// scoring does — the model name is part of the URL. Blank or null keeps GeminiApiEndpoint.</summary>
     Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default, int? thinkingBudget = null);
+        CancellationToken ct = default, int? thinkingBudget = null, double? temperature = null, string? endpoint = null);
 }
 
 public class GeminiStructuredClient : IGeminiStructuredClient
@@ -45,11 +49,11 @@ public class GeminiStructuredClient : IGeminiStructuredClient
     }
 
     public async Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default, int? thinkingBudget = null)
+        CancellationToken ct = default, int? thinkingBudget = null, double? temperature = null, string? endpoint = null)
     {
         var apiKey = _config["GeminiApiKey"];
-        var endpoint = _config["GeminiApiEndpoint"];
-        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(endpoint))
+        var resolvedEndpoint = string.IsNullOrWhiteSpace(endpoint) ? _config["GeminiApiEndpoint"] : endpoint;
+        if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(resolvedEndpoint))
             throw new InvalidOperationException("Gemini configuration missing");
 
         using var schema = JsonDocument.Parse(responseSchemaJson);
@@ -60,6 +64,8 @@ public class GeminiStructuredClient : IGeminiStructuredClient
         };
         if (thinkingBudget is not null)
             generationConfig["thinkingConfig"] = new { thinkingBudget };
+        if (temperature is not null)
+            generationConfig["temperature"] = temperature;
         var payload = new
         {
             systemInstruction = new { parts = new[] { new { text = systemInstruction } } },
@@ -71,7 +77,7 @@ public class GeminiStructuredClient : IGeminiStructuredClient
 
         for (var attempt = 0; ; attempt++)
         {
-            using var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
+            using var request = new HttpRequestMessage(HttpMethod.Post, resolvedEndpoint)
             {
                 Content = new StringContent(payloadJson, Encoding.UTF8, "application/json"),
             };

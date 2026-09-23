@@ -67,7 +67,8 @@ public class WritingService : IWritingService
 
         var userContent = BuildUserContent(prompt, request.EssayText);
         var result = await _gemini.GenerateAsync<WritingFeedback>(
-            WritingFeedbackPrompts.SystemPrompt, userContent, WritingFeedbackPrompts.GeminiSchema, ct);
+            WritingFeedbackPrompts.SystemPrompt, userContent, WritingFeedbackPrompts.GeminiSchema, ct,
+            temperature: 0); // a band is a score, not a draft: the same essay must not drift between runs
 
         var wordCount = request.EssayText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
         var evaluation = new WritingEvaluation

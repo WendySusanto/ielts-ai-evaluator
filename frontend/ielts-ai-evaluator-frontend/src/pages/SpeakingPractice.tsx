@@ -235,24 +235,12 @@ const SpeakingPractice = () => {
       await speech.startListening({
         onSilence: () => onSilenceRef.current(),
         silenceMs: SILENCE_MS,
-        phrases: phrasesRef.current,
       });
       setCallState("listening");
     } catch {
       degradeToTyped();
     }
   };
-
-  // Vocabulary the recognizer should expect this turn: the task itself plus whatever the
-  // examiner just asked. A ref for the same reason as onSilenceRef — the Part 2 prep effect
-  // starts listening without re-running on every turn.
-  const phrasesRef = useRef<string[]>([]);
-  phrasesRef.current = [
-    prompt?.topic ?? "",
-    prompt?.questionText ?? "",
-    ...(prompt?.cuepoints?.split("\n") ?? []),
-    ...turns.filter((t) => t.role === "examiner").slice(-1).map((t) => t.text),
-  ];
 
   // Silence ends the turn exactly like pressing stop. Kept in a ref so the recognizer's timer
   // always calls the latest render's handler, not the one captured when listening started.
@@ -349,7 +337,7 @@ const SpeakingPractice = () => {
       // First mic use happens here (permission prompt / Azure token), so commit to the
       // talk view only once the recognizer is actually live — the talk view has no
       // mic/typed controls to recover with if the start fails.
-      speech.startListening({ phrases: phrasesRef.current }).then(
+      speech.startListening().then(
         () => {
           setTalkLeft(TALK_SECONDS);
           setPart2Phase("talk");

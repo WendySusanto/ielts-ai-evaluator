@@ -356,4 +356,16 @@ public class SpeakingServiceTests
         var criterionRequired = criteria.GetProperty("items").GetProperty("required").EnumerateArray().Select(e => e.GetString()).ToList();
         Assert.Equal(new[] { "name", "band", "justification", "examples", "improvements" }, criterionRequired);
     }
+
+    /// <summary>A band is a score, not a draft. Gemini samples at its own default temperature, so
+    /// without pinning it to 0 the same submission can come back half a band apart on two runs —
+    /// the one thing a scoring product must never do. Asserted here rather than only in the client
+    /// because the requirement is that THIS service sends it, not merely that the client could.</summary>
+    [Fact]
+    public async Task Evaluate_PinsTemperatureToZero_SoBandsDoNotDrift()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+        Assert.Equal(0, gemini.LastTemperature);
+    }
 }

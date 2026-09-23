@@ -3,6 +3,7 @@ using IELTS.AI.Evaluator.Data.Models;
 using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace IELTS.AI.Evaluator.Functions.Services;
 
@@ -25,11 +26,13 @@ public class ExaminerService : IExaminerService
 
     private readonly IGeminiStructuredClient _gemini;
     private readonly EvaluatorDbContext _db;
+    private readonly IConfiguration _config;
 
-    public ExaminerService(IGeminiStructuredClient gemini, EvaluatorDbContext db)
+    public ExaminerService(IGeminiStructuredClient gemini, EvaluatorDbContext db, IConfiguration config)
     {
         _gemini = gemini;
         _db = db;
+        _config = config;
     }
 
     public async Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request,
@@ -51,9 +54,23 @@ public class ExaminerService : IExaminerService
             return new ExaminerTurnResult("", true);
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
+        // The budget belongs to the model, so it travels with the endpoint. gemini-3.5-flash-lite
+        // rejects thinkingBudget 0 with a 400 that is never retried; gemini-3.8-flash wants 0 so a
+        // follow-up question carries no thinking latency. Unset therefore cannot mean one fixed
+        // number: with no custom endpoint it means 0, the behaviour from before this was tunable;
+        // with one, it means omit thinkingConfig entirely, which every model accepts. That way a
+        // half-configured environment degrades to "maybe slower" instead of an examiner that dies
+        // on every turn. A non-zero budget is a ceiling, not a floor — unused tokens cost nothing.
+        var examinerEndpoint = _config["GeminiExaminerApiEndpoint"];
+        int? thinkingBudget = int.TryParse(_config["GeminiExaminerThinkingBudget"], out var configured)
+            ? configured
+            : string.IsNullOrWhiteSpace(examinerEndpoint) ? 0 : null;
         var result = await _gemini.GenerateAsync<ExaminerTurnResult>(
             ExaminerPrompts.SystemPrompt, userContent, ExaminerPrompts.GeminiSchema, ct,
-            thinkingBudget: 0); // a follow-up question needs no reasoning; thinking only adds turn latency
+            thinkingBudget: thinkingBudget,
+            // Null until an environment opts in, which leaves the client on GeminiApiEndpoint — so
+            // switching the examiner to a cheaper, lower-latency model is a config edit, not a deploy.
+            endpoint: examinerEndpoint);
 
         // The turn itself is never persisted, so this row is the only record that the call was
         // paid for. Written after the call so a failed one is not billed to the user.

@@ -8,6 +8,9 @@ Prep reference for the first production deployment. Nothing here provisions anyt
 |---|---|---|
 | `DbConnectionString` | PostgreSQL database | production connection string |
 | `GeminiApiKey` | Gemini evaluation calls | secret — App Settings only |
+| `GeminiApiEndpoint` | Model used for scoring (Writing + Speaking) | full `generateContent` URL; the model name lives in it. Also the fallback for the examiner. Receives `GeminiApiKey`, so only point it at Google |
+| `GeminiExaminerApiEndpoint` | Model used for live examiner turns | optional — blank or unset falls back to `GeminiApiEndpoint`. Point it at a cheaper, lower-latency model |
+| `GeminiExaminerThinkingBudget` | Thinking budget for examiner turns | optional. For `gemini-3.5-flash-lite` use `128` — it rejects `0` with a 400. Leave unset and `thinkingConfig` is omitted, which every model accepts; unset with no custom endpoint means `0` |
 | `FIREBASE_PROJECT_ID` | Firebase Admin token verification | |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials | secret — App Settings only |
 | `AzureSpeechKey` | Azure Speech (TTS/STT/pronunciation) | F0 tier works; app degrades to typed mode without it |

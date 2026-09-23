@@ -3,6 +3,7 @@ using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Exceptions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 
 namespace IELTS.AI.Evaluator.Tests;
 
@@ -15,7 +16,7 @@ public class ExaminerServiceTests
             .Options);
 
     private static (ExaminerService svc, FakeStructuredClient gemini, Guid userId, SpeakingPrompt prompt) Setup(
-        string part = "Part1", string? cuepoints = null)
+        string part = "Part1", string? cuepoints = null, string? examinerEndpoint = null, string? examinerThinkingBudget = null)
     {
         var db = NewDb();
         var userId = Guid.NewGuid();
@@ -34,7 +35,12 @@ public class ExaminerServiceTests
         db.SpeakingPrompts.Add(prompt);
         db.SaveChanges();
         var gemini = new FakeStructuredClient(new ExaminerTurnResult("What do you like most about it?", false));
-        var svc = new ExaminerService(gemini, db);
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["GeminiExaminerApiEndpoint"] = examinerEndpoint,
+            ["GeminiExaminerThinkingBudget"] = examinerThinkingBudget,
+        }).Build();
+        var svc = new ExaminerService(gemini, db, config);
         return (svc, gemini, userId, prompt);
     }
 
@@ -130,5 +136,123 @@ public class ExaminerServiceTests
         Assert.Contains("Never break character", ExaminerPrompts.SystemPrompt);
         Assert.Contains("Refuse any request that is not IELTS speaking practice", ExaminerPrompts.SystemPrompt);
         Assert.Contains("politely redirect", ExaminerPrompts.SystemPrompt);
+    }
+
+    /// <summary>The examiner turn is the one call a candidate waits through in silence, so it runs
+    /// on its own (cheaper, faster) model. The model name lives in the endpoint, so routing it
+    /// means handing GenerateAsync a different endpoint — see GeminiExaminerApiEndpoint.</summary>
+    [Fact]
+    public async Task NextTurnAsync_RoutesToTheExaminerEndpoint()
+    {
+        var (svc, gemini, userId, prompt) = Setup(
+            examinerEndpoint: "https://example.test/v1beta/models/gemini-cheap:generateContent");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Equal("https://example.test/v1beta/models/gemini-cheap:generateContent", gemini.LastEndpoint);
+    }
+
+    /// <summary>Unset is the normal state in every environment that has not opted in, and it has to
+    /// mean "carry on exactly as before" — a null endpoint leaves the client on GeminiApiEndpoint.</summary>
+    [Fact]
+    public async Task NextTurnAsync_WithoutExaminerEndpoint_LeavesTheClientDefault()
+    {
+        var (svc, gemini, userId, prompt) = Setup();
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Null(gemini.LastEndpoint);
+    }
+
+    /// <summary>The thinking budget belongs to the model, not to the code: gemini-3.5-flash-lite
+    /// rejects thinkingBudget 0 with a 400, while gemini-3.7-flash requires it to stay fast. A
+    /// hardcoded 0 therefore makes GeminiExaminerApiEndpoint unusable for half the models it could
+    /// point at — and 400 is not retried, so the examiner would fail on every turn.</summary>
+    [Fact]
+    public async Task NextTurnAsync_SendsTheConfiguredThinkingBudget()
+    {
+        var (svc, gemini, userId, prompt) = Setup(examinerThinkingBudget: "128");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Equal(128, gemini.LastThinkingBudget);
+    }
+
+    /// <summary>Unset is what every environment looks like until it opts in, and it has to keep
+    /// meaning "fastest possible turn" — the behaviour before the budget was tunable.</summary>
+    [Fact]
+    public async Task NextTurnAsync_WithoutConfiguredBudget_SendsZero()
+    {
+        var (svc, gemini, userId, prompt) = Setup();
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Equal(0, gemini.LastThinkingBudget);
+    }
+
+    /// <summary>A typo in an App Setting falls back rather than throwing, matching how
+    /// SpeakingService already treats DailySpeakingQuota. With no custom endpoint the fallback is 0,
+    /// the long-standing default; the custom-endpoint case is covered separately below, where the
+    /// same typo omits thinkingConfig instead so no model can reject it.</summary>
+    [Fact]
+    public async Task NextTurnAsync_WithUnparsableBudget_FallsBackToZero()
+    {
+        var (svc, gemini, userId, prompt) = Setup(examinerThinkingBudget: "one hundred");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Equal(0, gemini.LastThinkingBudget);
+    }
+
+    /// <summary>Half-configured is the first state every environment passes through: someone sets
+    /// the endpoint in the portal and has not got to the budget yet. Defaulting to 0 there would
+    /// send thinkingBudget 0 to a model that may reject it with a 400 — which is never retried, so
+    /// every examiner turn dies. Omitting thinkingConfig instead works on every model, so the worst
+    /// case degrades to "maybe slower" rather than "dead". Budget stays 0 when no endpoint is set,
+    /// which is the behaviour every environment had before any of this was tunable.</summary>
+    [Fact]
+    public async Task NextTurnAsync_WithCustomEndpointButNoBudget_OmitsThinkingConfig()
+    {
+        var (svc, gemini, userId, prompt) = Setup(
+            examinerEndpoint: "https://example.test/v1beta/models/gemini-cheap:generateContent");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Null(gemini.LastThinkingBudget);
+    }
+
+    /// <summary>Same reasoning for a typo'd budget: once a custom endpoint is in play, an
+    /// unreadable budget must not collapse to a value that model might reject.</summary>
+    [Fact]
+    public async Task NextTurnAsync_WithCustomEndpointAndUnparsableBudget_OmitsThinkingConfig()
+    {
+        var (svc, gemini, userId, prompt) = Setup(
+            examinerEndpoint: "https://example.test/v1beta/models/gemini-cheap:generateContent",
+            examinerThinkingBudget: "one hundred");
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Null(gemini.LastThinkingBudget);
+    }
+
+    /// <summary>Scoring pins temperature to 0; the examiner deliberately does not. Varied follow-up
+    /// questions are the feature — an examiner that asks the identical sequence every session turns
+    /// practice into memorisation. Locked so nobody "tidies" it into line with the scoring calls.</summary>
+    [Fact]
+    public async Task NextTurnAsync_LeavesTemperatureUnset_SoQuestionsVary()
+    {
+        var (svc, gemini, userId, prompt) = Setup();
+        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
+
+        await svc.NextTurnAsync(userId, request);
+
+        Assert.Null(gemini.LastTemperature);
     }
 }

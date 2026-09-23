@@ -84,7 +84,8 @@ public class SpeakingService : ISpeakingService
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns, pronunciation);
         var result = await _gemini.GenerateAsync<SpeakingFeedback>(
-            SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema, ct);
+            SpeakingFeedbackPrompts.SystemPrompt, userContent, SpeakingFeedbackPrompts.GeminiSchema, ct,
+            temperature: 0); // scoring is reproducible; only the examiner's questions want variety
 
         // Overall band is the average of the three Gemini-assessed criteria plus, when present, the
         // Azure PA band, rounded to the nearest 0.5 — not whatever Gemini put in its own overallBand field.

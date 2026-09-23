@@ -3,8 +3,6 @@ import type { PronunciationResult, PronunciationWord, SpeechToken } from "@/type
 import {
   AudioConfig,
   CancellationDetails,
-  PhraseListGrammar,
-  ProfanityOption,
   PronunciationAssessmentConfig,
   PronunciationAssessmentGradingSystem,
   PronunciationAssessmentGranularity,
@@ -20,11 +18,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // Azure STS tokens expire after 10 min; refresh a couple of minutes early.
 const TOKEN_TTL_MS = 8 * 60 * 1000;
 const MAX_WORDS = 400;
-// Phrase segmentation is left at Azure's 500ms default. Raising it gives the recognizer more
-// context per phrase (fewer misheard words from hesitant speech) but every ms is added to the
-// wait at the end of a turn; 1500 and 800 both read as laggy. If you retry it, the knob is
-// PropertyId.Speech_SegmentationSilenceTimeoutMs on speechConfig, and it must stay well below
-// SILENCE_MS in SpeakingPractice or the last phrase never lands before the turn ends.
 
 /** Per-turn pronunciation assessment: same shape as PronunciationResult minus the
  * server-computed band, so it doubles as the input aggregateAssessments merges across turns. */
@@ -50,15 +43,6 @@ function getSpeechToken(): Promise<SpeechToken> {
       inFlightToken = null; // a failed request must not be latched; the next caller retries
     });
   return inFlightToken;
-}
-
-// ponytail: dev-only latency probe, added to find where a turn's wait actually goes
-// (connection setup vs. live recognition vs. Azure finalizing pronunciation assessment).
-// Delete once the numbers are known.
-function mark(label: string, since: number): void {
-  if (import.meta.env.DEV) {
-    console.debug(`[stt] ${label} +${Math.round(performance.now() - since)}ms`);
-  }
 }
 
 const escapeXml = (s: string) =>
@@ -117,9 +101,6 @@ interface ListenOptions {
   /** Called once when the candidate has said something and then gone quiet for silenceMs. */
   onSilence?: () => void;
   silenceMs?: number;
-  /** Topic vocabulary to bias recognition towards (task topic, cue points, the examiner's last
-   * question). Blank entries are ignored. */
-  phrases?: string[];
 }
 
 interface UseSpeechResult {
@@ -128,7 +109,6 @@ interface UseSpeechResult {
   stopSpeaking: () => void;
   startListening: (opts?: ListenOptions) => Promise<void>;
   stopListening: () => Promise<{ transcript: string; assessment: TurnAssessment | null }>;
-  /** The whole turn as heard so far — closed phrases plus the one still open. Empty between turns. */
   interimTranscript: string;
   error: string | null;
 }
@@ -149,7 +129,6 @@ export function useSpeech(): UseSpeechResult {
   const segmentsRef = useRef<string[]>([]);
   const segmentAssessmentsRef = useRef<TurnAssessment[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listenStartRef = useRef(0); // ponytail: probe only, see mark()
 
   const [supported] = useState(
     () => typeof navigator !== "undefined" && !!navigator.mediaDevices,
@@ -263,27 +242,11 @@ export function useSpeech(): UseSpeechResult {
       }, opts.silenceMs ?? 3000);
     };
 
-    const t0 = performance.now();
-    listenStartRef.current = t0;
-    let sawPartial = false;
-
     const startPromise = (async () => {
       const { token, region } = await getSpeechToken();
-      mark("token ready", t0);
       const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
-      speechConfig.speechRecognitionLanguage = "en-US";
-      // An IELTS transcript is scored on what was actually said; masking turns words into "***".
-      speechConfig.setProfanity(ProfanityOption.Raw);
       const audioConfig = AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechRecognizer(speechConfig, audioConfig);
-
-      // Bias the recognizer towards this task's vocabulary — topic words and proper nouns are
-      // what it most often gets wrong.
-      const phrases = opts?.phrases?.map((p) => p.trim()).filter(Boolean) ?? [];
-      if (phrases.length) {
-        const grammar = PhraseListGrammar.fromRecognizer(recognizer);
-        phrases.forEach((p) => grammar.addPhrase(p));
-      }
 
       const paConfig = new PronunciationAssessmentConfig(
         "",
@@ -294,27 +257,19 @@ export function useSpeech(): UseSpeechResult {
       paConfig.applyTo(recognizer);
 
       recognizer.recognizing = (_sender, e) => {
-        // Everything recognized so far plus the open phrase. Showing only the open phrase made
-        // the UI blank out every time a phrase closed, which reads as "it stopped processing".
+        // Committed segments + the open phrase. Showing only e.result.text made every
+        // finalized sentence vanish from the caption, which reads as a wrong transcript even
+        // though stopListening() still returns all of them joined.
         setInterimTranscript([...segmentsRef.current, e.result.text].join(" "));
-        if (!sawPartial && e.result.text) {
-          sawPartial = true;
-          mark("first partial", t0);
-        }
         bumpSilenceTimer();
       };
       recognizer.recognized = (_sender, e) => {
         if (e.result.reason !== ResultReason.RecognizedSpeech) return;
         const text = e.result.text.trim();
         if (!text) return;
-        // Arm the silence timer only if nothing has yet — a very short utterance can land
-        // without a `recognizing` event. Never extend it: `recognized` only fires once Azure's
-        // end-of-phrase silence has already elapsed, so bumping here would stack that delay on
-        // top of silenceMs at the end of every turn.
-        if (!silenceTimerRef.current) bumpSilenceTimer();
+        bumpSilenceTimer();
 
         segmentsRef.current.push(text);
-        mark(`phrase committed (${text.split(" ").length}w)`, t0);
         const pa = PronunciationAssessmentResult.fromResult(e.result);
         const words: PronunciationWord[] = pa.detailResult.Words.map((w) => ({
           word: w.Word,
@@ -329,7 +284,6 @@ export function useSpeech(): UseSpeechResult {
           completenessScore: pa.completenessScore,
           words,
         });
-        // Keep the closed phrases on screen rather than blanking until the next word.
         setInterimTranscript(segmentsRef.current.join(" "));
       };
       recognizer.canceled = (_sender, e) => {
@@ -340,7 +294,6 @@ export function useSpeech(): UseSpeechResult {
         await new Promise<void>((resolve, reject) => {
           recognizer.startContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
         });
-        mark("recognizer live", t0);
       } catch (e) {
         safeClose(recognizer); // never leak a recognizer whose start failed
         throw e;
@@ -386,12 +339,10 @@ export function useSpeech(): UseSpeechResult {
     if (!recognizer) return { transcript: "", assessment: null };
     recognizerRef.current = null; // claim it so a concurrent stop can't double-dispose
 
-    mark("stop requested", listenStartRef.current);
     try {
       await new Promise<void>((resolve, reject) => {
         recognizer.stopContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
       });
-      mark("recognizer stopped", listenStartRef.current);
     } catch (e) {
       setError(toMessage(e));
     } finally {

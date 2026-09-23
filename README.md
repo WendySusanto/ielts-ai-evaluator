@@ -92,7 +92,7 @@ func start               # http://localhost:7103
 ```
 
 Settings needed in `local.settings.json` (git-ignored):
-`DbConnectionString`, `GeminiApiKey`, `GeminiApiEndpoint`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `AzureSpeechKey`, `AzureSpeechRegion`, `ExaminerVoice`, `DailyWritingQuota`, `DailySpeakingQuota`
+`DbConnectionString`, `GeminiApiKey`, `GeminiApiEndpoint`, `GeminiExaminerApiEndpoint`, `GeminiExaminerThinkingBudget`, `FIREBASE_PROJECT_ID`, `FIREBASE_SERVICE_ACCOUNT_JSON`, `AzureSpeechKey`, `AzureSpeechRegion`, `ExaminerVoice`, `DailyWritingQuota`, `DailySpeakingQuota`
 
 Azure Speech is optional — without it, speaking practice falls back to typed input and omits the pronunciation criterion.
 

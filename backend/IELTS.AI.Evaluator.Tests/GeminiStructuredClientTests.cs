@@ -13,9 +13,11 @@ public class GeminiStructuredClientTests
     private sealed class CapturingHandler : HttpMessageHandler
     {
         public string? Body;
+        public Uri? Uri;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             Body = await request.Content!.ReadAsStringAsync(ct);
+            Uri = request.RequestUri;
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(
@@ -54,6 +56,7 @@ public class GeminiStructuredClientTests
         Assert.Equal("application/json", genCfg.GetProperty("responseMimeType").GetString());
         Assert.True(genCfg.TryGetProperty("responseSchema", out _));
         Assert.False(genCfg.TryGetProperty("thinkingConfig", out _)); // model default unless asked
+        Assert.False(genCfg.TryGetProperty("temperature", out _)); // likewise — null means leave it to the model
         Assert.Equal("sys", sent.RootElement.GetProperty("systemInstruction").GetProperty("parts")[0].GetProperty("text").GetString());
     }
 
@@ -160,5 +163,59 @@ public class GeminiStructuredClientTests
         var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
         await Assert.ThrowsAnyAsync<Exception>(() =>
             client.GenerateAsync<int[]>("sys", "user", """{"type":"ARRAY"}"""));
+    }
+
+    /// <summary>Scoring pins temperature to 0. Left unset, Gemini samples at its own default and the
+    /// same essay can come back half a band apart on two runs — the one thing a band must never do.</summary>
+    [Fact]
+    public async Task GenerateAsync_WithTemperature_SendsIt()
+    {
+        var handler = new CapturingHandler();
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""", temperature: 0);
+
+        using var sent = JsonDocument.Parse(handler.Body!);
+        Assert.Equal(0, sent.RootElement.GetProperty("generationConfig").GetProperty("temperature").GetDouble());
+    }
+
+    /// <summary>The examiner turn and the scoring call want different models, and the model name
+    /// lives inside the endpoint URL. A caller-supplied endpoint therefore has to beat the
+    /// configured one; null keeps the configured default, which every other test here relies on.</summary>
+    [Fact]
+    public async Task GenerateAsync_WithEndpoint_OverridesTheConfiguredOne()
+    {
+        var handler = new CapturingHandler();
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""",
+            endpoint: "https://example.test/v1beta/models/gemini-cheap:generateContent");
+
+        Assert.Equal("https://example.test/v1beta/models/gemini-cheap:generateContent", handler.Uri!.ToString());
+    }
+
+    [Fact]
+    public async Task GenerateAsync_WithoutEndpoint_UsesTheConfiguredOne()
+    {
+        var handler = new CapturingHandler();
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""");
+
+        Assert.Equal("https://example.test/v1beta/models/gemini:generateContent", handler.Uri!.ToString());
+    }
+
+    /// <summary>An override that is present but blank is what a half-configured environment looks
+    /// like — Azure App Settings happily stores an empty string. That must degrade to the default
+    /// endpoint, not take down the examiner with "configuration missing".</summary>
+    [Fact]
+    public async Task GenerateAsync_WithBlankEndpoint_FallsBackToTheConfiguredOne()
+    {
+        var handler = new CapturingHandler();
+        var client = new GeminiStructuredClient(new HttpClient(handler), Config(), NullLogger<GeminiStructuredClient>.Instance);
+
+        await client.GenerateAsync<Verdict>("sys", "user", """{"type":"OBJECT"}""", endpoint: "");
+
+        Assert.Equal("https://example.test/v1beta/models/gemini:generateContent", handler.Uri!.ToString());
     }
 }
