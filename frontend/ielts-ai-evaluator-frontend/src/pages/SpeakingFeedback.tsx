@@ -1,6 +1,7 @@
 import { ArrowLeft, AudioLines } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "@/hooks/use-api";
+import { useNotebook } from "@/hooks/use-notebook";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -51,6 +52,7 @@ const SpeakingFeedback = () => {
     isLoading,
     error,
   } = useApi<SpeakingSessionDetail>(`/api/v2/speaking/sessions/${speakingId}`);
+  const notebook = useNotebook();
 
   if (isLoading) {
     return <SpeakingFeedbackSkeleton />;
@@ -224,7 +226,7 @@ const SpeakingFeedback = () => {
       </div>
 
       {feedback.vocabulary && feedback.vocabulary.length > 0 && (
-        <VocabularyCard items={feedback.vocabulary} />
+        <VocabularyCard items={feedback.vocabulary} sessionId={speakingId!} notebook={notebook} />
       )}
 
       {/* Transcript */}
