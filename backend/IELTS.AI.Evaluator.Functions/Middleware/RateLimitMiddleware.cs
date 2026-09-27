@@ -25,6 +25,8 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
         // leaked loop here is spendable outside the app entirely. The client shares one
         // in-flight request and caches for 8 min, so a session needs 1 plus 1 per 8 minutes.
         ["SpeechToken_Get"] = (30, 60),
+        // A paid Gemini lookup per click of "Fill with AI" — far more than anyone adds by hand.
+        ["Notebook_Suggest"] = (60, 60),
     };
 
     private static readonly (int Limit, int WindowMinutes) Default = (300, 60);

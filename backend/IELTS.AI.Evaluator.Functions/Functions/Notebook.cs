@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Extensions;
 using IELTS.AI.Evaluator.Functions.Services;
 using Microsoft.AspNetCore.Http;
@@ -35,6 +36,19 @@ public class Notebook
         var request = JsonSerializer.Deserialize<NotebookCreateRequest>(body, Web)!;
         var entry = await _service.CreateAsync(context.GetUserId()!.Value, request);
         return new OkObjectResult(entry);
+    }
+
+    [Function("Notebook_Suggest")]
+    public async Task<IActionResult> SuggestAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v2/notebook/suggest")] HttpRequest req,
+        FunctionContext context)
+    {
+        // Cancelled with the invocation, so an abandoned lookup doesn't pay for a Gemini call.
+        var ct = context.CancellationToken;
+        var body = await new StreamReader(req.Body).ReadToEndAsync(ct);
+        var request = JsonSerializer.Deserialize<WordSuggestionRequest>(body, Web)!;
+        var suggestion = await _service.SuggestAsync(request.Word, ct);
+        return new OkObjectResult(suggestion);
     }
 
     [Function("Notebook_Update")]

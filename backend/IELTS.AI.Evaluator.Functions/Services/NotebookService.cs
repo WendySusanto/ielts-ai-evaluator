@@ -1,4 +1,5 @@
 using IELTS.AI.Evaluator.Data.Models;
+using IELTS.AI.Evaluator.Functions.DTOs;
 using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.EntityFrameworkCore;
 
@@ -18,6 +19,7 @@ public interface INotebookService
     Task<NotebookEntryDto> CreateAsync(Guid userId, NotebookCreateRequest request);
     Task<NotebookEntryDto> UpdateAsync(Guid userId, Guid id, NotebookUpdateRequest request);
     Task DeleteAsync(Guid userId, Guid id);
+    Task<WordSuggestion> SuggestAsync(string word, CancellationToken ct = default);
 }
 
 public class NotebookService : INotebookService
@@ -25,8 +27,13 @@ public class NotebookService : INotebookService
     private static readonly string[] Sources = ["Manual", "Writing", "Speaking"];
 
     private readonly EvaluatorDbContext _db;
+    private readonly IGeminiStructuredClient _gemini;
 
-    public NotebookService(EvaluatorDbContext db) => _db = db;
+    public NotebookService(EvaluatorDbContext db, IGeminiStructuredClient gemini)
+    {
+        _db = db;
+        _gemini = gemini;
+    }
 
     public async Task<List<NotebookEntryDto>> ListAsync(Guid userId)
     {
@@ -88,6 +95,18 @@ public class NotebookService : INotebookService
     {
         _db.NotebookEntries.Remove(await GetOwnedAsync(userId, id));
         await _db.SaveChangesAsync();
+    }
+
+    /// <summary>Checks the spelling of a word the learner typed and drafts its meaning and example.
+    /// Nothing is saved — the learner edits the draft before adding it.</summary>
+    // ponytail: no usage row, unlike ExaminerTurnUsage. A lookup is a few hundred tokens and the
+    // rate limit caps it at 60/hour per user; record usage if this spend ever needs to be visible.
+    public async Task<WordSuggestion> SuggestAsync(string word, CancellationToken ct = default)
+    {
+        var result = await _gemini.GenerateAsync<WordSuggestion>(
+            WordSuggestionPrompts.SystemPrompt, Required(word, "Word", 100), WordSuggestionPrompts.GeminiSchema, ct,
+            thinkingBudget: 0); // a dictionary lookup, not reasoning — the learner is waiting on it
+        return result.Value;
     }
 
     // Another user's entry is reported as missing, not forbidden, so ids can't be probed.

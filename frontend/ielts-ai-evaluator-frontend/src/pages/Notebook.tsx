@@ -77,14 +77,16 @@ const Notebook = () => {
       (!q || matches(e, q)),
   );
 
-  const submit = async (values: EntryFormValues) => {
+  const submit = async ({ word, meaning, example, level }: EntryFormValues) => {
     if (editing) {
       return !!(await notebook.update(editing.notebookEntryId, {
-        ...values,
+        word,
+        meaning,
+        example,
         mastered: editing.mastered,
       }));
     }
-    return !!(await notebook.save({ ...values, source: "Manual" }));
+    return !!(await notebook.save({ word, meaning, example, level, source: "Manual" }));
   };
 
   const setMastered = (e: NotebookEntry, mastered: boolean) =>
