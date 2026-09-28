@@ -12,6 +12,7 @@ import DetailedFeedback from "./pages/DetailedFeedback";
 import FeedbackHistory from "./pages/FeedbackHistory";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
+import Notebook from "./pages/Notebook";
 import Premium from "./pages/Premium";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
@@ -110,6 +111,14 @@ function App() {
                           element={
                             <PrivateRoute>
                               <FeedbackHistory />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/notebook"
+                          element={
+                            <PrivateRoute>
+                              <Notebook />
                             </PrivateRoute>
                           }
                         />

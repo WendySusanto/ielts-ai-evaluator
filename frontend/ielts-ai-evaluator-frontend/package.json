@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "check:lexical": "node --experimental-strip-types --no-warnings src/lib/lexical.check.ts",
+    "check:notebook": "node --experimental-strip-types --no-warnings src/lib/notebook.check.ts",
     "preview": "vite preview"
   },
   "engines": {

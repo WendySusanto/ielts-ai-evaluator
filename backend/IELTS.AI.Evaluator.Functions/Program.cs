@@ -47,6 +47,7 @@ var host = new HostBuilder()
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAuthSyncService, AuthSyncService>();
+        services.AddScoped<INotebookService, NotebookService>();
 
         // initialize FirebaseApp once using JSON from env (or KeyVault)
         var firebaseJson = Environment.GetEnvironmentVariable("FIREBASE_SERVICE_ACCOUNT_JSON")
