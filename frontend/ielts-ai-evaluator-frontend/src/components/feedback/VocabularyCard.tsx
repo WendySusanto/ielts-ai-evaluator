@@ -1,35 +1,37 @@
+import { SaveWordButton } from "@/components/notebook/SaveWordButton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { Notebook } from "@/hooks/use-notebook";
+import { findPhrase } from "@/lib/notebook";
 import type { SpeakingVocabularyUpgrade } from "@/types/Speaking";
 import { ArrowRight } from "lucide-react";
 
-const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 /** Marks the suggested phrase inside the improved sentence, so "where would I use this" is
- * answered at a glance. The trailing \w* stretches the mark over an inflection ("exacerbate" →
- * "exacerbates").
- * ponytail: irregular forms ("take a toll" → "took a toll") and reordered phrases are not found
- * and simply render unmarked — the sentence still reads correctly. Match on a lemma list if
- * that happens often enough to matter. */
+ * answered at a glance. A phrase findPhrase can't locate renders unmarked — the sentence still
+ * reads correctly. */
 function Highlighted({ text, phrase }: { text: string; phrase: string }) {
-  const match = phrase.trim()
-    ? new RegExp(`${escapeRegExp(phrase.trim())}\\w*`, "i").exec(text)
-    : null;
-  if (!match) return <>{text}</>;
+  const parts = findPhrase(text, phrase);
+  if (!parts) return <>{text}</>;
   return (
     <>
-      {text.slice(0, match.index)}
-      <mark className="rounded bg-primary/15 px-0.5 text-foreground">
-        {match[0]}
-      </mark>
-      {text.slice(match.index + match[0].length)}
+      {parts[0]}
+      <mark className="rounded bg-primary/15 px-0.5 text-foreground">{parts[1]}</mark>
+      {parts[2]}
     </>
   );
 }
 
 /** C1/C2 words and phrases placed inside sentences the candidate actually said. The level is
  * Gemini's estimate, not a dictionary lookup, and the badge's title says so. */
-export function VocabularyCard({ items }: { items: SpeakingVocabularyUpgrade[] }) {
+export function VocabularyCard({
+  items,
+  sessionId,
+  notebook,
+}: {
+  items: SpeakingVocabularyUpgrade[];
+  sessionId: string;
+  notebook: Notebook;
+}) {
   return (
     <Card>
       <CardHeader>
@@ -51,6 +53,18 @@ export function VocabularyCard({ items }: { items: SpeakingVocabularyUpgrade[] }
                 <span className="text-xs text-muted-foreground">
                   instead of “{item.replaces}”
                 </span>
+                <SaveWordButton
+                  className="ml-auto"
+                  notebook={notebook}
+                  entry={{
+                    word: item.phrase,
+                    replaces: item.replaces,
+                    example: item.original,
+                    level: item.level,
+                    source: "Speaking",
+                    sourceId: sessionId,
+                  }}
+                />
               </div>
               <p className="border-l-2 border-border pl-3 italic text-muted-foreground">
                 {item.original}

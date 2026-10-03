@@ -22,6 +22,9 @@ interface MutateOptions<T, R = T> {
 interface UseApiResponse<T> extends UseApiState<T> {
   refetch: () => Promise<void>;
   mutate: <R>(options: MutateOptions<T, R>) => Promise<void>;
+  /** Edits the loaded data in place — for lists whose mutations return one item, which
+   * mutate() would otherwise put in place of the whole list. */
+  setData: (update: (prev: T | null) => T | null) => void;
 }
 
 function asApiError(error: unknown): ApiError {
@@ -80,6 +83,12 @@ export function useApi<T>(
     []
   );
 
+  const setData = useCallback(
+    (update: (prev: T | null) => T | null) =>
+      setState((prev) => ({ ...prev, data: update(prev.data) })),
+    []
+  );
+
   useEffect(() => {
     if (!config?.skipInitialFetch) {
       fetchData();
@@ -90,5 +99,6 @@ export function useApi<T>(
     ...state,
     refetch: fetchData,
     mutate,
+    setData,
   };
 }

@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { LayoutDashboard, Mic, Edit3, History, Crown } from "lucide-react";
+import { LayoutDashboard, Mic, Edit3, History, Crown, BookMarked } from "lucide-react";
 
 import {
   Sidebar,
@@ -31,6 +31,7 @@ const practiceItems: NavItem[] = [
     icon: History,
     alsoMatch: ["/speaking-feedback"],
   },
+  { title: "Notebook", url: "/notebook", icon: BookMarked },
 ];
 
 // A section stays lit on its child routes, so /writing/Task2/7 keeps "Writing"

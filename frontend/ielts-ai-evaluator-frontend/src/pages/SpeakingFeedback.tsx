@@ -1,17 +1,18 @@
-import { ArrowLeft, AudioLines } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useApi } from "@/hooks/use-api";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
 import { BandScore } from "@/components/feedback/BandScore";
 import { CriterionCard } from "@/components/feedback/CriterionCard";
 import { PausedTranscript } from "@/components/feedback/PausedTranscript";
 import { VocabularyCard } from "@/components/feedback/VocabularyCard";
-import { LONG_PAUSE_SECONDS } from "@/lib/lexical";
 import { SpeakingFeedbackSkeleton } from "@/components/skeleton/SpeakingFeedbackSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { useApi } from "@/hooks/use-api";
+import { useNotebook } from "@/hooks/use-notebook";
+import { LONG_PAUSE_SECONDS } from "@/lib/lexical";
 import type { SpeakingSessionDetail } from "@/types/Speaking";
+import { ArrowLeft, AudioLines } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 import ErrorPage from "./ErrorPage";
 
 const PRONUNCIATION_METERS = [
@@ -51,6 +52,7 @@ const SpeakingFeedback = () => {
     isLoading,
     error,
   } = useApi<SpeakingSessionDetail>(`/api/v2/speaking/sessions/${speakingId}`);
+  const notebook = useNotebook();
 
   if (isLoading) {
     return <SpeakingFeedbackSkeleton />;
@@ -187,17 +189,22 @@ const SpeakingFeedback = () => {
                       <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
                         +{problemWords.length - MAX_PROBLEM_WORDS} more
                         <span className="group-open:hidden"> — show</span>
-                        <span className="hidden group-open:inline"> — hide</span>
+                        <span className="hidden group-open:inline">
+                          {" "}
+                          — hide
+                        </span>
                       </summary>
                       <div className="flex flex-wrap gap-2">
-                        {problemWords.slice(MAX_PROBLEM_WORDS).map((word, i) => (
-                          <Badge
-                            key={`${word.word}-more-${i}`}
-                            variant="secondary"
-                          >
-                            {word.word} · {Math.round(word.accuracyScore)}%
-                          </Badge>
-                        ))}
+                        {problemWords
+                          .slice(MAX_PROBLEM_WORDS)
+                          .map((word, i) => (
+                            <Badge
+                              key={`${word.word}-more-${i}`}
+                              variant="secondary"
+                            >
+                              {word.word} · {Math.round(word.accuracyScore)}%
+                            </Badge>
+                          ))}
                       </div>
                     </details>
                   )}
@@ -215,8 +222,8 @@ const SpeakingFeedback = () => {
             </CardHeader>
             <CardContent>
               <p className="text-sm text-muted-foreground">
-                Pronunciation scoring with per-word analysis arrives with the live
-                examiner.
+                Pronunciation scoring with per-word analysis arrives with the
+                live examiner.
               </p>
             </CardContent>
           </Card>
@@ -224,7 +231,11 @@ const SpeakingFeedback = () => {
       </div>
 
       {feedback.vocabulary && feedback.vocabulary.length > 0 && (
-        <VocabularyCard items={feedback.vocabulary} />
+        <VocabularyCard
+          items={feedback.vocabulary}
+          sessionId={speakingId!}
+          notebook={notebook}
+        />
       )}
 
       {/* Transcript */}
@@ -253,24 +264,17 @@ const SpeakingFeedback = () => {
                 {turn.text}
               </div>
               {/* The bubble shows display text, which the recognizer punctuates and tidies.
-                  Spoken answers can show what was actually said, and where it stopped.
-                  ponytail: native <details>, no useState toggle */}
+                  Spoken answers also show what was actually said, and where it stopped. */}
               {turn.lexical && (
-                <details className="group mt-1 max-w-[85%]">
-                  <summary className="cursor-pointer list-none text-xs text-muted-foreground hover:text-foreground">
-                    <span className="group-open:hidden">Show pauses</span>
-                    <span className="hidden group-open:inline">Hide pauses</span>
-                  </summary>
-                  <div className="mt-2 rounded-2xl border border-dashed px-4 py-2">
-                    <PausedTranscript lexical={turn.lexical} />
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      <span className="mr-1 inline-block h-2 w-4 rounded-full bg-chart-4 align-middle" />
-                      under {LONG_PAUSE_SECONDS}s
-                      <span className="ml-3 mr-1 inline-block h-2 w-4 rounded-full bg-destructive align-middle" />
-                      longer
-                    </p>
-                  </div>
-                </details>
+                <div className="mt-2 max-w-[85%] rounded-2xl border border-dashed px-4 py-2">
+                  <PausedTranscript lexical={turn.lexical} />
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    <span className="mr-1 inline-block h-2 w-4 rounded-full bg-chart-4 align-middle" />
+                    under {LONG_PAUSE_SECONDS}s
+                    <span className="ml-3 mr-1 inline-block h-2 w-4 rounded-full bg-destructive align-middle" />
+                    longer
+                  </p>
+                </div>
               )}
             </div>
           ))}

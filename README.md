@@ -25,6 +25,10 @@ A candidate picks a prompt and either writes an essay or holds a spoken conversa
 
 Source: [`WritingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/WritingService.cs), [`SpeakingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs), [`GeminiStructuredClient.cs`](backend/IELTS.AI.Evaluator.Functions/Services/GeminiStructuredClient.cs)
 
+**Vocabulary notebook.** Every vocabulary upgrade in writing and speaking feedback has a bookmark that saves it to a per-user notebook, together with the sentence the candidate actually wrote or said and the weaker word it replaces. Words can also be added by hand: **Fill with AI** asks Gemini whether the word is real English, returns the likely intended spelling if it isn't, and otherwise drafts a meaning, an example sentence and a CEFR level for the candidate to edit. Browsers expose no dictionary API, so that one call doubles as the spelling check, with the browser's own spellcheck underlining typos as they're typed. Flashcard review quizzes each word from its own context: "a stronger word for *very big*" over the candidate's own sentence, or a manual word blanked out of its example.
+
+Source: [`NotebookService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/NotebookService.cs), [`WordSuggestion.cs`](backend/IELTS.AI.Evaluator.Functions/DTOs/WordSuggestion.cs), [`Notebook.tsx`](frontend/ielts-ai-evaluator-frontend/src/pages/Notebook.tsx), [`notebook.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/notebook.ts)
+
 ---
 
 ## Tech stack
@@ -44,7 +48,7 @@ Source: [`WritingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/Writ
 - PostgreSQL via Npgsql 9.0.4 / EF Core 9.0.7 with migrations
 - FirebaseAdmin 3.3.0 (server-side token verification)
 - Google Gemini API (structured JSON output)
-- xUnit 2.9.3 — 13 test classes, run as a deploy gate
+- xUnit 2.9.3 — 14 test classes, run as a deploy gate
 
 **Hosting** — Azure Static Web Apps (frontend), Azure Functions (API), both deployed from GitHub Actions on push to `main`.
 
@@ -56,11 +60,11 @@ Source: [`WritingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/Writ
 
 **Scores are recomputed server-side, never accepted from the client.** The pronunciation band is derived from Azure's raw score in [`SpeakingService.cs:77`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L77) rather than read off the request, and the overall band is averaged from the criteria in [`SpeakingService.cs:87-91`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L87-L91) rather than taken from Gemini's own `overallBand` field. A tampered request cannot inflate a band, and the model cannot contradict its own criterion scores.
 
-**Rate limiting is shaped by what each endpoint costs, not by one global number.** [`RateLimitMiddleware.cs:19-29`](backend/IELTS.AI.Evaluator.Functions/Middleware/RateLimitMiddleware.cs#L19-L29) sets 60/hour on the examiner-turn endpoint (one paid Gemini call per turn, ~20 per real session), 30/hour on Speech token issuance (a leaked token is spendable against the Speech resource outside the app), and 300/hour everywhere else. The counter is per-instance in `IMemoryCache`, which is a deliberate accuracy-for-simplicity trade: it stops a scripted loop without adding Redis to the deployment, and the code says so in a comment. Daily per-user evaluation quotas sit on top, enforced against the database.
+**Rate limiting is shaped by what each endpoint costs, not by one global number.** [`RateLimitMiddleware.cs:19-32`](backend/IELTS.AI.Evaluator.Functions/Middleware/RateLimitMiddleware.cs#L19-L32) sets 60/hour on the examiner-turn endpoint (one paid Gemini call per turn, ~20 per real session), 60/hour on the notebook's Fill with AI lookup (also a paid Gemini call), 30/hour on Speech token issuance (a leaked token is spendable against the Speech resource outside the app), and 300/hour everywhere else. The counter is per-instance in `IMemoryCache`, which is a deliberate accuracy-for-simplicity trade: it stops a scripted loop without adding Redis to the deployment, and the code says so in a comment. Daily per-user evaluation quotas sit on top, enforced against the database.
 
 **Pronunciation is measured, not inferred.** Gemini only ever receives text, so it scores three criteria; pronunciation comes from Azure's acoustic assessment and is averaged in as a fourth. When no audio was assessed, [`SpeakingService.cs:171-173`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs#L171-L173) states that explicitly in the prompt so the model scores fluency knowing the signal is absent, and the pronunciation criterion is dropped rather than guessed.
 
-**No state management library.** Server state runs through a ~100-line [`use-api.ts`](frontend/ielts-ai-evaluator-frontend/src/hooks/use-api.ts) hook (`data`/`isLoading`/`error` + `refetch`/`mutate`); the only global state is auth and theme, each a React Context. There is no Redux, Zustand, or React Query in `src/`. Errors are mapped to plain-language strings in [`friendly-error.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/friendly-error.ts) — no HTTP codes shown to users, who are mostly ESL — including a specific message for 429.
+**No state management library.** Server state runs through a ~100-line [`use-api.ts`](frontend/ielts-ai-evaluator-frontend/src/hooks/use-api.ts) hook (`data`/`isLoading`/`error` + `refetch`/`mutate`/`setData`); the only global state is auth and theme, each a React Context. There is no Redux, Zustand, or React Query in `src/`. Errors are mapped to plain-language strings in [`friendly-error.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/friendly-error.ts) — no HTTP codes shown to users, who are mostly ESL — including a specific message for 429.
 
 **Azure was the objective, not the default.** I built this to work through a full end-to-end Azure deployment while preparing for AZ-204, so the platform choice came first and the architecture followed. That was the point of the exercise, and it put real surface area under my hands: Static Web Apps hosting the SPA, Functions on the isolated worker model behind it, Cognitive Services for speech, app settings and GitHub Secrets as the credential store, and two Actions pipelines that gate on `dotnet test` and run `dotnet ef database update` before publishing. Routing fallback and the security header set — CSP, HSTS, `nosniff`, `frame-ancestors 'none'`, and a `Permissions-Policy` granting `microphone=(self)` while denying camera and geolocation — are declared in [`staticwebapp.config.json`](frontend/ielts-ai-evaluator-frontend/public/staticwebapp.config.json) rather than in a separate CDN or reverse-proxy config. Vercel plus a managed Postgres would have been fewer moving parts; it would also have skipped everything I was trying to learn.
 
@@ -100,6 +104,11 @@ Azure Speech is optional — without it, speaking practice falls back to typed i
 
 ```bash
 cd backend && dotnet test IELTS.AI.Evaluator.sln
+
+# Frontend: assert-based checks for the pure helpers (no test runner)
+cd frontend/ielts-ai-evaluator-frontend
+npm run check:lexical
+npm run check:notebook
 ```
 
 The database ships with no seed prompts. Register, then promote yourself with

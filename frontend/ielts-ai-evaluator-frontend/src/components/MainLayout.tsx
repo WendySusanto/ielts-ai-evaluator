@@ -23,6 +23,7 @@ const TITLES: [string, string][] = [
   // Trailing slash first: /feedback/:id is one evaluation, /feedback is the list.
   ["/feedback/", "Writing Feedback"],
   ["/feedback", "Feedback History"],
+  ["/notebook", "Notebook"],
   ["/premium", "Premium"],
   ["/admin", "Admin"],
   ["/profile", "Profile"],

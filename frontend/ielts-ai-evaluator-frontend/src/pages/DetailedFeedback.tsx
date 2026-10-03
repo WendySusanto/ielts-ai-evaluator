@@ -1,6 +1,8 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "@/hooks/use-api";
+import { useNotebook } from "@/hooks/use-notebook";
+import { SaveWordButton } from "@/components/notebook/SaveWordButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BandScore } from "@/components/feedback/BandScore";
@@ -31,6 +33,7 @@ const DetailedFeedback = () => {
     isLoading,
     error,
   } = useApi<WritingEvaluationDetail>(`/api/v2/writing/evaluations/${essayId}`);
+  const notebook = useNotebook();
 
   if (isLoading) {
     return <DetailedFeedbackSkeleton />;
@@ -145,13 +148,25 @@ const DetailedFeedback = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {feedback.vocabularyUpgrades.map((v, i) => (
-                  <div key={i} className="text-sm">
-                    <p>
-                      <span className="text-muted-foreground">{v.original}</span>
-                      {" → "}
-                      <span className="font-medium text-foreground">{v.upgrade}</span>
-                    </p>
-                    <p className="text-muted-foreground mt-0.5">{v.context}</p>
+                  <div key={i} className="flex items-start gap-2 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <p>
+                        <span className="text-muted-foreground">{v.original}</span>
+                        {" → "}
+                        <span className="font-medium text-foreground">{v.upgrade}</span>
+                      </p>
+                      <p className="text-muted-foreground mt-0.5">{v.context}</p>
+                    </div>
+                    <SaveWordButton
+                      notebook={notebook}
+                      entry={{
+                        word: v.upgrade,
+                        replaces: v.original,
+                        example: v.context,
+                        source: "Writing",
+                        sourceId: essayId,
+                      }}
+                    />
                   </div>
                 ))}
               </CardContent>

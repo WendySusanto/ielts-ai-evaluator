@@ -19,6 +19,7 @@ namespace IELTS.AI.Evaluator.Data.Models
         public DbSet<SpeakingSession> SpeakingSessions => Set<SpeakingSession>();
         public DbSet<SpeechTokenIssue> SpeechTokenIssues => Set<SpeechTokenIssue>();
         public DbSet<ExaminerTurnUsage> ExaminerTurnUsages => Set<ExaminerTurnUsage>();
+        public DbSet<NotebookEntry> NotebookEntries => Set<NotebookEntry>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -68,6 +69,19 @@ namespace IELTS.AI.Evaluator.Data.Models
             modelBuilder.Entity<ExaminerTurnUsage>(e =>
             {
                 e.HasKey(x => x.ExaminerTurnUsageId);
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
+                e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            });
+
+            modelBuilder.Entity<NotebookEntry>(e =>
+            {
+                e.HasKey(x => x.NotebookEntryId);
+                e.Property(x => x.Word).HasMaxLength(100);
+                e.Property(x => x.Meaning).HasMaxLength(500);
+                e.Property(x => x.Example).HasMaxLength(500);
+                e.Property(x => x.Replaces).HasMaxLength(100);
+                e.Property(x => x.Level).HasMaxLength(10);
+                e.Property(x => x.Source).HasMaxLength(10);
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasIndex(x => new { x.UserId, x.CreatedAt });
             });
