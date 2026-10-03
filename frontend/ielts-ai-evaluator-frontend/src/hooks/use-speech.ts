@@ -8,6 +8,7 @@ import {
   PronunciationAssessmentGradingSystem,
   PronunciationAssessmentGranularity,
   PronunciationAssessmentResult,
+  PropertyId,
   ResultReason,
   SpeakerAudioDestination,
   SpeechConfig,
@@ -261,6 +262,12 @@ export function useSpeech(): UseSpeechResult {
     const startPromise = (async () => {
       const { token, region } = await getSpeechToken();
       const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
+      // Azure's default ends a phrase after 500ms of silence, so a candidate who pauses
+      // mid-clause ("we only take photos during … a family trip") gets each fragment recognized
+      // alone, with no language-model context — that's where most misheard words came from.
+      // Pauses are measured from word timings, not segments, so this doesn't hide them.
+      // ponytail: hand-picked; raise toward 2000 if mid-sentence splits persist.
+      speechConfig.setProperty(PropertyId.Speech_SegmentationSilenceTimeoutMs, "1200");
       const audioConfig = AudioConfig.fromDefaultMicrophoneInput();
       const recognizer = new SpeechRecognizer(speechConfig, audioConfig);
 

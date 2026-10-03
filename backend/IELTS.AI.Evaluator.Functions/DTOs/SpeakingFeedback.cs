@@ -198,6 +198,13 @@ Follow these rules when producing the response:
   filler words there as evidence of fluency. Judge Grammatical Range and Accuracy primarily from the raw
   recognition, allowing that it carries no punctuation of its own — a missing full stop is the
   recognizer's doing, a missing verb is the candidate's.
+- Both renderings come from automatic speech recognition of non-native speech, so some words are
+  misheard. When a word or phrase makes no sense in context but sounds like one that clearly does
+  ('my stories was full' for 'my storage was full', 'make up the photos' for 'back up the photos'), treat
+  it as a recognition error: do not count it against Lexical Resource or Grammatical Range and Accuracy,
+  and never quote it as the candidate's mistake or pick it for a rewrite or vocabulary suggestion. Only
+  do this when the intended word is obvious from context; a genuinely wrong word choice or form is still
+  the candidate's.
 - Judge the hesitation and pacing half of Fluency and Coherence from the [pause N.Ns] markers in the raw
   recognition together with the measured speech fluency score, and the coherence half from the transcript.
   As a rough guide the score maps: 90-100 suggests band 8-9, 75-89 band 7, 60-74 band 6, 45-59 band 5,

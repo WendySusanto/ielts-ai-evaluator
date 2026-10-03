@@ -366,8 +366,13 @@ const SpeakingPractice = () => {
     if (part2Phase !== "talk") return;
     setPart2Phase("done");
     setCallState("thinking");
-    const { transcript, assessment } = await speech.stopListening();
-    await submitCandidateTurn(transcript, assessment);
+    const { transcript, lexical, durationSeconds, assessment } =
+      await speech.stopListening();
+    await submitCandidateTurn(
+      transcript,
+      assessment,
+      lexical ? { lexical, durationSeconds } : undefined,
+    );
   };
 
   const handleEndSession = async () => {
