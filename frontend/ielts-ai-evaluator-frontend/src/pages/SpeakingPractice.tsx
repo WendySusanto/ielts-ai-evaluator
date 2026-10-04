@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { VoiceLevelBars } from "@/components/VoiceLevelBars";
 import { useApi } from "@/hooks/use-api";
 import {
   aggregateAssessments,
@@ -587,7 +588,10 @@ const SpeakingPractice = () => {
       {/* Controls dock */}
       <div className="sticky bottom-0 space-y-3 border-t border-border bg-background pt-3">
         {part2Phase === "talk" ? (
-          <div className="flex justify-center">
+          <div className="flex items-center justify-center gap-3">
+            {callState === "listening" && (
+              <VoiceLevelBars getLevel={speech.getMicLevel} />
+            )}
             <Button
               variant="outline"
               className="h-11"
@@ -642,6 +646,12 @@ const SpeakingPractice = () => {
           </div>
         ) : (
           <div className="flex items-center justify-center gap-3">
+            {/* A fixed slot, so the bars appearing never shifts the mic button. */}
+            <div className="flex w-12 justify-end">
+              {callState === "listening" && (
+                <VoiceLevelBars getLevel={speech.getMicLevel} />
+              )}
+            </div>
             <button
               type="button"
               onClick={handleMicClick}
@@ -652,7 +662,7 @@ const SpeakingPractice = () => {
               className={cn(
                 "flex size-14 items-center justify-center rounded-full transition-transform duration-200 disabled:opacity-40",
                 callState === "listening"
-                  ? "bg-destructive animate-pulse"
+                  ? "bg-destructive"
                   : "bg-primary hover:bg-primary/90",
               )}
             >

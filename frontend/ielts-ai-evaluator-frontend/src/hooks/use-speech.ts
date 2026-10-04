@@ -104,6 +104,35 @@ function safeClose(obj: { close: () => void } | null): void {
   }
 }
 
+// Loudness (RMS, 0-1) above which the mic is hearing the candidate rather than the room: speech
+// through the browser's default auto-gain sits around 0.03-0.1, a quiet room under 0.005.
+// ponytail: fixed threshold, not an adaptive noise floor — a loud room just keeps the turn open
+// until the candidate taps stop; measure the room's level first if that turns up.
+const VOICE_RMS = 0.01;
+
+/** The mic's loudness as RMS (0-1), measured fresh on every call, plus the teardown. */
+function meterStream(stream: MediaStream) {
+  const context = new AudioContext();
+  const analyser = context.createAnalyser();
+  context.createMediaStreamSource(stream).connect(analyser);
+  const samples = new Float32Array(analyser.fftSize);
+  return {
+    rms: () => {
+      analyser.getFloatTimeDomainData(samples);
+      return Math.sqrt(samples.reduce((sum, s) => sum + s * s, 0) / samples.length);
+    },
+    close: () => {
+      context.close().catch(() => {});
+    },
+  };
+}
+
+/** RMS as a 0-1 meter reading on a decibel scale, as level meters use: a quiet room (-50 dBFS)
+ * reads 0 and loud, close speech (-15 dBFS) reads 1. On a linear scale normal speech would
+ * barely lift the bars. */
+const toMeterLevel = (rms: number) =>
+  Math.min(1, Math.max(0, (20 * Math.log10(rms) + 50) / 35));
+
 interface ListenOptions {
   /** Called once when the candidate has said something and then gone quiet for silenceMs. */
   onSilence?: () => void;
@@ -123,6 +152,9 @@ interface UseSpeechResult {
     durationSeconds: number;
     assessment: TurnAssessment | null;
   }>;
+  /** Live mic loudness from 0 (silent, or not listening) to 1, measured on each call — read it
+   * from an animation frame rather than holding it in React state. */
+  getMicLevel: () => number;
   interimTranscript: string;
   error: string | null;
 }
@@ -145,6 +177,9 @@ export function useSpeech(): UseSpeechResult {
   // Raw recognition per segment, kept beside the display text rather than replacing it.
   const lexicalSegmentsRef = useRef<{ lexical: string; words: TimedWord[] }[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The live turn's mic: its meter reading and the teardown that stops the stream. Committed
+  // alongside recognizerRef.
+  const micRef = useRef<{ level: () => number; release: () => void } | null>(null);
 
   const [supported] = useState(
     () => typeof navigator !== "undefined" && !!navigator.mediaDevices,
@@ -246,8 +281,9 @@ export function useSpeech(): UseSpeechResult {
     lexicalSegmentsRef.current = [];
     clearSilenceTimer();
 
-    // Armed only once speech is heard, so thinking time before the first word never ends the
-    // turn; every recognizer event pushes it back. Fires at most once per listen.
+    // Armed only once speech is recognized, so thinking time before the first word never ends the
+    // turn; every recognizer event, and once armed any sound on the mic, pushes it back. Fires at
+    // most once per listen.
     let silenceFired = false;
     const bumpSilenceTimer = () => {
       if (!opts?.onSilence || silenceFired) return;
@@ -268,7 +304,29 @@ export function useSpeech(): UseSpeechResult {
       // Pauses are measured from word timings, not segments, so this doesn't hide them.
       // ponytail: hand-picked; raise toward 2000 if mid-sentence splits persist.
       speechConfig.setProperty(PropertyId.Speech_SegmentationSilenceTimeoutMs, "1200");
-      const audioConfig = AudioConfig.fromDefaultMicrophoneInput();
+      // The mic stream is opened here rather than by the SDK so the silence timer and the level
+      // meter can hear the same audio. Recognizer events alone are a poor sign of speech: they
+      // trail the voice after every pause, and an "eee…" or a word Azure can't place produces
+      // none at all — enough to end the turn while the candidate is still talking. Same
+      // constraints as the SDK's own default mic, so recognition hears exactly what it did
+      // before. The SDK never stops a stream it was handed, so mic.release does.
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const meter = meterStream(stream);
+      const poll = opts?.onSilence
+        ? setInterval(() => {
+            // extends an armed timer, never arms one
+            if (silenceTimerRef.current && meter.rms() > VOICE_RMS) bumpSilenceTimer();
+          }, 100)
+        : undefined;
+      const mic = {
+        level: () => toMeterLevel(meter.rms()),
+        release: () => {
+          clearInterval(poll);
+          meter.close();
+          stream.getTracks().forEach((t) => t.stop());
+        },
+      };
+      const audioConfig = AudioConfig.fromStreamInput(stream);
       const recognizer = new SpeechRecognizer(speechConfig, audioConfig);
 
       const paConfig = new PronunciationAssessmentConfig(
@@ -332,6 +390,7 @@ export function useSpeech(): UseSpeechResult {
         });
       } catch (e) {
         safeClose(recognizer); // never leak a recognizer whose start failed
+        mic.release();
         throw e;
       }
 
@@ -343,9 +402,11 @@ export function useSpeech(): UseSpeechResult {
           () => safeClose(recognizer),
           () => safeClose(recognizer),
         );
+        mic.release();
         return;
       }
       recognizerRef.current = recognizer;
+      micRef.current = mic;
     })();
 
     startPromiseRef.current = startPromise;
@@ -383,6 +444,8 @@ export function useSpeech(): UseSpeechResult {
       setError(toMessage(e));
     } finally {
       safeClose(recognizer);
+      micRef.current?.release();
+      micRef.current = null;
       setInterimTranscript("");
     }
 
@@ -404,6 +467,8 @@ export function useSpeech(): UseSpeechResult {
     return { transcript, lexical, durationSeconds: speakingSeconds(timedWords), assessment };
   }, []);
 
+  const getMicLevel = useCallback(() => micRef.current?.level() ?? 0, []);
+
   // Dispose any live SDK objects (they hold the mic/speaker) if the component unmounts mid-turn.
   useEffect(() => {
     disposedRef.current = false;
@@ -411,6 +476,7 @@ export function useSpeech(): UseSpeechResult {
       disposedRef.current = true;
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       safeClose(recognizerRef.current);
+      micRef.current?.release();
       stopSpeaking(); // pauses playback; a bare close() would let it finish the sentence
     };
   }, [stopSpeaking]);
@@ -421,6 +487,7 @@ export function useSpeech(): UseSpeechResult {
     stopSpeaking,
     startListening,
     stopListening,
+    getMicLevel,
     interimTranscript,
     error,
   };
