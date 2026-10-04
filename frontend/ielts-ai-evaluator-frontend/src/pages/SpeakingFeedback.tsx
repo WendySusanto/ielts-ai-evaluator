@@ -1,5 +1,6 @@
 import { BandScore } from "@/components/feedback/BandScore";
 import { CriterionCard } from "@/components/feedback/CriterionCard";
+import { ErrorsCard } from "@/components/feedback/ErrorsCard";
 import { PausedTranscript } from "@/components/feedback/PausedTranscript";
 import { VocabularyCard } from "@/components/feedback/VocabularyCard";
 import { SpeakingFeedbackSkeleton } from "@/components/skeleton/SpeakingFeedbackSkeleton";
@@ -10,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { useApi } from "@/hooks/use-api";
 import { useNotebook } from "@/hooks/use-notebook";
 import { LONG_PAUSE_SECONDS } from "@/lib/lexical";
+import { matchAnswersToTurns } from "@/lib/speaking-feedback";
 import type { SpeakingSessionDetail } from "@/types/Speaking";
 import { ArrowLeft, AudioLines } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -73,6 +75,8 @@ const SpeakingFeedback = () => {
         (w) => w.errorType !== "None" || w.accuracyScore < 70,
       )
     : [];
+  const answerFeedback = matchAnswersToTurns(detail.turns, feedback.answers);
+  const recordings = matchAnswersToTurns(detail.turns, detail.audio);
 
   return (
     <div className="space-y-6">
@@ -122,6 +126,7 @@ const SpeakingFeedback = () => {
             examples={criterion.examples}
             improvements={criterion.improvements}
             rewrites={criterion.rewrites}
+            nextBand={criterion.nextBand}
           />
         ))}
 
@@ -210,6 +215,25 @@ const SpeakingFeedback = () => {
                   )}
                 </div>
               )}
+
+              {feedback.pronunciationNotes && feedback.pronunciationNotes.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-card-foreground">
+                    From your recording
+                  </p>
+                  <ul className="space-y-2">
+                    {feedback.pronunciationNotes.map((note, i) => (
+                      <li key={i} className="text-sm">
+                        <span className="font-medium">{note.word}</span>{" "}
+                        <span className="text-muted-foreground">
+                          sounded like “{note.heardAs}”
+                        </span>
+                        <p className="text-xs text-muted-foreground">{note.tip}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -230,6 +254,10 @@ const SpeakingFeedback = () => {
         )}
       </div>
 
+      {feedback.errors && feedback.errors.length > 0 && (
+        <ErrorsCard errors={feedback.errors} />
+      )}
+
       {feedback.vocabulary && feedback.vocabulary.length > 0 && (
         <VocabularyCard
           items={feedback.vocabulary}
@@ -244,40 +272,73 @@ const SpeakingFeedback = () => {
           <CardTitle>Your conversation</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {detail.turns.map((turn, i) => (
-            <div
-              key={i}
-              className={`flex flex-col ${
-                turn.role === "candidate" ? "items-end" : "items-start"
-              }`}
-            >
-              <p className="text-xs text-muted-foreground mb-1">
-                {turn.role === "candidate" ? "You" : "Examiner"}
-              </p>
+          {detail.turns.map((turn, i) => {
+            const answer = answerFeedback[i];
+            const recording = recordings[i];
+            return (
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
-                  turn.role === "candidate"
-                    ? "bg-secondary text-secondary-foreground"
-                    : "bg-muted text-foreground"
+                key={i}
+                className={`flex flex-col ${
+                  turn.role === "candidate" ? "items-end" : "items-start"
                 }`}
               >
-                {turn.text}
-              </div>
-              {/* The bubble shows display text, which the recognizer punctuates and tidies.
-                  Spoken answers also show what was actually said, and where it stopped. */}
-              {turn.lexical && (
-                <div className="mt-2 max-w-[85%] rounded-2xl border border-dashed px-4 py-2">
-                  <PausedTranscript lexical={turn.lexical} />
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    <span className="mr-1 inline-block h-2 w-4 rounded-full bg-chart-4 align-middle" />
-                    under {LONG_PAUSE_SECONDS}s
-                    <span className="ml-3 mr-1 inline-block h-2 w-4 rounded-full bg-destructive align-middle" />
-                    longer
-                  </p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {turn.role === "candidate" ? "You" : "Examiner"}
+                </p>
+                <div
+                  className={`max-w-[85%] rounded-2xl px-4 py-2 text-sm whitespace-pre-wrap ${
+                    turn.role === "candidate"
+                      ? "bg-secondary text-secondary-foreground"
+                      : "bg-muted text-foreground"
+                  }`}
+                >
+                  {answer?.transcript ?? turn.text}
                 </div>
-              )}
-            </div>
-          ))}
+                {recording && (
+                  <audio
+                    controls
+                    preload="none"
+                    src={recording.url}
+                    aria-label={`Your recording of answer ${recording.answer}`}
+                    className="mt-2 w-full max-w-[85%]"
+                  />
+                )}
+                {/* The bubble shows what Gemini heard in the recording when there is one, and the
+                    recognizer's tidied display text otherwise. Spoken answers also show the live
+                    recognition, with where each pause fell. */}
+                {turn.lexical && (
+                  <div className="mt-2 max-w-[85%] rounded-2xl border border-dashed px-4 py-2">
+                    {answer?.transcript && (
+                      <p className="mb-1 text-xs text-muted-foreground">
+                        Live recognition, with pauses
+                      </p>
+                    )}
+                    <PausedTranscript lexical={turn.lexical} />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="mr-1 inline-block h-2 w-4 rounded-full bg-chart-4 align-middle" />
+                      under {LONG_PAUSE_SECONDS}s
+                      <span className="ml-3 mr-1 inline-block h-2 w-4 rounded-full bg-destructive align-middle" />
+                      longer
+                    </p>
+                  </div>
+                )}
+                {answer && (
+                  <div className="mt-2 max-w-[85%] space-y-2 text-sm">
+                    <p className="text-muted-foreground">{answer.comment}</p>
+                    {/* ponytail: native <details>, same as the problem-words list above */}
+                    <details className="group rounded-lg border border-border px-3 py-2">
+                      <summary className="cursor-pointer list-none font-medium text-card-foreground">
+                        How a band 7 speaker might answer
+                        <span className="text-muted-foreground group-open:hidden"> — show</span>
+                        <span className="hidden text-muted-foreground group-open:inline"> — hide</span>
+                      </summary>
+                      <p className="mt-2 text-muted-foreground">{answer.sampleAnswer}</p>
+                    </details>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

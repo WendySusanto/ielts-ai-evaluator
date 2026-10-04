@@ -66,9 +66,12 @@ public class WritingService : IWritingService
         }
 
         var userContent = BuildUserContent(prompt, request.EssayText);
+        // No temperature: see SpeakingService — Gemini 3 is tuned for its default; the rubric and the
+        // server-side average keep bands steady.
         var result = await _gemini.GenerateAsync<WritingFeedback>(
             WritingFeedbackPrompts.SystemPrompt, userContent, WritingFeedbackPrompts.GeminiSchema, ct,
-            temperature: 0); // a band is a score, not a draft: the same essay must not drift between runs
+            thinkingLevel: GeminiStructuredClient.ThinkingLevelSetting(_config["GeminiScoringThinkingLevel"]),
+            timeout: GeminiStructuredClient.ScoringTimeout);
 
         var wordCount = request.EssayText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
         var evaluation = new WritingEvaluation

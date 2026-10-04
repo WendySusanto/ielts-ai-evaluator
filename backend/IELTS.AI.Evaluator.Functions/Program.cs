@@ -31,16 +31,18 @@ var host = new HostBuilder()
         services.AddDbContext<EvaluatorDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        // 45s per attempt, not HttpClient's default 100s: GeminiStructuredClient retries twice on
-        // 429/503, so the worst case is 45+1+45+3+45 ≈ 139s — still inside the Functions host's own
-        // 230s HTTP limit, which a 100s timeout would blow past on the second attempt.
+        // HttpClient.Timeout is one number for every call, but an examiner turn should give up after
+        // 45s while a scoring call may need 150s — so the real per-attempt limits live in
+        // GeminiStructuredClient. This is only a backstop above the longest of them.
         services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>(
-            c => c.Timeout = TimeSpan.FromSeconds(45));
+            c => c.Timeout = TimeSpan.FromMinutes(3));
         // STS token issuance is one small POST; if it hasn't answered in 10s it isn't going to.
         services.AddHttpClient<ISpeechTokenService, SpeechTokenService>(
             c => c.Timeout = TimeSpan.FromSeconds(10));
         services.AddScoped<IWritingService, WritingService>();
         services.AddScoped<ISpeakingService, SpeakingService>();
+        // One client for the process: BlobContainerClient is thread-safe and holds no per-request state.
+        services.AddSingleton<IAudioStore, BlobAudioStore>();
         services.AddScoped<IExaminerService, ExaminerService>();
         services.AddScoped<IWritingPromptService, WritingPromptService>();
         services.AddScoped<ISpeakingPromptService, SpeakingPromptService>();

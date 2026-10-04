@@ -9,6 +9,7 @@ export function CriterionCard({
   examples,
   improvements,
   rewrites,
+  nextBand,
 }: {
   name: string;
   band: number;
@@ -17,6 +18,9 @@ export function CriterionCard({
   improvements: string[];
   /** Speaking only, and absent on older sessions: the candidate's sentence and a better one. */
   rewrites?: { original: string; improved: string; explanation: string }[] | null;
+  /** Speaking only, and absent on older sessions: what the next whole band asks for that this
+   * answer does not show yet. Null for a band of 9. */
+  nextBand?: { band: number; missing: string; howTo: string } | null;
 }) {
   const hasRewrites = !!rewrites && rewrites.length > 0;
   return (
@@ -66,6 +70,19 @@ export function CriterionCard({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {nextBand && (
+          <div className="space-y-2 rounded-lg bg-muted p-3 text-sm">
+            <p className="font-medium text-card-foreground">
+              Why not band {nextBand.band} yet
+            </p>
+            <p className="text-muted-foreground">{nextBand.missing}</p>
+            <p className="flex items-start gap-2">
+              <ArrowUpRight className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+              <span>{nextBand.howTo}</span>
+            </p>
           </div>
         )}
 

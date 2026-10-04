@@ -241,18 +241,4 @@ public class ExaminerServiceTests
 
         Assert.Null(gemini.LastThinkingBudget);
     }
-
-    /// <summary>Scoring pins temperature to 0; the examiner deliberately does not. Varied follow-up
-    /// questions are the feature — an examiner that asks the identical sequence every session turns
-    /// practice into memorisation. Locked so nobody "tidies" it into line with the scoring calls.</summary>
-    [Fact]
-    public async Task NextTurnAsync_LeavesTemperatureUnset_SoQuestionsVary()
-    {
-        var (svc, gemini, userId, prompt) = Setup();
-        var request = new ExaminerTurnRequest(prompt.SpeakingPromptId, "Part1", ExaminerTurns(1));
-
-        await svc.NextTurnAsync(userId, request);
-
-        Assert.Null(gemini.LastTemperature);
-    }
 }

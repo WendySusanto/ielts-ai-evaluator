@@ -49,7 +49,8 @@ public static class WritingFeedbackPrompts
                     ""properties"": {
                         ""name"": {
                             ""type"": ""STRING"",
-                            ""description"": ""One of exactly: 'TaskAchievement' (Task 1 prompts) or 'TaskResponse' (Task 2 prompts), 'CoherenceCohesion', 'LexicalResource', 'GrammaticalRangeAccuracy'.""
+                            ""enum"": [""TaskAchievement"", ""TaskResponse"", ""CoherenceCohesion"", ""LexicalResource"", ""GrammaticalRangeAccuracy""],
+                            ""description"": ""The criterion's key: 'TaskAchievement' for Task 1 prompts or 'TaskResponse' for Task 2 prompts, then 'CoherenceCohesion', 'LexicalResource', 'GrammaticalRangeAccuracy'.""
                         },
                         ""band"": {
                             ""type"": ""NUMBER"",

@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 using IELTS.AI.Evaluator.Data.Models;
 using IELTS.AI.Evaluator.Functions.DTOs;
@@ -19,18 +20,35 @@ public class FakeStructuredClient : IGeminiStructuredClient
     public string? LastUserContent { get; private set; }
     public string? LastEndpoint { get; private set; }
     public int? LastThinkingBudget { get; private set; }
-    public double? LastTemperature { get; private set; }
+    public string? LastThinkingLevel { get; private set; }
+    public TimeSpan? LastTimeout { get; private set; }
+    public IReadOnlyList<GeminiPart>? LastUserParts { get; private set; }
+
+    /// <summary>Acts like Gemini refusing an audio encoding: a call carrying inline media fails with an
+    /// (unbilled) 400.</summary>
+    public bool RejectInlineMedia { get; set; }
 
     public FakeStructuredClient(object canned) => _canned = canned;
 
     public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
-        CancellationToken ct = default, int? thinkingBudget = null, double? temperature = null, string? endpoint = null)
+        CancellationToken ct = default, int? thinkingBudget = null, string? endpoint = null,
+        string? thinkingLevel = null, TimeSpan? timeout = null) =>
+        GenerateAsync<T>(systemInstruction, [GeminiPart.FromText(userContent)], responseSchemaJson, ct,
+            thinkingBudget, endpoint, thinkingLevel, timeout);
+
+    public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, IReadOnlyList<GeminiPart> userParts,
+        string responseSchemaJson, CancellationToken ct = default, int? thinkingBudget = null, string? endpoint = null,
+        string? thinkingLevel = null, TimeSpan? timeout = null)
     {
         Calls++;
-        LastUserContent = userContent;
+        LastUserParts = userParts;
+        LastUserContent = string.Concat(userParts.Select(p => p.Text));
         LastEndpoint = endpoint;
         LastThinkingBudget = thinkingBudget;
-        LastTemperature = temperature;
+        LastThinkingLevel = thinkingLevel;
+        LastTimeout = timeout;
+        if (RejectInlineMedia && userParts.Any(p => p.Data is not null))
+            throw new HttpRequestException("Gemini call failed with status 400", null, HttpStatusCode.BadRequest);
         var json = JsonSerializer.Serialize(_canned, CamelCase);
         var value = JsonSerializer.Deserialize<T>(json, CamelCase)!;
         return Task.FromResult(new GeminiResult<T>(value, "gemini-test", 100, 200));
@@ -48,6 +66,7 @@ public class WritingServiceTests
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["DailyWritingQuota"] = "10",
+            ["GeminiScoringThinkingLevel"] = "high",
         }).Build();
 
     private static WritingFeedback CannedFeedback() => new(
@@ -243,15 +262,29 @@ public class WritingServiceTests
         Assert.Equal(new[] { "original", "upgrade", "context" }, upgradeRequired);
     }
 
-    /// <summary>A band is a score, not a draft. Gemini samples at its own default temperature, so
-    /// without pinning it to 0 the same submission can come back half a band apart on two runs —
-    /// the one thing a scoring product must never do. Asserted here rather than only in the client
-    /// because the requirement is that THIS service sends it, not merely that the client could.</summary>
+    /// <summary>Without a temperature pin, a description saying "one of exactly" is a request, not a
+    /// rule: Gemini started writing "Lexical Resource" instead of the key the screens look up. An enum
+    /// is enforced by structured output, so the criterion names are pinned there.</summary>
     [Fact]
-    public async Task Evaluate_PinsTemperatureToZero_SoBandsDoNotDrift()
+    public void GeminiSchema_PinsCriterionNamesWithAnEnum()
+    {
+        using var doc = JsonDocument.Parse(WritingFeedbackPrompts.GeminiSchema);
+        var name = doc.RootElement.GetProperty("properties").GetProperty("criteria")
+            .GetProperty("items").GetProperty("properties").GetProperty("name");
+        Assert.Equal(
+            new[] { "TaskAchievement", "TaskResponse", "CoherenceCohesion", "LexicalResource", "GrammaticalRangeAccuracy" },
+            name.GetProperty("enum").EnumerateArray().Select(e => e.GetString()).ToArray());
+    }
+
+    /// <summary>The scoring call thinks at the configured level and gets the long, final timeout.
+    /// Asserted on this service, not only the client, because the requirement is that THIS call
+    /// sends them.</summary>
+    [Fact]
+    public async Task Evaluate_UsesConfiguredThinkingLevel_AndScoringTimeout()
     {
         var (svc, _, gemini, user, prompt) = Setup();
         await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
-        Assert.Equal(0, gemini.LastTemperature);
+        Assert.Equal("high", gemini.LastThinkingLevel);
+        Assert.Equal(GeminiStructuredClient.ScoringTimeout, gemini.LastTimeout);
     }
 }

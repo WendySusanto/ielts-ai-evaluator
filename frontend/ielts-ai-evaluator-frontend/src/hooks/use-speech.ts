@@ -133,6 +133,28 @@ function meterStream(stream: MediaStream) {
 const toMeterLevel = (rms: number) =>
   Math.min(1, Math.max(0, (20 * Math.log10(rms) + 50) / 35));
 
+/** One answer's recording: the audio as the browser encoded it, and how long it ran. */
+export type RecordedAudio = { blob: Blob; seconds: number };
+
+// Containers the browser can record that Gemini also reads, best first: Chrome and Edge record webm,
+// Firefox ogg, Safari mp4. ponytail: Safari's mp4 is the one not yet tried on a real device.
+const RECORDING_TYPES = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"];
+
+/** The first type this browser can record, or null — the answer is then scored from the recognizer
+ * text alone. */
+function pickRecordingType(): string | null {
+  if (typeof MediaRecorder === "undefined") return null;
+  return RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
+}
+
+/** The live turn's microphone: its level for the meter, its recording, and the teardown. */
+type Mic = {
+  level: () => number;
+  startRecording: () => void;
+  stopRecording: () => Promise<RecordedAudio | null>;
+  release: () => void;
+};
+
 interface ListenOptions {
   /** Called once when the candidate has said something and then gone quiet for silenceMs. */
   onSilence?: () => void;
@@ -151,6 +173,8 @@ interface UseSpeechResult {
     /** Speaking time of the turn, pauses included; 0 when no word timings came through. */
     durationSeconds: number;
     assessment: TurnAssessment | null;
+    /** The answer's recording; null when the browser could not record. */
+    audio: RecordedAudio | null;
   }>;
   /** Live mic loudness from 0 (silent, or not listening) to 1, measured on each call — read it
    * from an animation frame rather than holding it in React state. */
@@ -177,9 +201,9 @@ export function useSpeech(): UseSpeechResult {
   // Raw recognition per segment, kept beside the display text rather than replacing it.
   const lexicalSegmentsRef = useRef<{ lexical: string; words: TimedWord[] }[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The live turn's mic: its meter reading and the teardown that stops the stream. Committed
-  // alongside recognizerRef.
-  const micRef = useRef<{ level: () => number; release: () => void } | null>(null);
+  // The live turn's mic: its meter reading, its recording and the teardown that stops the stream.
+  // Committed alongside recognizerRef.
+  const micRef = useRef<Mic | null>(null);
 
   const [supported] = useState(
     () => typeof navigator !== "undefined" && !!navigator.mediaDevices,
@@ -318,8 +342,40 @@ export function useSpeech(): UseSpeechResult {
             if (silenceTimerRef.current && meter.rms() > VOICE_RMS) bumpSilenceTimer();
           }, 100)
         : undefined;
-      const mic = {
+      // The answer is recorded from the same stream the recognizer hears, for the scorer to listen to
+      // and for playback on the feedback page. 32 kbps: Gemini works from 16 kbps audio anyway, and
+      // five minutes stays near 1.2 MB.
+      const recordingType = pickRecordingType();
+      const recorder = recordingType
+        ? new MediaRecorder(stream, { mimeType: recordingType, audioBitsPerSecond: 32_000 })
+        : null;
+      const chunks: Blob[] = [];
+      if (recorder)
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) chunks.push(e.data);
+        };
+      let recordingStartedAt = 0;
+      const mic: Mic = {
         level: () => toMeterLevel(meter.rms()),
+        startRecording: () => {
+          recorder?.start();
+          recordingStartedAt = Date.now();
+        },
+        stopRecording: () =>
+          new Promise((resolve) => {
+            const finish = () =>
+              resolve(
+                recorder && chunks.length > 0
+                  ? {
+                      blob: new Blob(chunks, { type: recorder.mimeType }),
+                      seconds: (Date.now() - recordingStartedAt) / 1000,
+                    }
+                  : null,
+              );
+            if (!recorder || recorder.state === "inactive") return finish();
+            recorder.onstop = finish;
+            recorder.stop();
+          }),
         release: () => {
           clearInterval(poll);
           meter.close();
@@ -407,6 +463,7 @@ export function useSpeech(): UseSpeechResult {
       }
       recognizerRef.current = recognizer;
       micRef.current = mic;
+      mic.startRecording(); // from the moment the recognizer is live, like the transcript
     })();
 
     startPromiseRef.current = startPromise;
@@ -433,9 +490,11 @@ export function useSpeech(): UseSpeechResult {
     }
 
     const recognizer = recognizerRef.current;
-    if (!recognizer) return { transcript: "", lexical: "", durationSeconds: 0, assessment: null };
+    if (!recognizer)
+      return { transcript: "", lexical: "", durationSeconds: 0, assessment: null, audio: null };
     recognizerRef.current = null; // claim it so a concurrent stop can't double-dispose
 
+    let audio: RecordedAudio | null = null;
     try {
       await new Promise<void>((resolve, reject) => {
         recognizer.stopContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
@@ -444,6 +503,9 @@ export function useSpeech(): UseSpeechResult {
       setError(toMessage(e));
     } finally {
       safeClose(recognizer);
+      // After the recognizer has flushed its last phrase and before the tracks stop: stopping a
+      // track ends the recording too, and its final chunk would be lost.
+      audio = (await micRef.current?.stopRecording()) ?? null;
       micRef.current?.release();
       micRef.current = null;
       setInterimTranscript("");
@@ -464,7 +526,7 @@ export function useSpeech(): UseSpeechResult {
       segmentAssessmentsRef.current.length > 0
         ? aggregateAssessments(segmentAssessmentsRef.current)
         : null;
-    return { transcript, lexical, durationSeconds: speakingSeconds(timedWords), assessment };
+    return { transcript, lexical, durationSeconds: speakingSeconds(timedWords), assessment, audio };
   }, []);
 
   const getMicLevel = useCallback(() => micRef.current?.level() ?? 0, []);

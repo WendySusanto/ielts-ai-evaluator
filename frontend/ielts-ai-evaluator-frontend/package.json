@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "check:lexical": "node --experimental-strip-types --no-warnings src/lib/lexical.check.ts",
     "check:notebook": "node --experimental-strip-types --no-warnings src/lib/notebook.check.ts",
+    "check:speaking-feedback": "node --experimental-strip-types --no-warnings src/lib/speaking-feedback.check.ts",
     "preview": "vite preview"
   },
   "engines": {

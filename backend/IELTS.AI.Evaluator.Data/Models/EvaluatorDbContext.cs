@@ -52,6 +52,7 @@ namespace IELTS.AI.Evaluator.Data.Models
                 e.Property(x => x.Turns).HasColumnType("jsonb");
                 e.Property(x => x.Feedback).HasColumnType("jsonb");
                 e.Property(x => x.Pronunciation).HasColumnType("jsonb");
+                e.Property(x => x.AudioClips).HasColumnType("jsonb");
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.SpeakingPrompt).WithMany().HasForeignKey(x => x.SpeakingPromptId).OnDelete(DeleteBehavior.Restrict);
                 e.HasIndex(x => new { x.UserId, x.CreatedAt });

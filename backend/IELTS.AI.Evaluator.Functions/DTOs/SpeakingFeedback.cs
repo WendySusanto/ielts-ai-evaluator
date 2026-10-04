@@ -3,17 +3,37 @@ namespace IELTS.AI.Evaluator.Functions.DTOs;
 /// <summary>One of the three Gemini-scored IELTS speaking criteria for a single session.
 /// Pronunciation is Azure PA's job (Phase 4) and is not part of this shape.
 /// Rewrites is nullable because feedback is stored as jsonb and read back through this record:
-/// sessions marked before rewrites existed have no such key, and must still open.</summary>
+/// sessions marked before rewrites existed have no such key, and must still open. NextBand is null
+/// for the same reason on sessions before schema v2, and for a band of 9.</summary>
 public record SpeakingCriterion(
     string Name,
     decimal Band,
     string Justification,
     List<string> Examples,
     List<string> Improvements,
-    List<SpeakingRewrite>? Rewrites = null);
+    List<SpeakingRewrite>? Rewrites = null,
+    SpeakingNextBand? NextBand = null);
 
 /// <summary>One of the candidate's own sentences, and how a stronger speaker would say it.</summary>
 public record SpeakingRewrite(string Original, string Improved, string Explanation);
+
+/// <summary>Why a criterion is not yet at the next whole band: what that band's descriptor asks for
+/// that the candidate did not show, and one step that closes the gap.</summary>
+public record SpeakingNextBand(decimal Band, string Missing, string HowTo);
+
+/// <summary>Feedback on one candidate answer. Answer is the 1-based number the transcript sent to
+/// Gemini gives it ("Candidate (answer 2): ..."), counting candidate turns in conversation order.
+/// Transcript is Gemini's verbatim transcription of that answer's recording — null when the answer
+/// had none, and on sessions before schema v3.</summary>
+public record SpeakingAnswerFeedback(int Answer, string Comment, string SampleAnswer, string? Transcript = null);
+
+/// <summary>One grammar or word-choice mistake: the shortest verbatim stretch containing it, that
+/// stretch corrected, its category, and the rule in one sentence.</summary>
+public record SpeakingError(string Original, string Corrected, string Category, string Explanation);
+
+/// <summary>A word the candidate clearly mispronounced in a recording: as meant, as it sounded, and
+/// one tip. Explains the Azure pronunciation band; never replaces it.</summary>
+public record SpeakingPronunciationNote(string Word, string HeardAs, string Tip);
 
 /// <summary>A C1/C2 word or phrase shown in place, inside a sentence the candidate actually said.
 /// Level is "C1" or "C2" — Gemini's best estimate, not an English Vocabulary Profile lookup.</summary>
@@ -53,7 +73,10 @@ public record SpeakingFeedback(
     decimal OverallBand,
     string Summary,
     List<SpeakingCriterion> Criteria, // exactly 3 from Gemini: FluencyCoherence, LexicalResource, GrammaticalRangeAccuracy
-    List<SpeakingVocabularyUpgrade>? Vocabulary = null); // null on sessions marked before it existed
+    List<SpeakingVocabularyUpgrade>? Vocabulary = null, // null on sessions marked before it existed
+    List<SpeakingAnswerFeedback>? Answers = null, // null on sessions before schema v2 (FeedbackVersion 1)
+    List<SpeakingError>? Errors = null, // likewise
+    List<SpeakingPronunciationNote>? PronunciationNotes = null); // null on sessions before schema v3
 
 /// <summary>Gemini responseSchema + system prompt for SpeakingFeedback. Designed together
 /// (spec §8), same discipline as Task 5's WritingFeedbackPrompts.</summary>
@@ -62,6 +85,87 @@ public static class SpeakingFeedbackPrompts
     public const string GeminiSchema = @"{
         ""type"": ""OBJECT"",
         ""properties"": {
+            ""answers"": {
+                ""type"": ""ARRAY"",
+                ""description"": ""One entry per candidate answer, in conversation order, numbered exactly as the transcript numbers them."",
+                ""items"": {
+                    ""type"": ""OBJECT"",
+                    ""properties"": {
+                        ""answer"": {
+                            ""type"": ""INTEGER"",
+                            ""description"": ""The answer's number from the transcript, as in 'Candidate (answer 2)'.""
+                        },
+                        ""transcript"": {
+                            ""type"": ""STRING"",
+                            ""nullable"": true,
+                            ""description"": ""Only for an answer with a recording: what the candidate said in it, verbatim — fillers, repetitions and false starts kept, grammar and word choice left exactly as spoken, sentence punctuation added. Null when the answer has no recording.""
+                        },
+                        ""comment"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""1-3 sentences on how well this answer responds to its question: what worked, and the single most useful thing it was missing.""
+                        },
+                        ""sampleAnswer"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""How a band 7 candidate might answer the same question aloud, in natural spoken English. At most 80 words for Part 1 and Part 3, at most 150 for the Part 2 long turn.""
+                        }
+                    },
+                    ""required"": [""answer"", ""transcript"", ""comment"", ""sampleAnswer""],
+                    ""propertyOrdering"": [""answer"", ""transcript"", ""comment"", ""sampleAnswer""]
+                }
+            },
+            ""errors"": {
+                ""type"": ""ARRAY"",
+                ""maxItems"": 15,
+                ""description"": ""Up to 15 of the candidate's grammar and word-choice mistakes, most impactful first. Empty when there are none."",
+                ""items"": {
+                    ""type"": ""OBJECT"",
+                    ""properties"": {
+                        ""original"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""The shortest stretch of the candidate's words that contains the mistake, copied verbatim from the transcript.""
+                        },
+                        ""corrected"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""That same stretch with the mistake fixed and nothing else changed.""
+                        },
+                        ""category"": {
+                            ""type"": ""STRING"",
+                            ""enum"": [""tense"", ""article"", ""agreement"", ""preposition"", ""word form"", ""word choice"", ""plural"", ""word order"", ""other""],
+                            ""description"": ""The kind of mistake; 'other' only when none of the rest fits.""
+                        },
+                        ""explanation"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""One short sentence naming the rule, e.g. 'Past simple: the trip is finished.'""
+                        }
+                    },
+                    ""required"": [""original"", ""corrected"", ""category"", ""explanation""],
+                    ""propertyOrdering"": [""original"", ""corrected"", ""category"", ""explanation""]
+                }
+            },
+            ""pronunciationNotes"": {
+                ""type"": ""ARRAY"",
+                ""maxItems"": 6,
+                ""description"": ""Up to 6 words the candidate clearly mispronounced in the recordings, in a way that could confuse a listener. Empty when there are no recordings or nothing stands out."",
+                ""items"": {
+                    ""type"": ""OBJECT"",
+                    ""properties"": {
+                        ""word"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""The word as the candidate meant it.""
+                        },
+                        ""heardAs"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""How it sounded, spelled the way an English listener would hear it, e.g. 'scenary'.""
+                        },
+                        ""tip"": {
+                            ""type"": ""STRING"",
+                            ""description"": ""One short, concrete tip for saying it, e.g. 'Stress the first syllable: SEE-nuh-ree.'""
+                        }
+                    },
+                    ""required"": [""word"", ""heardAs"", ""tip""],
+                    ""propertyOrdering"": [""word"", ""heardAs"", ""tip""]
+                }
+            },
             ""overallBand"": {
                 ""type"": ""NUMBER"",
                 ""description"": ""Your best-effort overall band for the session, 0-9 in 0.5 increments. The caller recomputes the authoritative overall band as the average of the three criteria bands below, so this value is advisory.""
@@ -80,7 +184,8 @@ public static class SpeakingFeedbackPrompts
                     ""properties"": {
                         ""name"": {
                             ""type"": ""STRING"",
-                            ""description"": ""One of exactly: 'FluencyCoherence', 'LexicalResource', 'GrammaticalRangeAccuracy'.""
+                            ""enum"": [""FluencyCoherence"", ""LexicalResource"", ""GrammaticalRangeAccuracy""],
+                            ""description"": ""The criterion's key, in the order given above.""
                         },
                         ""band"": {
                             ""type"": ""NUMBER"",
@@ -94,6 +199,27 @@ public static class SpeakingFeedbackPrompts
                             ""type"": ""ARRAY"",
                             ""items"": { ""type"": ""STRING"" },
                             ""description"": ""1-3 short direct quotes copied verbatim from the candidate's turns that illustrate this criterion's strengths or weaknesses.""
+                        },
+                        ""nextBand"": {
+                            ""type"": ""OBJECT"",
+                            ""nullable"": true,
+                            ""description"": ""Why this criterion is not yet at the next whole band above its band (6.0 or 6.5 -> 7, 7.0 or 7.5 -> 8). Null only when the band is 9."",
+                            ""properties"": {
+                                ""band"": {
+                                    ""type"": ""NUMBER"",
+                                    ""description"": ""The next whole band above this criterion's band.""
+                                },
+                                ""missing"": {
+                                    ""type"": ""STRING"",
+                                    ""description"": ""What the official descriptor for that band requires that the candidate did not yet show, quoting verbatim where the answer fell short.""
+                                },
+                                ""howTo"": {
+                                    ""type"": ""STRING"",
+                                    ""description"": ""One concrete step that would close that gap in the next practice session.""
+                                }
+                            },
+                            ""required"": [""band"", ""missing"", ""howTo""],
+                            ""propertyOrdering"": [""band"", ""missing"", ""howTo""]
                         },
                         ""improvements"": {
                             ""type"": ""ARRAY"",
@@ -109,7 +235,7 @@ public static class SpeakingFeedbackPrompts
                                 ""properties"": {
                                     ""original"": {
                                         ""type"": ""STRING"",
-                                        ""description"": ""The candidate's sentence, copied verbatim from the display transcript.""
+                                        ""description"": ""The candidate's sentence, copied verbatim from your transcript of the recording where the answer has one, otherwise from the display transcript.""
                                     },
                                     ""improved"": {
                                         ""type"": ""STRING"",
@@ -120,11 +246,13 @@ public static class SpeakingFeedbackPrompts
                                         ""description"": ""One short sentence naming what changed and why, e.g. 'Past tense: the event is finished.'""
                                     }
                                 },
-                                ""required"": [""original"", ""improved"", ""explanation""]
+                                ""required"": [""original"", ""improved"", ""explanation""],
+                                ""propertyOrdering"": [""original"", ""improved"", ""explanation""]
                             }
                         }
                     },
-                    ""required"": [""name"", ""band"", ""justification"", ""examples"", ""improvements"", ""rewrites""]
+                    ""required"": [""name"", ""band"", ""justification"", ""examples"", ""improvements"", ""rewrites"", ""nextBand""],
+                    ""propertyOrdering"": [""name"", ""justification"", ""examples"", ""band"", ""nextBand"", ""improvements"", ""rewrites""]
                 }
             },
             ""vocabulary"": {
@@ -140,7 +268,8 @@ public static class SpeakingFeedbackPrompts
                         },
                         ""level"": {
                             ""type"": ""STRING"",
-                            ""description"": ""One of exactly: 'C1', 'C2'.""
+                            ""enum"": [""C1"", ""C2""],
+                            ""description"": ""Your best estimate of the phrase's English Vocabulary Profile level.""
                         },
                         ""replaces"": {
                             ""type"": ""STRING"",
@@ -148,18 +277,20 @@ public static class SpeakingFeedbackPrompts
                         },
                         ""original"": {
                             ""type"": ""STRING"",
-                            ""description"": ""The candidate's sentence, copied verbatim from the display transcript.""
+                            ""description"": ""The candidate's sentence, copied verbatim from your transcript of the recording where the answer has one, otherwise from the display transcript.""
                         },
                         ""improved"": {
                             ""type"": ""STRING"",
                             ""description"": ""That sentence with the phrase used in it, otherwise changed as little as possible.""
                         }
                     },
-                    ""required"": [""phrase"", ""level"", ""replaces"", ""original"", ""improved""]
+                    ""required"": [""phrase"", ""level"", ""replaces"", ""original"", ""improved""],
+                    ""propertyOrdering"": [""phrase"", ""level"", ""replaces"", ""original"", ""improved""]
                 }
             }
         },
-        ""required"": [""overallBand"", ""summary"", ""criteria"", ""vocabulary""]
+        ""required"": [""overallBand"", ""summary"", ""criteria"", ""vocabulary"", ""answers"", ""errors"", ""pronunciationNotes""],
+        ""propertyOrdering"": [""answers"", ""errors"", ""pronunciationNotes"", ""criteria"", ""vocabulary"", ""summary"", ""overallBand""]
     }";
 
     // ponytail: the fluency-score-to-band mapping below is a hand-tuned heuristic, not a calibrated
@@ -167,8 +298,9 @@ public static class SpeakingFeedbackPrompts
     public const string SystemPrompt = @"You are a certified IELTS examiner with years of experience marking the IELTS Speaking
 test. You will be given the part of the test (Part 1, 2, or 3), the question or cue card the candidate was
 asked, any cue points, a measured speech fluency score and speech rate where available, the transcript of the
-conversation as alternating Examiner/Candidate turns, and — when the candidate actually spoke — a second
-rendering of the same candidate answers as raw recognition.
+conversation as alternating Examiner/Candidate turns with each candidate answer numbered ('Candidate (answer 2): ...'), and — when the candidate actually spoke — a second
+rendering of the same candidate answers as raw recognition. Answers recorded in the browser also carry the
+candidate's own voice: an audio part placed right after the line 'Recording of answer N:'.
 Assess only the candidate's turns, strictly against three of the four official IELTS Speaking band
 descriptors (pronunciation is assessed separately by automated tooling and is not your concern here):
 
@@ -184,9 +316,10 @@ Follow these rules when producing the response:
   arbitrary increments.
 - For every criterion, ground the band in the transcript itself: quote the candidate's exact words
   (verbatim, copied from their turns, not paraphrased) that justify the score, both when praising
-  strengths and when flagging weaknesses. Quote from the display transcript, which the candidate reads
-  back in their report — except when the hesitation, repetition or false start is itself the point, where
-  you quote the raw recognition instead so the evidence survives.
+  strengths and when flagging weaknesses. Quote from your transcript of the recording where the answer has
+  one and otherwise from the display transcript — that is what the candidate reads back in their report —
+  except when the hesitation, repetition or false start is itself the point, where you quote the raw
+  recognition instead so the evidence survives.
 - Never quote or score the examiner's turns — they exist only for context.
 - The two renderings are the same speech, not two answers — never score the candidate twice for one
   sentence, and never treat a difference between them as something the candidate said. The display
@@ -205,6 +338,18 @@ Follow these rules when producing the response:
   and never quote it as the candidate's mistake or pick it for a rewrite or vocabulary suggestion. Only
   do this when the intended word is obvious from context; a genuinely wrong word choice or form is still
   the candidate's.
+- Recordings: where an answer has one, the recording is the evidence of what the candidate said, and
+  both recognizer renderings are machine transcriptions of it that may mishear words. Write that answer's
+  transcript from the recording, verbatim — keep fillers ('uh', 'eee'), repetitions and false starts, add
+  sentence punctuation, and leave grammar and word choice exactly as spoken — and judge Lexical Resource
+  and Grammatical Range and Accuracy from it. Keep reading pause lengths from the [pause N.Ns] markers,
+  which come from timing data. Answers without a recording keep a null transcript and are judged from
+  the recognizer renderings as above.
+- Pronunciation notes: from the recordings only, list up to six words the candidate clearly
+  mispronounced in a way that could confuse a listener — the word as meant, how it sounded, and one
+  concrete tip. Never infer pronunciation from recognizer text, and leave the list empty when there are
+  no recordings. The pronunciation band itself comes from separate acoustic scoring; these notes only
+  explain it.
 - Judge the hesitation and pacing half of Fluency and Coherence from the [pause N.Ns] markers in the raw
   recognition together with the measured speech fluency score, and the coherence half from the transcript.
   As a rough guide the score maps: 90-100 suggests band 8-9, 75-89 band 7, 60-74 band 6, 45-59 band 5,
@@ -231,8 +376,27 @@ Follow these rules when producing the response:
   fluently'; instead name the exact change (e.g. replace repeated 'very good' with a wider range of
   intensifiers).
 - Do not invent content that is not in the transcript: every quote — including the original of every
-  rewrite and vocabulary item — must be text that actually appears in the candidate's turns, in either
-  rendering.
+  rewrite, vocabulary item and error — must be text that actually appears in the candidate's turns, in
+  either rendering.
+- Work through the evidence before any verdict: the answers first, then the mistakes, then each
+  criterion's justification and examples, and only then its band.
+- Answers: one entry per numbered candidate answer, using the same number. The comment says, in one to
+  three sentences, how well the answer responds to its question — what worked, and the single most
+  useful thing it was missing (a reason, an example, an extension, a clearer link back to the question).
+  The sample answer shows how a band 7 candidate might answer the same question aloud: natural spoken
+  English with contractions and discourse markers, no written-register words, keeping the candidate's
+  own ideas where they work. At most 80 words for a Part 1 or Part 3 question, at most 150 for the Part 2
+  long turn. It is a model to learn from, never a claim about what the candidate said.
+- Next band: for each criterion, name the next whole band above the one you gave (6.0 or 6.5 -> 7,
+  7.0 or 7.5 -> 8). In missing, say what the official descriptor for that band requires that this
+  candidate did not yet show, quoting verbatim where the answer fell short; in howTo, give one concrete
+  step that would close the gap. Use null only for a band of 9. This comparison keeps the band honest:
+  if the candidate already meets the next band's descriptor, the band you gave is too low.
+- Errors: list the candidate's grammar and word-choice mistakes, most impactful first, at most 15.
+  Original is the shortest verbatim stretch of the transcript that contains the mistake; corrected is
+  that stretch fixed and nothing else. Recognition errors (see above) are not the candidate's mistakes and
+  never appear here. A sentence whose only problem is already listed here should not also be a
+  Grammatical Range and Accuracy rewrite — rewrites are for sentences that also gain range or naturalness.
 - Be honest and calibrated: do not inflate bands to be encouraging, and do not be unnecessarily harsh —
   mark exactly as a certified examiner would in a real IELTS speaking test.";
 }

@@ -11,10 +11,19 @@ Prep reference for the first production deployment. Nothing here provisions anyt
 | `GeminiApiEndpoint` | Model used for scoring (Writing + Speaking) | full `generateContent` URL; the model name lives in it. Also the fallback for the examiner. Receives `GeminiApiKey`, so only point it at Google |
 | `GeminiExaminerApiEndpoint` | Model used for live examiner turns | optional — blank or unset falls back to `GeminiApiEndpoint`. Point it at a cheaper, lower-latency model |
 | `GeminiExaminerThinkingBudget` | Thinking budget for examiner turns | optional. For `gemini-3.5-flash-lite` use `128` — it rejects `0` with a 400. Leave unset and `thinkingConfig` is omitted, which every model accepts; unset with no custom endpoint means `0` |
+| `GeminiScoringThinkingLevel` | Thinking level for Writing + Speaking scoring | optional: `low`, `medium` or `high` — `high` recommended. Anything else (including `minimal`, which `gemini-3.8-flash` rejects) is ignored and the model default (`medium`) applies |
+| `AudioStorageConnectionString` | Blob Storage for answer recordings (playback on the feedback page) | optional, secret. Key-based connection string — it signs the 30-minute read links; `UseDevelopmentStorage=true` works with Azurite locally. Container `speaking-audio` is created privately on first upload. Unset: recordings are still scored, just not stored |
 | `FIREBASE_PROJECT_ID` | Firebase Admin token verification | |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials | secret — App Settings only |
 | `AzureSpeechKey` | Azure Speech (TTS/STT/pronunciation) | F0 tier works; app degrades to typed mode without it |
 | `AzureSpeechRegion` | Azure Speech region | e.g. `southeastasia` |
+
+**Recording retention.** Recordings are personal data. Add a lifecycle management rule on the
+storage account that deletes blobs in `speaking-audio` after the period you want (for example 90
+days); the app never deletes them itself. The production CSP in `staticwebapp.config.json` already
+allows playback from `https://*.blob.core.windows.net`. If `GeminiApiKey` is on Gemini's free tier,
+Google may use submitted content — recordings included — to improve its products, so move to a
+paid tier before real users record anything.
 
 **CORS:** enforced by the Functions host, not the worker. Locally it's
 `Host.CORS` in `local.settings.json`; in production set the allowed origin to

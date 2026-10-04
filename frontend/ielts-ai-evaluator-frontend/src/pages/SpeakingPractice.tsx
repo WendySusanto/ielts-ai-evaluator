@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { RecordingClock } from "@/components/RecordingClock";
 import { VoiceLevelBars } from "@/components/VoiceLevelBars";
 import { useApi } from "@/hooks/use-api";
 import {
   aggregateAssessments,
   useSpeech,
+  type RecordedAudio,
   type TurnAssessment,
 } from "@/hooks/use-speech";
 import { ApiError, api } from "@/lib/api";
@@ -45,12 +47,26 @@ const MAX_QUESTIONS_DEFAULT = 8;
 // A resumable session goes stale after a day — past that, restoring a half-forgotten
 // conversation is more confusing than starting clean.
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
+// Recording a session may send to the scorer — about a real Part 1 or Part 3. A warning comes 30
+// seconds before; at the limit the answer in progress is sent and the part ends.
+const RECORDING_LIMIT_SECONDS = 5 * 60;
+const RECORDING_WARNING_SECONDS = 30;
+
+/** A recording as base64, the way the evaluation request carries it. */
+const blobToBase64 = (blob: Blob) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",", 2)[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
 
 type SpeakingDraft = {
   turns: SpeakingTurn[];
   assessments: TurnAssessment[];
   partComplete: boolean;
   savedAt: number;
+  clientSessionId?: string;
 };
 
 const readDraft = (key: string): SpeakingDraft | null => {
@@ -109,6 +125,14 @@ const SpeakingPractice = () => {
   const [forcedTypedMode, setForcedTypedMode] = useState(false);
   const [typedText, setTypedText] = useState("");
   const [isSubmittingFinal, setIsSubmittingFinal] = useState(false);
+  // Sent with the final evaluation: a retried submission reuses it, so the server hands back the
+  // saved result instead of scoring twice. Kept in the draft for the same reason.
+  const [clientSessionId, setClientSessionId] = useState<string>(() => crypto.randomUUID());
+  // Each answer's recording, by answer number. Memory only — too big for the localStorage draft — so
+  // a resumed session scores its earlier answers from the recognizer text.
+  const recordingsRef = useRef(new Map<number, RecordedAudio>());
+  const [recordedSeconds, setRecordedSeconds] = useState(0);
+  const recordingWarnedRef = useRef(false);
 
   // Part 2 cue-card phase: only relevant before the first candidate turn.
   const [part2Phase, setPart2Phase] = useState<
@@ -150,6 +174,7 @@ const SpeakingPractice = () => {
       setTurns(draft.turns);
       setAssessments(draft.assessments);
       setPartComplete(draft.partComplete);
+      if (draft.clientSessionId) setClientSessionId(draft.clientSessionId);
       if (prompt.part === "Part2") setPart2Phase("done");
       setCallState("yourTurn");
       toast.info("Resumed your previous session.", {
@@ -204,6 +229,7 @@ const SpeakingPractice = () => {
       assessments,
       partComplete,
       savedAt: Date.now(),
+      clientSessionId,
     };
     // ponytail: best-effort — a full/blocked quota shouldn't break a live session.
     try {
@@ -211,7 +237,7 @@ const SpeakingPractice = () => {
     } catch {
       /* ignore */
     }
-  }, [draftKey, turns, assessments, partComplete]);
+  }, [draftKey, turns, assessments, partComplete, clientSessionId]);
 
   // Auto-scroll to the latest turn / interim transcript.
   useEffect(() => {
@@ -239,11 +265,21 @@ const SpeakingPractice = () => {
   const submitCandidateTurn = async (
     rawText: string,
     assessment: TurnAssessment | null,
-    spoken?: Pick<SpeakingTurn, "lexical" | "durationSeconds">,
+    {
+      spoken,
+      audio,
+      endPart = false,
+    }: {
+      spoken?: Pick<SpeakingTurn, "lexical" | "durationSeconds">;
+      audio?: RecordedAudio | null;
+      /** The recording limit was reached: keep this answer, ask nothing more. */
+      endPart?: boolean;
+    } = {},
   ) => {
     const text = rawText.trim();
     if (!text) {
-      toast.error("Didn't catch that — try again.");
+      if (!endPart) toast.error("Didn't catch that — try again.");
+      if (endPart) setPartComplete(true);
       setCallState("yourTurn");
       return;
     }
@@ -253,8 +289,31 @@ const SpeakingPractice = () => {
     ];
     setTurns(updatedTurns);
     if (assessment) setAssessments((prev) => [...prev, assessment]);
+    if (audio) {
+      const answerNumber = updatedTurns.filter((t) => t.role === "candidate").length;
+      recordingsRef.current.set(answerNumber, audio);
+      setRecordedSeconds((total) => total + audio.seconds);
+    }
+    if (endPart) {
+      setPartComplete(true);
+      setCallState("yourTurn");
+      return;
+    }
     await postExaminerTurn(updatedTurns);
   };
+
+  /** Sends what stopListening heard as the candidate's turn. */
+  const submitSpokenTurn = (
+    heard: Awaited<ReturnType<typeof speech.stopListening>>,
+    endPart = false,
+  ) =>
+    submitCandidateTurn(heard.transcript, heard.assessment, {
+      spoken: heard.lexical
+        ? { lexical: heard.lexical, durationSeconds: heard.durationSeconds }
+        : undefined,
+      audio: heard.audio,
+      endPart,
+    });
 
   const postExaminerTurn = async (updatedTurns: SpeakingTurn[]) => {
     if (!prompt) return;
@@ -301,13 +360,7 @@ const SpeakingPractice = () => {
   const handleMicClick = async () => {
     if (callState === "listening") {
       setCallState("thinking");
-      const { transcript, lexical, durationSeconds, assessment } =
-        await speech.stopListening();
-      await submitCandidateTurn(
-        transcript,
-        assessment,
-        lexical ? { lexical, durationSeconds } : undefined,
-      );
+      await submitSpokenTurn(await speech.stopListening());
       return;
     }
     if (callState !== "yourTurn") return;
@@ -330,6 +383,35 @@ const SpeakingPractice = () => {
       if (callState === "listening") handleMicClick();
     };
   });
+
+  // The recording limit, armed while the mic is open: a one-time warning shortly before, and at the
+  // limit the answer in progress is sent and the part ends. A ref, like onSilence, so the timer
+  // always calls the latest render's handler.
+  const onRecordingLimitRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    onRecordingLimitRef.current = async () => {
+      if (callState !== "listening") return;
+      setCallState("thinking");
+      if (part2Phase === "talk") setPart2Phase("done");
+      toast.info("That's five minutes of recording — this part is complete.");
+      await submitSpokenTurn(await speech.stopListening(), true);
+    };
+  });
+  useEffect(() => {
+    if (callState !== "listening") return;
+    const remainingMs = (RECORDING_LIMIT_SECONDS - recordedSeconds) * 1000;
+    const warning = recordingWarnedRef.current
+      ? undefined
+      : setTimeout(() => {
+          recordingWarnedRef.current = true;
+          toast.warning("Less than 30 seconds of recording left.");
+        }, Math.max(remainingMs - RECORDING_WARNING_SECONDS * 1000, 0));
+    const limit = setTimeout(() => onRecordingLimitRef.current(), Math.max(remainingMs, 0));
+    return () => {
+      clearTimeout(warning);
+      clearTimeout(limit);
+    };
+  }, [callState, recordedSeconds]);
 
   // Hands-free: open the mic as soon as it's the candidate's turn. Part 2's first long turn is
   // left to the prep countdown, which starts listening itself (without a silence cutoff).
@@ -367,13 +449,7 @@ const SpeakingPractice = () => {
     if (part2Phase !== "talk") return;
     setPart2Phase("done");
     setCallState("thinking");
-    const { transcript, lexical, durationSeconds, assessment } =
-      await speech.stopListening();
-    await submitCandidateTurn(
-      transcript,
-      assessment,
-      lexical ? { lexical, durationSeconds } : undefined,
-    );
+    await submitSpokenTurn(await speech.stopListening());
   };
 
   const handleEndSession = async () => {
@@ -387,11 +463,23 @@ const SpeakingPractice = () => {
       speakingPromptId: prompt.speakingPromptId,
       part: prompt.part,
       turns,
+      clientSessionId,
     };
     if (assessments.length > 0)
       payload.pronunciation = aggregateAssessments(assessments);
 
     try {
+      // Every recorded answer goes with the transcript, so the scorer hears what was said rather
+      // than what the recognizer made of it.
+      const audio = await Promise.all(
+        [...recordingsRef.current].map(async ([answer, recording]) => ({
+          answer,
+          mimeType: recording.blob.type,
+          seconds: Math.round(recording.seconds * 10) / 10,
+          data: await blobToBase64(recording.blob),
+        })),
+      );
+      if (audio.length > 0) payload.audio = audio;
       const result = await api.post<SpeakingSessionDto>(
         "/api/v2/speaking/sessions",
         payload,
@@ -589,6 +677,11 @@ const SpeakingPractice = () => {
       <div className="sticky bottom-0 space-y-3 border-t border-border bg-background pt-3">
         {part2Phase === "talk" ? (
           <div className="flex items-center justify-center gap-3">
+            <RecordingClock
+              recordedSeconds={recordedSeconds}
+              running={callState === "listening"}
+              limitSeconds={RECORDING_LIMIT_SECONDS}
+            />
             {callState === "listening" && (
               <VoiceLevelBars getLevel={speech.getMicLevel} />
             )}
@@ -646,8 +739,15 @@ const SpeakingPractice = () => {
           </div>
         ) : (
           <div className="flex items-center justify-center gap-3">
-            {/* A fixed slot, so the bars appearing never shifts the mic button. */}
-            <div className="flex w-12 justify-end">
+            {/* A fixed slot, so the clock and bars appearing never shift the mic button. */}
+            <div className="flex w-36 items-center justify-end gap-2">
+              {(callState === "listening" || recordedSeconds > 0) && (
+                <RecordingClock
+                  recordedSeconds={recordedSeconds}
+                  running={callState === "listening"}
+                  limitSeconds={RECORDING_LIMIT_SECONDS}
+                />
+              )}
               {callState === "listening" && (
                 <VoiceLevelBars getLevel={speech.getMicLevel} />
               )}
@@ -683,6 +783,12 @@ const SpeakingPractice = () => {
           </div>
         )}
 
+        {!typedMode && candidateTurnCount === 0 && (
+          <p className="text-center text-xs text-muted-foreground">
+            Your spoken answers are recorded for scoring and can be replayed on
+            your feedback page.
+          </p>
+        )}
         <Button
           className="w-full h-11"
           disabled={candidateTurnCount === 0 || isSubmittingFinal || busy}

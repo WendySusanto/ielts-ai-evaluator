@@ -61,6 +61,51 @@ export interface SpeakingVocabularyUpgrade {
   improved: string;
 }
 
+/** Why a criterion is not yet at the next whole band, and one step that closes the gap. */
+export interface SpeakingNextBand {
+  band: number;
+  missing: string;
+  howTo: string;
+}
+
+/** Feedback on one candidate answer. `answer` counts candidate turns 1..n in conversation order. */
+export interface SpeakingAnswerFeedback {
+  answer: number;
+  comment: string;
+  sampleAnswer: string;
+  /** From the answer's recording; null without one, absent before schema v3. */
+  transcript?: string | null;
+}
+
+/** One grammar or word-choice mistake, quoted verbatim and corrected. */
+export interface SpeakingError {
+  original: string;
+  corrected: string;
+  category: string;
+  explanation: string;
+}
+
+/** A word the candidate clearly mispronounced in a recording: as meant, as it sounded, one tip. */
+export interface SpeakingPronunciationNote {
+  word: string;
+  heardAs: string;
+  tip: string;
+}
+
+/** One answer's recording, sent with the final evaluation. `data` is base64. */
+export interface SpeakingAudioClip {
+  answer: number;
+  mimeType: string;
+  seconds: number;
+  data: string;
+}
+
+/** A playable recording on the feedback page; the link expires after 30 minutes. */
+export interface SpeakingAudioLink {
+  answer: number;
+  url: string;
+}
+
 /** One of the three Gemini-scored IELTS speaking criteria (pronunciation is separate). */
 export interface SpeakingCriterion {
   name: string;
@@ -70,6 +115,8 @@ export interface SpeakingCriterion {
   improvements: string[];
   /** Absent on sessions marked before rewrites existed. */
   rewrites?: SpeakingRewrite[] | null;
+  /** Absent on sessions marked before it existed; null for a band of 9. */
+  nextBand?: SpeakingNextBand | null;
 }
 
 export interface SpeakingFeedback {
@@ -78,6 +125,12 @@ export interface SpeakingFeedback {
   criteria: SpeakingCriterion[];
   /** Absent on sessions marked before it existed. */
   vocabulary?: SpeakingVocabularyUpgrade[] | null;
+  /** Absent on sessions marked before schema v2. */
+  answers?: SpeakingAnswerFeedback[] | null;
+  /** Absent on sessions marked before schema v2. */
+  errors?: SpeakingError[] | null;
+  /** Absent on sessions marked before schema v3. */
+  pronunciationNotes?: SpeakingPronunciationNote[] | null;
 }
 
 // Body for POST /api/v2/speaking/sessions
@@ -88,6 +141,11 @@ export interface SpeakingEvaluateRequest {
   // Aggregated client-side via aggregateAssessments(); omitted entirely when no
   // candidate turn produced a pronunciation assessment (e.g. typed-mode fallback).
   pronunciation?: PronunciationResult;
+  /** Generated when the session starts and kept in the draft: a retried submission reuses it, so the
+   * server hands back the saved result instead of scoring twice. */
+  clientSessionId?: string;
+  /** Recorded answers, by answer number. Omitted when nothing was recorded. */
+  audio?: SpeakingAudioClip[];
 }
 
 // Response from POST /api/v2/speaking/sessions
@@ -118,6 +176,8 @@ export interface SpeakingSessionDetail {
   feedback: SpeakingFeedback;
   pronunciation: PronunciationResult | null;
   createdAt: string;
+  /** Null when nothing was recorded or storage is not configured. */
+  audio?: SpeakingAudioLink[] | null;
 }
 
 // GET /api/speech/token — Azure Speech STS token used to drive TTS/STT client-side.

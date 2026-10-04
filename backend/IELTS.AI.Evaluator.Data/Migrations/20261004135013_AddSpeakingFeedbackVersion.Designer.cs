@@ -3,6 +3,7 @@ using System;
 using IELTS.AI.Evaluator.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace IELTS.AI.Evaluator.Data.Migrations
 {
     [DbContext(typeof(EvaluatorDbContext))]
-    partial class EvaluatorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20261004135013_AddSpeakingFeedbackVersion")]
+    partial class AddSpeakingFeedbackVersion
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -184,9 +187,6 @@ namespace IELTS.AI.Evaluator.Data.Migrations
                     b.Property<string>("AiModel")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<string>("AudioClips")
-                        .HasColumnType("jsonb");
 
                     b.Property<int>("CompletionTokens")
                         .HasColumnType("integer");
