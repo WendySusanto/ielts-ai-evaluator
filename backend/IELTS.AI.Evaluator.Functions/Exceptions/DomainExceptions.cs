@@ -24,6 +24,13 @@ public sealed class QuotaExceededException : DomainException
     public QuotaExceededException(string message) : base(message) { }
 }
 
+/// <summary>The same evaluation is already running; the caller keeps polling its status instead.</summary>
+public sealed class EvaluationInProgressException : DomainException
+{
+    public override int StatusCode => 409;
+    public EvaluationInProgressException(string message) : base(message) { }
+}
+
 public sealed class ForbiddenException : DomainException
 {
     public override int StatusCode => 403;

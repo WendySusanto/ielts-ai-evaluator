@@ -24,6 +24,17 @@ public record SpeakingAudioLink(int Answer, string Url);
 public record SpeakingSessionDetailDto(Guid SpeakingSessionId, string Part, string Topic, string QuestionText,
     List<SpeakingTurn> Turns, decimal OverallBand, SpeakingFeedback Feedback, PronunciationResult? Pronunciation, DateTime CreatedAt,
     List<SpeakingAudioLink>? Audio = null);
+/// <summary>What the practice page polls while an evaluation runs. Error is set only when Status is
+/// "failed", and is fit to show the candidate.</summary>
+public record SpeakingEvaluationStatusDto(string Status, DateTime StartedAt, string? Error);
+
+/// <summary>The values of SpeakingEvaluation.Status.</summary>
+public static class SpeakingEvaluationStatus
+{
+    public const string Processing = "processing";
+    public const string Completed = "completed";
+    public const string Failed = "failed";
+}
 
 public interface ISpeakingService
 {
@@ -31,6 +42,7 @@ public interface ISpeakingService
     /// paid, never after.</summary>
     Task<SpeakingSessionDto> EvaluateAsync(Guid userId, string role, SpeakingEvaluateRequest request,
         CancellationToken ct = default);
+    Task<SpeakingEvaluationStatusDto> GetEvaluationStatusAsync(Guid userId, Guid id);
     Task<List<SpeakingSessionHistoryItemDto>> GetHistoryAsync(Guid userId);
     Task<SpeakingSessionDetailDto> GetDetailAsync(Guid userId, Guid id);
 }
@@ -48,6 +60,10 @@ public class SpeakingService : ISpeakingService
 
     /// <summary>Stamped on every new session; see SpeakingSession.FeedbackVersion.</summary>
     internal const int CurrentFeedbackVersion = 3;
+
+    // Past this an attempt still marked processing has died without writing "failed" (the host was
+    // recycled mid-call): scoring is capped at 150s plus a quick retry, far inside it.
+    private static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(5);
 
     // Five minutes of recording per session, as the practice page caps it, plus slack for the clock
     // running a moment past the cap before the recorder stops.
@@ -114,8 +130,6 @@ public class SpeakingService : ISpeakingService
         // A retried submission — a refresh, a browser that gave up waiting — carries the id its first
         // attempt used. Once that one is saved, hand it back instead of paying Gemini a second time.
         // Checked before the quota: the retry must not be refused for the slot its first attempt used.
-        // ponytail: two attempts arriving at the same moment both pay, and the second save fails on the
-        // primary key; the page already blocks a double click, so only a lost response repeats one.
         var sessionId = request.ClientSessionId is { } requested && requested != Guid.Empty ? requested : Guid.NewGuid();
         if (await _db.SpeakingSessions.AsNoTracking().FirstOrDefaultAsync(s => s.SpeakingSessionId == sessionId, ct) is { } saved)
         {
@@ -124,6 +138,16 @@ public class SpeakingService : ISpeakingService
             return new SpeakingSessionDto(saved.SpeakingSessionId, saved.OverallBand,
                 JsonSerializer.Deserialize<SpeakingFeedback>(saved.Feedback, CamelCase)!);
         }
+
+        // Not saved yet, but maybe still being scored: then the caller keeps polling rather than paying
+        // twice. A failed or stale attempt is simply run again.
+        // ponytail: two first attempts arriving at the same moment both pass this, and the second
+        // insert below fails on the primary key; the page sends one, so only a client bug repeats it.
+        var evaluation = await _db.SpeakingEvaluations.FirstOrDefaultAsync(e => e.SpeakingEvaluationId == sessionId, ct);
+        if (evaluation is not null && evaluation.UserId != userId)
+            throw new ValidationException("Invalid session id.");
+        if (evaluation is not null && IsRunning(evaluation))
+            throw new EvaluationInProgressException("This session is already being scored.");
 
         var prompt = await _db.SpeakingPrompts.FirstOrDefaultAsync(p => p.SpeakingPromptId == request.SpeakingPromptId, ct)
             ?? throw new NotFoundException("Speaking prompt not found.");
@@ -149,6 +173,47 @@ public class SpeakingService : ISpeakingService
         if (pronunciation is not null)
             ValidatePronunciation(pronunciation);
 
+        // Recorded before Gemini is paid, so a poll — or a retry — sees the attempt from here on.
+        evaluation ??= _db.SpeakingEvaluations.Add(new SpeakingEvaluation { SpeakingEvaluationId = sessionId, UserId = userId }).Entity;
+        evaluation.Status = SpeakingEvaluationStatus.Processing;
+        evaluation.StartedAt = DateTime.UtcNow;
+        evaluation.Error = null;
+        await _db.SaveChangesAsync(ct);
+
+        try
+        {
+            return await ScoreAndSaveAsync(userId, request, prompt, pronunciation, clips, evaluation);
+        }
+        catch (Exception ex)
+        {
+            // The page learns about this from its poll, the request may be long gone. Whatever failed
+            // can still sit in the change tracker (a session that would not save), so the failure is
+            // written on a clean slate — best effort: if even that fails, the poll reports the attempt
+            // failed once it is StaleAfter old.
+            _db.ChangeTracker.Clear();
+            evaluation.Status = SpeakingEvaluationStatus.Failed;
+            evaluation.Error = ex is TimeoutException
+                ? "Scoring took longer than expected. Please try again."
+                : "Scoring failed. Please try again.";
+            _db.SpeakingEvaluations.Update(evaluation);
+            try
+            {
+                await _db.SaveChangesAsync(CancellationToken.None);
+            }
+            catch
+            {
+                // see above
+            }
+            throw;
+        }
+    }
+
+    /// <summary>The paid part of an evaluation: Gemini, then the session, then the recordings. Runs on
+    /// CancellationToken.None throughout — the browser closing or dropping the request must not
+    /// cancel a call that is being paid for; the poll, or the History page, picks the result up.</summary>
+    private async Task<SpeakingSessionDto> ScoreAndSaveAsync(Guid userId, SpeakingEvaluateRequest request,
+        SpeakingPrompt prompt, PronunciationResult? pronunciation, List<DecodedClip> clips, SpeakingEvaluation evaluation)
+    {
         // No temperature: Gemini 3 models are tuned for their default, and lowering it risks looping
         // and weaker reasoning (Google's 3.8 Flash migration guide says to strip it). Bands stay
         // steady through the rubric in SpeakingFeedbackPrompts and the server-side average below.
@@ -156,7 +221,7 @@ public class SpeakingService : ISpeakingService
         Task<GeminiResult<SpeakingFeedback>> Score(IReadOnlyCollection<DecodedClip> recordings) =>
             _gemini.GenerateAsync<SpeakingFeedback>(SpeakingFeedbackPrompts.SystemPrompt,
                 BuildUserParts(prompt, request.Part, request.Turns, pronunciation, recordings),
-                SpeakingFeedbackPrompts.GeminiSchema, ct,
+                SpeakingFeedbackPrompts.GeminiSchema, CancellationToken.None,
                 thinkingLevel: thinkingLevel, timeout: GeminiStructuredClient.ScoringTimeout);
 
         GeminiResult<SpeakingFeedback> result;
@@ -182,7 +247,7 @@ public class SpeakingService : ISpeakingService
 
         var session = new SpeakingSession
         {
-            SpeakingSessionId = sessionId,
+            SpeakingSessionId = evaluation.SpeakingEvaluationId,
             UserId = userId,
             SpeakingPromptId = prompt.SpeakingPromptId,
             Part = request.Part,
@@ -197,8 +262,8 @@ public class SpeakingService : ISpeakingService
         };
 
         _db.SpeakingSessions.Add(session);
-        // Deliberately not ct — same reason as WritingService: the Gemini call is already billed,
-        // and a whole spoken session's feedback is not worth discarding over a closed tab.
+        // One save for both, so a poll never sees "completed" without the session to show.
+        evaluation.Status = SpeakingEvaluationStatus.Completed;
         await _db.SaveChangesAsync(CancellationToken.None);
 
         // Playback copies, stored only once the paid result is safe in the database: a storage outage
@@ -208,7 +273,9 @@ public class SpeakingService : ISpeakingService
             var stored = new List<StoredAudioClip>();
             foreach (var clip in clips)
             {
-                var blobName = $"{userId}/{session.SpeakingSessionId}/answer-{clip.Answer}.{clip.Extension}";
+                // Under its own prefix in the shared container, so a lifecycle rule can expire
+                // recordings without touching anything else stored there.
+                var blobName = $"speaking-audio/{userId}/{session.SpeakingSessionId}/answer-{clip.Answer}.{clip.Extension}";
                 if (await _audio.TryUploadAsync(blobName, clip.BrowserType, clip.Data))
                     stored.Add(new StoredAudioClip(clip.Answer, blobName));
             }
@@ -221,6 +288,27 @@ public class SpeakingService : ISpeakingService
 
         return new SpeakingSessionDto(session.SpeakingSessionId, session.OverallBand, feedback);
     }
+
+    public async Task<SpeakingEvaluationStatusDto> GetEvaluationStatusAsync(Guid userId, Guid id)
+    {
+        // A saved session is the final word — it also covers sessions scored before polling existed.
+        var session = await _db.SpeakingSessions.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.SpeakingSessionId == id && s.UserId == userId);
+        if (session is not null)
+            return new SpeakingEvaluationStatusDto(SpeakingEvaluationStatus.Completed, session.CreatedAt, null);
+
+        var evaluation = await _db.SpeakingEvaluations.AsNoTracking()
+            .FirstOrDefaultAsync(e => e.SpeakingEvaluationId == id && e.UserId == userId)
+            ?? throw new NotFoundException("Evaluation not found.");
+        // An attempt that died mid-call never wrote "failed"; past StaleAfter, report it for it.
+        if (evaluation.Status == SpeakingEvaluationStatus.Processing && !IsRunning(evaluation))
+            return new SpeakingEvaluationStatusDto(SpeakingEvaluationStatus.Failed, evaluation.StartedAt,
+                "Scoring did not finish. Please try again.");
+        return new SpeakingEvaluationStatusDto(evaluation.Status, evaluation.StartedAt, evaluation.Error);
+    }
+
+    private static bool IsRunning(SpeakingEvaluation evaluation) =>
+        evaluation.Status == SpeakingEvaluationStatus.Processing && DateTime.UtcNow - evaluation.StartedAt < StaleAfter;
 
     public async Task<List<SpeakingSessionHistoryItemDto>> GetHistoryAsync(Guid userId)
     {
@@ -246,12 +334,12 @@ public class SpeakingService : ISpeakingService
             ? null
             : JsonSerializer.Deserialize<PronunciationResult>(session.Pronunciation, CamelCase);
         // Signed fresh on every read and short-lived, so a copied link stops working on its own.
-        var audio = session.AudioClips is null
-            ? null
-            : JsonSerializer.Deserialize<List<StoredAudioClip>>(session.AudioClips, CamelCase)!
-                .Select(c => _audio.ReadUrl(c.BlobName, AudioLinkLifetime) is { } url ? new SpeakingAudioLink(c.Answer, url) : null)
-                .OfType<SpeakingAudioLink>()
-                .ToList();
+        var audio = new List<SpeakingAudioLink>();
+        foreach (var clip in session.AudioClips is null ? [] : JsonSerializer.Deserialize<List<StoredAudioClip>>(session.AudioClips, CamelCase)!)
+        {
+            if (await _audio.ReadUrlAsync(clip.BlobName, AudioLinkLifetime) is { } url)
+                audio.Add(new SpeakingAudioLink(clip.Answer, url));
+        }
         return new SpeakingSessionDetailDto(
             session.SpeakingSessionId, session.Part, session.SpeakingPrompt.Topic, session.SpeakingPrompt.QuestionText,
             turns, session.OverallBand, feedback, pronunciation, session.CreatedAt,

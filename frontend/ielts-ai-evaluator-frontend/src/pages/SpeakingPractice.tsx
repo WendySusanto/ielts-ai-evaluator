@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { EvaluationProgress } from "@/components/EvaluationProgress";
 import { RecordingClock } from "@/components/RecordingClock";
 import { VoiceLevelBars } from "@/components/VoiceLevelBars";
 import { useApi } from "@/hooks/use-api";
@@ -19,12 +20,13 @@ import type {
   ExaminerTurnRequest,
   ExaminerTurnResult,
   SpeakingEvaluateRequest,
+  SpeakingEvaluationStatus,
   SpeakingPrompt,
   SpeakingSessionDto,
   SpeakingTurn,
 } from "@/types/Speaking";
 import { ArrowLeft, Keyboard, Mic, Send, Square } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "sonner";
 import NotFound from "./NotFound";
@@ -67,6 +69,8 @@ type SpeakingDraft = {
   partComplete: boolean;
   savedAt: number;
   clientSessionId?: string;
+  /** Set once the session was sent for scoring, so a reload resumes the progress card. */
+  submittedAt?: number;
 };
 
 const readDraft = (key: string): SpeakingDraft | null => {
@@ -133,6 +137,14 @@ const SpeakingPractice = () => {
   const recordingsRef = useRef(new Map<number, RecordedAudio>());
   const [recordedSeconds, setRecordedSeconds] = useState(0);
   const recordingWarnedRef = useRef(false);
+  // The session is being scored: the POST does the work but is not waited on — the server keeps
+  // going if the connection drops or the tab closes — so the poll below decides when it is done.
+  // Non-null swaps the controls for the progress card; startedAt survives a reload via the draft.
+  const [evaluation, setEvaluation] = useState<{
+    startedAt: number;
+    error: string | null;
+  } | null>(null);
+  const evaluationFinishedRef = useRef(false);
 
   // Part 2 cue-card phase: only relevant before the first candidate turn.
   const [part2Phase, setPart2Phase] = useState<
@@ -175,6 +187,11 @@ const SpeakingPractice = () => {
       setAssessments(draft.assessments);
       setPartComplete(draft.partComplete);
       if (draft.clientSessionId) setClientSessionId(draft.clientSessionId);
+      if (draft.submittedAt) {
+        // Sent for scoring before the reload: pick the scoring back up, not the conversation.
+        setIsSubmittingFinal(true);
+        setEvaluation({ startedAt: draft.submittedAt, error: null });
+      }
       if (prompt.part === "Part2") setPart2Phase("done");
       setCallState("yourTurn");
       toast.info("Resumed your previous session.", {
@@ -230,6 +247,7 @@ const SpeakingPractice = () => {
       partComplete,
       savedAt: Date.now(),
       clientSessionId,
+      submittedAt: evaluation?.startedAt,
     };
     // ponytail: best-effort — a full/blocked quota shouldn't break a live session.
     try {
@@ -237,7 +255,7 @@ const SpeakingPractice = () => {
     } catch {
       /* ignore */
     }
-  }, [draftKey, turns, assessments, partComplete, clientSessionId]);
+  }, [draftKey, turns, assessments, partComplete, clientSessionId, evaluation]);
 
   // Auto-scroll to the latest turn / interim transcript.
   useEffect(() => {
@@ -452,8 +470,18 @@ const SpeakingPractice = () => {
     await submitSpokenTurn(await speech.stopListening());
   };
 
+  // The session is saved under clientSessionId, so that is where its feedback lives.
+  const finishEvaluation = useCallback(() => {
+    if (evaluationFinishedRef.current) return; // the POST and the poll can both report it done
+    evaluationFinishedRef.current = true;
+    if (draftKey) localStorage.removeItem(draftKey);
+    toast.success("Speaking response analyzed successfully!");
+    navigate(`/speaking-feedback/${clientSessionId}`);
+  }, [draftKey, navigate, clientSessionId]);
+
   const handleEndSession = async () => {
-    if (!prompt || isSubmittingFinal || candidateTurnCount === 0) return;
+    if (!prompt || candidateTurnCount === 0) return;
+    if (evaluation && !evaluation.error) return; // already being scored
     setIsSubmittingFinal(true);
     speech.stopSpeaking();
     // Release the mic if a turn was mid-recording (or the hands-free start is still in flight);
@@ -480,25 +508,59 @@ const SpeakingPractice = () => {
         })),
       );
       if (audio.length > 0) payload.audio = audio;
-      const result = await api.post<SpeakingSessionDto>(
-        "/api/v2/speaking/sessions",
-        payload,
-      );
-      if (draftKey) localStorage.removeItem(draftKey);
-      toast.success("Speaking response analyzed successfully!");
-      navigate(`/speaking-feedback/${result.speakingSessionId}`);
-    } catch (e) {
-      const err =
-        e instanceof ApiError
-          ? e
-          : new ApiError(0, e instanceof Error ? e.message : "Request failed");
-      // The transcript is saved locally, so "try again" is a real instruction, not a platitude.
-      toast.error(
-        `Error analyzing response: ${err.message}. Your session is saved — try again.`,
-      );
+    } catch {
+      toast.error("Couldn't prepare your recordings — please try again.");
       setIsSubmittingFinal(false);
+      return;
     }
+
+    setEvaluation({ startedAt: Date.now(), error: null });
+    api.post<SpeakingSessionDto>("/api/v2/speaking/sessions", payload).then(
+      finishEvaluation,
+      (e) => {
+        // Refused before scoring began (invalid, over quota): the poll would only ever see a 404,
+        // so say so now. A 409 means an earlier attempt is still running, and anything else may
+        // well have reached the server — for those the poll decides.
+        if (e instanceof ApiError && e.status >= 400 && e.status < 500 && e.status !== 409)
+          setEvaluation((current) => current && { ...current, error: e.message });
+      },
+    );
   };
+
+  // While the session is scored: ask the server every 3 seconds. A 404 is normal for a moment —
+  // the POST may still be uploading — but a minute of it means the answers never arrived.
+  useEffect(() => {
+    if (!evaluation || evaluation.error) return;
+    let missingSince: number | null = null;
+    const poll = setInterval(async () => {
+      try {
+        const status = await api.get<SpeakingEvaluationStatus>(
+          `/api/v2/speaking/evaluations/${clientSessionId}`,
+        );
+        if (status.status === "completed") finishEvaluation();
+        else if (status.status === "failed")
+          setEvaluation(
+            (current) =>
+              current && {
+                ...current,
+                error: status.error ?? "Scoring failed. Please try again.",
+              },
+          );
+      } catch (e) {
+        if (!(e instanceof ApiError && e.status === 404)) return; // a network blip: keep polling
+        missingSince ??= Date.now();
+        if (Date.now() - missingSince > 60_000)
+          setEvaluation(
+            (current) =>
+              current && {
+                ...current,
+                error: "Your answers didn't reach the server. Please try again.",
+              },
+          );
+      }
+    }, 3000);
+    return () => clearInterval(poll);
+  }, [evaluation, clientSessionId, finishEvaluation]);
 
   // Part 2 prep countdown -> auto-starts listening once it hits zero.
   useEffect(() => {
@@ -675,127 +737,137 @@ const SpeakingPractice = () => {
 
       {/* Controls dock */}
       <div className="sticky bottom-0 space-y-3 border-t border-border bg-background pt-3">
-        {part2Phase === "talk" ? (
-          <div className="flex items-center justify-center gap-3">
-            <RecordingClock
-              recordedSeconds={recordedSeconds}
-              running={callState === "listening"}
-              limitSeconds={RECORDING_LIMIT_SECONDS}
-            />
-            {callState === "listening" && (
-              <VoiceLevelBars getLevel={speech.getMicLevel} />
-            )}
-            <Button
-              variant="outline"
-              className="h-11"
-              onClick={finishPart2Talk}
-              disabled={busy}
-            >
-              Finish early
-            </Button>
-          </div>
-        ) : pendingRetryTurns ? (
-          <div className="flex justify-center">
-            <Button
-              className="h-11"
-              onClick={() => postExaminerTurn(pendingRetryTurns)}
-              disabled={busy}
-            >
-              Retry
-            </Button>
-          </div>
-        ) : part2Phase === "prep" || partComplete ? null : typedMode ? (
-          <div className="flex items-end gap-2">
-            <Textarea
-              value={typedText}
-              onChange={(e) => setTypedText(e.target.value)}
-              placeholder="Type your answer..."
-              disabled={callState !== "yourTurn"}
-              className="min-h-11 max-h-32 resize-none"
-            />
-            <Button
-              size="icon"
-              className="h-11 w-11 shrink-0"
-              onClick={handleTypedSend}
-              disabled={callState !== "yourTurn" || !typedText.trim()}
-              aria-label="Send"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-            {speech.supported && (
-              <Button
-                variant="ghost"
-                className="h-11 shrink-0"
-                onClick={() => {
-                  // Also recovers from a speech error: one hiccup shouldn't cost voice for the session.
-                  degradedToastRef.current = false;
-                  setForcedTypedMode(false);
-                  setManualTypedMode(false);
-                }}
-              >
-                Use mic
-              </Button>
-            )}
-          </div>
+        {evaluation ? (
+          <EvaluationProgress
+            startedAt={evaluation.startedAt}
+            error={evaluation.error}
+            onRetry={handleEndSession}
+          />
         ) : (
-          <div className="flex items-center justify-center gap-3">
-            {/* A fixed slot, so the clock and bars appearing never shift the mic button. */}
-            <div className="flex w-36 items-center justify-end gap-2">
-              {(callState === "listening" || recordedSeconds > 0) && (
+          <>
+            {part2Phase === "talk" ? (
+              <div className="flex items-center justify-center gap-3">
                 <RecordingClock
                   recordedSeconds={recordedSeconds}
                   running={callState === "listening"}
                   limitSeconds={RECORDING_LIMIT_SECONDS}
                 />
-              )}
-              {callState === "listening" && (
-                <VoiceLevelBars getLevel={speech.getMicLevel} />
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={handleMicClick}
-              disabled={micDisabled}
-              aria-label={
-                callState === "listening" ? "Stop and send" : "Start recording"
-              }
-              className={cn(
-                "flex size-14 items-center justify-center rounded-full transition-transform duration-200 disabled:opacity-40",
-                callState === "listening"
-                  ? "bg-destructive"
-                  : "bg-primary hover:bg-primary/90",
-              )}
-            >
-              {callState === "listening" ? (
-                <Square className="h-5 w-5 text-destructive-foreground" />
-              ) : (
-                <Mic className="h-5 w-5 text-primary-foreground" />
-              )}
-            </button>
+                {callState === "listening" && (
+                  <VoiceLevelBars getLevel={speech.getMicLevel} />
+                )}
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={finishPart2Talk}
+                  disabled={busy}
+                >
+                  Finish early
+                </Button>
+              </div>
+            ) : pendingRetryTurns ? (
+              <div className="flex justify-center">
+                <Button
+                  className="h-11"
+                  onClick={() => postExaminerTurn(pendingRetryTurns)}
+                  disabled={busy}
+                >
+                  Retry
+                </Button>
+              </div>
+            ) : part2Phase === "prep" || partComplete ? null : typedMode ? (
+              <div className="flex items-end gap-2">
+                <Textarea
+                  value={typedText}
+                  onChange={(e) => setTypedText(e.target.value)}
+                  placeholder="Type your answer..."
+                  disabled={callState !== "yourTurn"}
+                  className="min-h-11 max-h-32 resize-none"
+                />
+                <Button
+                  size="icon"
+                  className="h-11 w-11 shrink-0"
+                  onClick={handleTypedSend}
+                  disabled={callState !== "yourTurn" || !typedText.trim()}
+                  aria-label="Send"
+                >
+                  <Send className="h-4 w-4" />
+                </Button>
+                {speech.supported && (
+                  <Button
+                    variant="ghost"
+                    className="h-11 shrink-0"
+                    onClick={() => {
+                      // Also recovers from a speech error: one hiccup shouldn't cost voice for the session.
+                      degradedToastRef.current = false;
+                      setForcedTypedMode(false);
+                      setManualTypedMode(false);
+                    }}
+                  >
+                    Use mic
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-3">
+                {/* A fixed slot, so the clock and bars appearing never shift the mic button. */}
+                <div className="flex w-36 items-center justify-end gap-2">
+                  {(callState === "listening" || recordedSeconds > 0) && (
+                    <RecordingClock
+                      recordedSeconds={recordedSeconds}
+                      running={callState === "listening"}
+                      limitSeconds={RECORDING_LIMIT_SECONDS}
+                    />
+                  )}
+                  {callState === "listening" && (
+                    <VoiceLevelBars getLevel={speech.getMicLevel} />
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleMicClick}
+                  disabled={micDisabled}
+                  aria-label={
+                    callState === "listening" ? "Stop and send" : "Start recording"
+                  }
+                  className={cn(
+                    "flex size-14 items-center justify-center rounded-full transition-transform duration-200 disabled:opacity-40",
+                    callState === "listening"
+                      ? "bg-destructive"
+                      : "bg-primary hover:bg-primary/90",
+                  )}
+                >
+                  {callState === "listening" ? (
+                    <Square className="h-5 w-5 text-destructive-foreground" />
+                  ) : (
+                    <Mic className="h-5 w-5 text-primary-foreground" />
+                  )}
+                </button>
+                <Button
+                  variant="ghost"
+                  className="h-11"
+                  onClick={() => setManualTypedMode(true)}
+                >
+                  <Keyboard />
+                  Type instead
+                </Button>
+              </div>
+            )}
+    
+            {!typedMode && candidateTurnCount === 0 && (
+              <p className="text-center text-xs text-muted-foreground">
+                Your spoken answers are recorded for scoring and can be replayed on
+                your feedback page.
+              </p>
+            )}
             <Button
-              variant="ghost"
-              className="h-11"
-              onClick={() => setManualTypedMode(true)}
+              className="w-full h-11"
+              disabled={candidateTurnCount === 0 || isSubmittingFinal || busy}
+              onClick={handleEndSession}
             >
-              <Keyboard />
-              Type instead
+              {isSubmittingFinal ? "Submitting..." : "End session & get feedback"}
             </Button>
-          </div>
+          </>
         )}
-
-        {!typedMode && candidateTurnCount === 0 && (
-          <p className="text-center text-xs text-muted-foreground">
-            Your spoken answers are recorded for scoring and can be replayed on
-            your feedback page.
-          </p>
-        )}
-        <Button
-          className="w-full h-11"
-          disabled={candidateTurnCount === 0 || isSubmittingFinal || busy}
-          onClick={handleEndSession}
-        >
-          {isSubmittingFinal ? "Submitting..." : "End session & get feedback"}
-        </Button>
       </div>
     </div>
   );

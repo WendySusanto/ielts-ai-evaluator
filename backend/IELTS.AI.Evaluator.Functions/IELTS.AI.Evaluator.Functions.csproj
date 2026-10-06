@@ -8,7 +8,8 @@
   </PropertyGroup>
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-    <!-- ponytail: pinned below 12.28, whose Azure.Core pulls System.Text.Json 10.x onto this net8 app and trips NU1605 against the 9.0.7 the test project pins. Lift both together when the app moves to .NET 10. -->
+    <!-- ponytail: the newest versions that stay on Azure.Core 1.50; later ones pull System.Text.Json 10.x onto this net8 app and trip NU1605 against the 9.0.7 the test project pins. Lift them together when the app moves to .NET 10. -->
+    <PackageReference Include="Azure.Identity" Version="1.17.2" />
     <PackageReference Include="Azure.Storage.Blobs" Version="12.27.0" />
     <PackageReference Include="FirebaseAdmin" Version="3.3.0" />
     <!-- Application Insights isn't enabled by default. See https://aka.ms/AAt8mw4. -->

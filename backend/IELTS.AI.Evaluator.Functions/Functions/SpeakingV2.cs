@@ -35,6 +35,17 @@ public class SpeakingV2
         return new OkObjectResult(dto);
     }
 
+    /// <summary>Polled by the practice page while an evaluation runs: processing, completed or failed.</summary>
+    [Function("SpeakingV2_EvaluationStatus")]
+    public async Task<IActionResult> EvaluationStatusAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v2/speaking/evaluations/{id:guid}")] HttpRequest req,
+        FunctionContext context,
+        Guid id)
+    {
+        var status = await _speakingService.GetEvaluationStatusAsync(context.GetUserId()!.Value, id);
+        return new OkObjectResult(status);
+    }
+
     [Function("SpeakingV2_GetHistory")]
     public async Task<IActionResult> GetHistoryAsync(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "v2/speaking/sessions")] HttpRequest req,

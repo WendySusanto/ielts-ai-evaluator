@@ -148,6 +148,14 @@ export interface SpeakingEvaluateRequest {
   audio?: SpeakingAudioClip[];
 }
 
+// GET /api/v2/speaking/evaluations/{id} — polled while an evaluation runs. `error` is set only when
+// failed, and is written to be shown as is.
+export interface SpeakingEvaluationStatus {
+  status: "processing" | "completed" | "failed";
+  startedAt: string;
+  error?: string | null;
+}
+
 // Response from POST /api/v2/speaking/sessions
 export interface SpeakingSessionDto {
   speakingSessionId: string;

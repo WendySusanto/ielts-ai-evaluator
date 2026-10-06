@@ -28,6 +28,10 @@ public class FakeStructuredClient : IGeminiStructuredClient
     /// (unbilled) 400.</summary>
     public bool RejectInlineMedia { get; set; }
 
+    /// <summary>Thrown by every call when set — a timeout, an outage.</summary>
+    public Exception? FailWith { get; set; }
+    public CancellationToken LastToken { get; private set; }
+
     public FakeStructuredClient(object canned) => _canned = canned;
 
     public Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
@@ -47,6 +51,9 @@ public class FakeStructuredClient : IGeminiStructuredClient
         LastThinkingBudget = thinkingBudget;
         LastThinkingLevel = thinkingLevel;
         LastTimeout = timeout;
+        LastToken = ct;
+        if (FailWith is not null)
+            throw FailWith;
         if (RejectInlineMedia && userParts.Any(p => p.Data is not null))
             throw new HttpRequestException("Gemini call failed with status 400", null, HttpStatusCode.BadRequest);
         var json = JsonSerializer.Serialize(_canned, CamelCase);

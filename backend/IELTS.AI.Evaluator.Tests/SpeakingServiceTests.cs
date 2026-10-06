@@ -358,6 +358,134 @@ public class SpeakingServiceTests
         Assert.Equal(1, gemini.Calls);
     }
 
+    private static void SeedEvaluation(EvaluatorDbContext db, Guid id, Guid userId, string status, TimeSpan age,
+        string? error = null)
+    {
+        db.SpeakingEvaluations.Add(new SpeakingEvaluation
+        {
+            SpeakingEvaluationId = id, UserId = userId, Status = status, StartedAt = DateTime.UtcNow - age, Error = error,
+        });
+        db.SaveChanges();
+    }
+
+    [Fact]
+    public async Task Evaluate_RecordsTheEvaluation_AsCompleted()
+    {
+        var (svc, db, _, user, prompt) = Setup();
+        var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+
+        var evaluation = await db.SpeakingEvaluations.SingleAsync(e => e.SpeakingEvaluationId == result.SpeakingSessionId);
+        Assert.Equal(SpeakingEvaluationStatus.Completed, evaluation.Status);
+        Assert.Null(evaluation.Error);
+    }
+
+    /// <summary>The page learns about a failure from the poll, not from the (possibly long gone)
+    /// request, so the failure has to be written down — and the request still fails for anyone still
+    /// waiting on it.</summary>
+    [Fact]
+    public async Task Evaluate_GeminiFails_MarksTheEvaluationFailed_AndRethrows()
+    {
+        var (svc, db, gemini, user, prompt) = Setup();
+        gemini.FailWith = new TimeoutException("Gemini did not answer within 150s.");
+        var id = Guid.NewGuid();
+
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, clientSessionId: id)));
+
+        var evaluation = await db.SpeakingEvaluations.AsNoTracking().SingleAsync(e => e.SpeakingEvaluationId == id);
+        Assert.Equal(SpeakingEvaluationStatus.Failed, evaluation.Status);
+        Assert.Contains("longer than expected", evaluation.Error);
+        Assert.False(await db.SpeakingSessions.AnyAsync(s => s.SpeakingSessionId == id));
+    }
+
+    /// <summary>A retry while the first attempt is still scoring must not pay a second time.</summary>
+    [Fact]
+    public async Task Evaluate_WhileTheSameIdIsStillRunning_ThrowsInProgress_NoGeminiCall()
+    {
+        var (svc, db, gemini, user, prompt) = Setup();
+        var id = Guid.NewGuid();
+        SeedEvaluation(db, id, user.UserId, SpeakingEvaluationStatus.Processing, TimeSpan.FromSeconds(20));
+
+        await Assert.ThrowsAsync<EvaluationInProgressException>(() =>
+            svc.EvaluateAsync(user.UserId, "Free", Request(prompt, clientSessionId: id)));
+        Assert.Equal(0, gemini.Calls);
+    }
+
+    public static TheoryData<string, int> FinishedAttempts => new()
+    {
+        { SpeakingEvaluationStatus.Failed, 1 },
+        { SpeakingEvaluationStatus.Processing, 10 }, // stale: the worker died without writing "failed"
+    };
+
+    [Theory]
+    [MemberData(nameof(FinishedAttempts))]
+    public async Task Evaluate_AfterAFailedOrStaleAttempt_RunsAgain(string status, int minutesAgo)
+    {
+        var (svc, db, gemini, user, prompt) = Setup();
+        var id = Guid.NewGuid();
+        SeedEvaluation(db, id, user.UserId, status, TimeSpan.FromMinutes(minutesAgo), "Scoring failed. Please try again.");
+
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt, clientSessionId: id));
+
+        Assert.Equal(1, gemini.Calls);
+        var evaluation = await db.SpeakingEvaluations.AsNoTracking().SingleAsync(e => e.SpeakingEvaluationId == id);
+        Assert.Equal(SpeakingEvaluationStatus.Completed, evaluation.Status);
+        Assert.Null(evaluation.Error);
+    }
+
+    /// <summary>The browser closing or dropping the request must not cancel a call that is being paid
+    /// for — the poll, or the History page, picks the result up later.</summary>
+    [Fact]
+    public async Task Evaluate_CallsGeminiWithoutTheRequestToken()
+    {
+        var (svc, _, gemini, user, prompt) = Setup();
+        using var request = new CancellationTokenSource();
+
+        await svc.EvaluateAsync(user.UserId, "Free", Request(prompt), request.Token);
+
+        Assert.False(gemini.LastToken.CanBeCanceled);
+    }
+
+    [Fact]
+    public async Task GetEvaluationStatus_SavedSession_IsCompleted()
+    {
+        var (svc, _, _, user, prompt) = Setup();
+        var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt));
+
+        var status = await svc.GetEvaluationStatusAsync(user.UserId, result.SpeakingSessionId);
+        Assert.Equal(SpeakingEvaluationStatus.Completed, status.Status);
+    }
+
+    [Fact]
+    public async Task GetEvaluationStatus_ReportsProcessing_StaleAsFailed_AndTheFailureMessage()
+    {
+        var (svc, db, _, user, _) = Setup();
+        var running = Guid.NewGuid();
+        var stale = Guid.NewGuid();
+        var failed = Guid.NewGuid();
+        SeedEvaluation(db, running, user.UserId, SpeakingEvaluationStatus.Processing, TimeSpan.FromSeconds(30));
+        SeedEvaluation(db, stale, user.UserId, SpeakingEvaluationStatus.Processing, TimeSpan.FromMinutes(6));
+        SeedEvaluation(db, failed, user.UserId, SpeakingEvaluationStatus.Failed, TimeSpan.FromMinutes(1),
+            "Scoring failed. Please try again.");
+
+        Assert.Equal(SpeakingEvaluationStatus.Processing, (await svc.GetEvaluationStatusAsync(user.UserId, running)).Status);
+        var staleStatus = await svc.GetEvaluationStatusAsync(user.UserId, stale);
+        Assert.Equal(SpeakingEvaluationStatus.Failed, staleStatus.Status);
+        Assert.Contains("did not finish", staleStatus.Error);
+        Assert.Equal("Scoring failed. Please try again.", (await svc.GetEvaluationStatusAsync(user.UserId, failed)).Error);
+    }
+
+    [Fact]
+    public async Task GetEvaluationStatus_UnknownOrSomeoneElses_IsNotFound()
+    {
+        var (svc, db, _, user, _) = Setup();
+        var id = Guid.NewGuid();
+        SeedEvaluation(db, id, user.UserId, SpeakingEvaluationStatus.Processing, TimeSpan.Zero);
+
+        await Assert.ThrowsAsync<NotFoundException>(() => svc.GetEvaluationStatusAsync(Guid.NewGuid(), id));
+        await Assert.ThrowsAsync<NotFoundException>(() => svc.GetEvaluationStatusAsync(user.UserId, Guid.NewGuid()));
+    }
+
     [Fact]
     public async Task Evaluate_StoresRecordingsAfterSaving_AndDetailLinksThem()
     {
@@ -366,7 +494,8 @@ public class SpeakingServiceTests
 
         var result = await svc.EvaluateAsync(user.UserId, "Free", Request(prompt, audio: [Clip(1, mime: "audio/mp4", data: [7])]));
 
-        var blobName = $"{user.UserId}/{result.SpeakingSessionId}/answer-1.m4a";
+        // Under its own prefix in the shared container, so a lifecycle rule can expire recordings alone.
+        var blobName = $"speaking-audio/{user.UserId}/{result.SpeakingSessionId}/answer-1.m4a";
         Assert.Equal("audio/mp4", audio.Uploads[blobName].ContentType);
         Assert.Equal(new byte[] { 7 }, audio.Uploads[blobName].Data);
         var detail = await svc.GetDetailAsync(user.UserId, result.SpeakingSessionId);
@@ -895,6 +1024,6 @@ public class FakeAudioStore : IAudioStore
         return Task.FromResult(true);
     }
 
-    public string? ReadUrl(string blobName, TimeSpan validFor) =>
-        $"https://audio.test/{blobName}?minutes={validFor.TotalMinutes}";
+    public Task<string?> ReadUrlAsync(string blobName, TimeSpan validFor) =>
+        Task.FromResult<string?>($"https://audio.test/{blobName}?minutes={validFor.TotalMinutes}");
 }

@@ -12,15 +12,23 @@ Prep reference for the first production deployment. Nothing here provisions anyt
 | `GeminiExaminerApiEndpoint` | Model used for live examiner turns | optional — blank or unset falls back to `GeminiApiEndpoint`. Point it at a cheaper, lower-latency model |
 | `GeminiExaminerThinkingBudget` | Thinking budget for examiner turns | optional. For `gemini-3.5-flash-lite` use `128` — it rejects `0` with a 400. Leave unset and `thinkingConfig` is omitted, which every model accepts; unset with no custom endpoint means `0` |
 | `GeminiScoringThinkingLevel` | Thinking level for Writing + Speaking scoring | optional: `low`, `medium` or `high` — `high` recommended. Anything else (including `minimal`, which `gemini-3.8-flash` rejects) is ignored and the model default (`medium`) applies |
-| `AudioStorageConnectionString` | Blob Storage for answer recordings (playback on the feedback page) | optional, secret. Key-based connection string — it signs the 30-minute read links; `UseDevelopmentStorage=true` works with Azurite locally. Container `speaking-audio` is created privately on first upload. Unset: recordings are still scored, just not stored |
+| `AudioStorageAccount` | Storage account for answer recordings (playback on the feedback page) | optional, e.g. `whenielts`. Reached through the Function App's managed identity — no key or connection string. Unset (or `AudioStorageContainer` unset): recordings are still scored, just not stored |
+| `AudioStorageContainer` | Container for answer recordings | e.g. `whenielts`. Must already exist; recordings go under the `speaking-audio/` prefix |
 | `FIREBASE_PROJECT_ID` | Firebase Admin token verification | |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Firebase Admin credentials | secret — App Settings only |
 | `AzureSpeechKey` | Azure Speech (TTS/STT/pronunciation) | F0 tier works; app degrades to typed mode without it |
 | `AzureSpeechRegion` | Azure Speech region | e.g. `southeastasia` |
 
+**Recording storage access.** Give the Function App's managed identity the **Storage Blob Data
+Contributor** role on the storage account: it uploads recordings and requests the user delegation
+key that signs the 30-minute playback links (there is no account key to sign with). With a
+user-assigned identity, also set `AZURE_CLIENT_ID` to its client id. Locally the same code uses your
+`az login` (or Visual Studio) account, which needs the same role; without it, uploads and links fail
+quietly in the log and feedback still works.
+
 **Recording retention.** Recordings are personal data. Add a lifecycle management rule on the
-storage account that deletes blobs in `speaking-audio` after the period you want (for example 90
-days); the app never deletes them itself. The production CSP in `staticwebapp.config.json` already
+storage account that deletes blobs under the `speaking-audio/` prefix after the period you want
+(for example 90 days); the app never deletes them itself. The production CSP in `staticwebapp.config.json` already
 allows playback from `https://*.blob.core.windows.net`. If `GeminiApiKey` is on Gemini's free tier,
 Google may use submitted content — recordings included — to improve its products, so move to a
 paid tier before real users record anything.

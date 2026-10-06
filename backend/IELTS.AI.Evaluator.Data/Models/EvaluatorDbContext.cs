@@ -17,6 +17,7 @@ namespace IELTS.AI.Evaluator.Data.Models
         public DbSet<SpeakingPrompt> SpeakingPrompts => Set<SpeakingPrompt>();
         public DbSet<WritingEvaluation> WritingEvaluations => Set<WritingEvaluation>();
         public DbSet<SpeakingSession> SpeakingSessions => Set<SpeakingSession>();
+        public DbSet<SpeakingEvaluation> SpeakingEvaluations => Set<SpeakingEvaluation>();
         public DbSet<SpeechTokenIssue> SpeechTokenIssues => Set<SpeechTokenIssue>();
         public DbSet<ExaminerTurnUsage> ExaminerTurnUsages => Set<ExaminerTurnUsage>();
         public DbSet<NotebookEntry> NotebookEntries => Set<NotebookEntry>();
@@ -56,6 +57,12 @@ namespace IELTS.AI.Evaluator.Data.Models
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasOne(x => x.SpeakingPrompt).WithMany().HasForeignKey(x => x.SpeakingPromptId).OnDelete(DeleteBehavior.Restrict);
                 e.HasIndex(x => new { x.UserId, x.CreatedAt });
+            });
+
+            modelBuilder.Entity<SpeakingEvaluation>(e =>
+            {
+                e.HasKey(x => x.SpeakingEvaluationId);
+                e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
             });
 
             modelBuilder.Entity<SpeechTokenIssue>(e =>
