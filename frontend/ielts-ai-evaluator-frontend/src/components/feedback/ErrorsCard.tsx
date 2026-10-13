@@ -1,3 +1,4 @@
+import { SpeakButton } from "@/components/notebook/SpeakButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { groupByCategory } from "@/lib/speaking-feedback";
 import type { SpeakingError } from "@/types/Speaking";
@@ -30,6 +31,10 @@ export function ErrorsCard({ errors }: { errors: SpeakingError[] }) {
                       aria-label="Correct:"
                     />
                     <span className="font-medium text-foreground">{error.corrected}</span>
+                    {/* -my-1.5 keeps the 32px button from stretching the 20px text line */}
+                    <span className="-my-1.5 shrink-0">
+                      <SpeakButton text={error.corrected} />
+                    </span>
                   </p>
                   <p className="pl-6 text-xs text-muted-foreground">{error.explanation}</p>
                 </li>

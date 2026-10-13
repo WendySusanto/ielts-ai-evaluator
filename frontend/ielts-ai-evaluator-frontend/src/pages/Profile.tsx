@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { ProfileSkeleton } from "@/components/skeleton/ProfileSkeleton";
 import ErrorPage from "./ErrorPage";
 
@@ -55,7 +56,7 @@ const Profile = () => {
     isLoading,
     error,
     refetch,
-    mutate,
+    setData,
   } = useApi<User>("/api/me");
 
   const {
@@ -84,27 +85,23 @@ const Profile = () => {
 
   const handleSaveProfile = async (data: ProfileFormValues) => {
     setIsSaving(true);
-    // Backend stores 0 / default(DateTimeOffset) as "not set" and returns null for them.
-    await mutate({
-      url: "/api/me",
-      method: "PUT",
-      data: {
+    try {
+      // Backend stores 0 / default(DateTimeOffset) as "not set" and returns null for them.
+      const updated = await api.put<User>("/api/me", {
         fullName: data.fullName,
         ieltsTargetScore: data.ieltsTargetScore ?? 0,
         targetTestDate: data.targetTestDate
           ? new Date(data.targetTestDate).toISOString()
           : "0001-01-01T00:00:00+00:00",
-      },
-      onSuccess: () => {
-        toast.success("Profile updated successfully");
-        setIsEditing(false);
-      },
-      onError: (error) => {
-        toast.error("Failed to update profile", {
-          description: error.message,
-        });
-      },
-    });
+      });
+      setData(() => updated);
+      toast.success("Profile updated successfully");
+      setIsEditing(false);
+    } catch (error) {
+      toast.error("Failed to update profile", {
+        description: (error as Error).message,
+      });
+    }
     setIsSaving(false);
   };
 

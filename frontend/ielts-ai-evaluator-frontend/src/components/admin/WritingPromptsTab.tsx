@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Edit, Plus } from "lucide-react";
 import WritingPrompt, { WritingPromptUpsertRequest } from "@/types/WritingPrompt";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { useSortedRows } from "@/hooks/use-sorted-rows";
 import { SortableHead } from "./SortableHead";
 import { WritingPromptForm } from "./WritingPromptForm";
@@ -44,26 +45,17 @@ export const WritingPromptsTab = () => {
     refetch,
   } = useApi<WritingPrompt[]>("/api/writing-prompts?includeInactive=true");
 
-  // Separate hook instance for the upsert: mutate overwrites its hook's data
-  // with the POST response (a single prompt), which would poison the list
-  // that useSortedRows spreads.
-  const { mutate } = useApi<WritingPrompt>("", { skipInitialFetch: true });
-
   const { sorted, key, dir, toggle } = useSortedRows(prompts ?? [], "topic");
 
   const handleUpsert = async (data: WritingPromptUpsertRequest) => {
-    await mutate({
-      url: "/api/writing-prompts",
-      method: "POST",
-      data,
-      onSuccess: () => {
-        toast.success(data.writingPromptId ? "Writing prompt updated" : "Writing prompt created");
-        setEditing(undefined);
-        refetch();
-      },
-      onError: (err) =>
-        toast.error("Failed to save writing prompt", { description: err.message }),
-    });
+    try {
+      await api.post("/api/writing-prompts", data);
+      toast.success(data.writingPromptId ? "Writing prompt updated" : "Writing prompt created");
+      setEditing(undefined);
+      refetch();
+    } catch (err) {
+      toast.error("Failed to save writing prompt", { description: (err as Error).message });
+    }
   };
 
   if (error) {

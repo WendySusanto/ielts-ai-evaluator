@@ -6,7 +6,7 @@ import {
   parseLexicalTranscript,
   speakingSeconds,
   type TimedWord,
-} from "./lexical.ts";
+} from "../lib/lexical.ts";
 
 const TICKS_PER_MS = 10_000;
 const w = (Word: string, startMs: number, durMs: number): TimedWord => ({

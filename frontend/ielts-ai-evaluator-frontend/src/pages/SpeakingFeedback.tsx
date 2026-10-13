@@ -3,6 +3,7 @@ import { CriterionCard } from "@/components/feedback/CriterionCard";
 import { ErrorsCard } from "@/components/feedback/ErrorsCard";
 import { PausedTranscript } from "@/components/feedback/PausedTranscript";
 import { VocabularyCard } from "@/components/feedback/VocabularyCard";
+import { SpeakButton } from "@/components/notebook/SpeakButton";
 import { SpeakingFeedbackSkeleton } from "@/components/skeleton/SpeakingFeedbackSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -332,7 +333,15 @@ const SpeakingFeedback = () => {
                         <span className="text-muted-foreground group-open:hidden"> — show</span>
                         <span className="hidden text-muted-foreground group-open:inline"> — hide</span>
                       </summary>
-                      <p className="mt-2 text-muted-foreground">{answer.sampleAnswer}</p>
+                      <div className="mt-2 flex items-start gap-2">
+                        <p className="text-muted-foreground">{answer.sampleAnswer}</p>
+                        <span className="-my-1.5 shrink-0">
+                          <SpeakButton
+                            text={answer.sampleAnswer}
+                            label="Read the sample answer aloud"
+                          />
+                        </span>
+                      </div>
                     </details>
                   </div>
                 )}

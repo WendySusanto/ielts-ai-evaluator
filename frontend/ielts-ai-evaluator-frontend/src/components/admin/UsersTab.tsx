@@ -2,6 +2,7 @@ import { useState } from "react";
 import { History, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { useSortedRows } from "@/hooks/use-sorted-rows";
 import { SortableHead } from "./SortableHead";
 import ErrorPage from "@/pages/ErrorPage";
@@ -67,25 +68,19 @@ export const UsersTab = () => {
     refetch,
   } = useApi<AdminUser[]>("/api/manage/users");
 
-  // Separate hook instance for the delete: mutate overwrites its hook's data with the response
-  // (204, so empty), which would wipe the list useSortedRows spreads.
-  const { mutate } = useApi<void>("", { skipInitialFetch: true });
-
   const { sorted, key, dir, toggle } = useSortedRows(users ?? [], "email");
   const [viewing, setViewing] = useState<AdminUser | null>(null);
   const [deleting, setDeleting] = useState<AdminUser | null>(null);
 
   const handleDelete = async (user: AdminUser) => {
-    await mutate({
-      url: `/api/manage/users/${user.userId}`,
-      method: "DELETE",
-      onSuccess: () => {
-        toast.success(`Deleted ${user.email}`);
-        setDeleting(null);
-        refetch();
-      },
-      onError: (err) => toast.error("Failed to delete user", { description: err.message }),
-    });
+    try {
+      await api.delete(`/api/manage/users/${user.userId}`);
+      toast.success(`Deleted ${user.email}`);
+      setDeleting(null);
+      refetch();
+    } catch (err) {
+      toast.error("Failed to delete user", { description: (err as Error).message });
+    }
   };
 
   if (error) {

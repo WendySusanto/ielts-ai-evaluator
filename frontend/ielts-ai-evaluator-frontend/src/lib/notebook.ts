@@ -60,11 +60,16 @@ export function shuffle<T>(items: readonly T[]): T[] {
 
 export const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
 
-/** Reads a word aloud with the browser's own voice — British English, as in the exam. */
+/** Reads text aloud with the browser's own voice — British English, as in the exam. */
 export function speak(text: string) {
   if (!canSpeak) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "en-GB";
-  window.speechSynthesis.speak(utterance);
+  // One utterance per sentence: Chrome's online voices stop mid-utterance after ~15s, which
+  // cut a band 7 sample answer off halfway. speak() queues, so the sentences play in order.
+  const segments = new Intl.Segmenter("en", { granularity: "sentence" }).segment(text);
+  for (const { segment } of segments) {
+    const utterance = new SpeechSynthesisUtterance(segment);
+    utterance.lang = "en-GB";
+    window.speechSynthesis.speak(utterance);
+  }
 }

@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "check:lexical": "node --experimental-strip-types --no-warnings src/lib/lexical.check.ts",
-    "check:notebook": "node --experimental-strip-types --no-warnings src/lib/notebook.check.ts",
-    "check:speaking-feedback": "node --experimental-strip-types --no-warnings src/lib/speaking-feedback.check.ts",
+    "check:lexical": "node --experimental-strip-types --no-warnings src/checks/lexical.check.ts",
+    "check:notebook": "node --experimental-strip-types --no-warnings src/checks/notebook.check.ts",
+    "check:speaking-feedback": "node --experimental-strip-types --no-warnings src/checks/speaking-feedback.check.ts",
     "preview": "vite preview"
   },
   "engines": {
@@ -28,7 +28,6 @@
     "@radix-ui/react-tabs": "^1.1.12",
     "@radix-ui/react-tooltip": "^1.2.7",
     "@tailwindcss/vite": "^4.1.11",
-    "axios": "^1.11.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "^12.1.0",

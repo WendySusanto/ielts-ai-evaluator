@@ -1,4 +1,5 @@
 import { SaveWordButton } from "@/components/notebook/SaveWordButton";
+import { SpeakButton } from "@/components/notebook/SpeakButton";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Notebook } from "@/hooks/use-notebook";
@@ -76,6 +77,9 @@ export function VocabularyCard({
                 />
                 <span className="text-foreground">
                   <Highlighted text={item.improved} phrase={item.phrase} />
+                </span>
+                <span className="-my-1.5 shrink-0">
+                  <SpeakButton text={item.improved} />
                 </span>
               </p>
             </li>

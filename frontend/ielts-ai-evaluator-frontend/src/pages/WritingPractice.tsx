@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { formatText } from "@/lib/utils";
 import type { WritingEvaluationDto } from "@/types/evaluation";
 import WritingPrompt from "@/types/WritingPrompt";
@@ -98,13 +99,6 @@ const WritingPractice = () => {
   const { data: writingPrompt = null, isLoading: isLoadingPrompts } =
     useApi<WritingPrompt>(`/api/writing-prompts/${taskId}`);
 
-  const { mutate } = useApi<WritingEvaluationDto>(
-    "/api/v2/writing/evaluations",
-    {
-      skipInitialFetch: true,
-    },
-  );
-
   const navigate = useNavigate();
 
   const [essay, setEssay] = useState("");
@@ -161,24 +155,18 @@ const WritingPractice = () => {
     if (belowMinimum || isSubmitting || !writingPrompt) return;
     setIsSubmitting(true);
 
-    await mutate({
-      url: "/api/v2/writing/evaluations",
-      method: "POST",
-      data: {
+    try {
+      const result = await api.post<WritingEvaluationDto>("/api/v2/writing/evaluations", {
         writingPromptId: writingPrompt.writingPromptId,
         essayText: essay,
-      },
-      onSuccess: (result) => {
-        setIsSubmitting(false);
-        if (draftKey) localStorage.removeItem(draftKey);
-        toast.success("Essay analyzed successfully!");
-        navigate(`/feedback/${result.writingEvaluationId}`);
-      },
-      onError: (error) => {
-        setIsSubmitting(false);
-        toast.error(`Error analyzing essay: ${error.message}`);
-      },
-    });
+      });
+      if (draftKey) localStorage.removeItem(draftKey);
+      toast.success("Essay analyzed successfully!");
+      navigate(`/feedback/${result.writingEvaluationId}`);
+    } catch (error) {
+      toast.error(`Error analyzing essay: ${(error as Error).message}`);
+    }
+    setIsSubmitting(false);
   };
 
   if (isLoadingPrompts) {

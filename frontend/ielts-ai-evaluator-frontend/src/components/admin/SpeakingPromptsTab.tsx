@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { Edit, Plus } from "lucide-react";
 import { SpeakingPrompt, SpeakingPromptUpsertRequest } from "@/types/Speaking";
 import { useApi } from "@/hooks/use-api";
+import { api } from "@/lib/api";
 import { useSortedRows } from "@/hooks/use-sorted-rows";
 import { SortableHead } from "./SortableHead";
 import { SpeakingPromptForm } from "./SpeakingPromptForm";
@@ -46,28 +47,19 @@ export const SpeakingPromptsTab = () => {
     refetch,
   } = useApi<SpeakingPrompt[]>("/api/speaking-prompts?includeInactive=true");
 
-  // Separate hook instance for the upsert: mutate overwrites its hook's data
-  // with the POST response (a single prompt), which would poison the list
-  // that useSortedRows spreads.
-  const { mutate } = useApi<SpeakingPrompt>("", { skipInitialFetch: true });
-
   const { sorted, key, dir, toggle } = useSortedRows(prompts ?? [], "topic");
 
   const handleUpsert = async (data: SpeakingPromptUpsertRequest) => {
-    await mutate({
-      url: "/api/speaking-prompts",
-      method: "POST",
-      data,
-      onSuccess: () => {
-        toast.success(
-          data.speakingPromptId ? "Speaking prompt updated" : "Speaking prompt created",
-        );
-        setEditing(undefined);
-        refetch();
-      },
-      onError: (err) =>
-        toast.error("Failed to save speaking prompt", { description: err.message }),
-    });
+    try {
+      await api.post("/api/speaking-prompts", data);
+      toast.success(
+        data.speakingPromptId ? "Speaking prompt updated" : "Speaking prompt created",
+      );
+      setEditing(undefined);
+      refetch();
+    } catch (err) {
+      toast.error("Failed to save speaking prompt", { description: (err as Error).message });
+    }
   };
 
   if (error) {

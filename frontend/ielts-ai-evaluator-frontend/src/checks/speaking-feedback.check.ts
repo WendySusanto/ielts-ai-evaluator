@@ -1,6 +1,6 @@
 // Same setup as lexical.check.ts: `npm run check:speaking-feedback`.
 import assert from "node:assert/strict";
-import { matchAnswersToTurns, groupByCategory } from "./speaking-feedback.ts";
+import { matchAnswersToTurns, groupByCategory } from "../lib/speaking-feedback.ts";
 
 // Answers are numbered by candidate turn, skipping examiner turns — the numbers SpeakingService
 // writes into the transcript it sends to Gemini.

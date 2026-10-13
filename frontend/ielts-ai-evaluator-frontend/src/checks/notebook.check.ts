@@ -1,6 +1,6 @@
 // Same setup as lexical.check.ts: `npm run check:notebook`.
 import assert from "node:assert/strict";
-import { cardFront, findPhrase, shuffle } from "./notebook.ts";
+import { cardFront, findPhrase, shuffle } from "../lib/notebook.ts";
 
 // Case-insensitive, and stretches over an inflection.
 assert.deepEqual(findPhrase("It Exacerbates the problem.", "exacerbate"), [
