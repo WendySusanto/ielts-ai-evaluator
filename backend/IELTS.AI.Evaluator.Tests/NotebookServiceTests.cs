@@ -196,4 +196,83 @@ public class NotebookServiceTests
         await Assert.ThrowsAsync<ValidationException>(() => svc.SuggestAsync(word));
         Assert.Equal(0, gemini.Calls);
     }
+
+    [Fact]
+    public async Task Create_NewWord_StartsInBoxZero_DueNow()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+
+        var entry = await svc.CreateAsync(Alice, Create());
+
+        Assert.Equal(0, entry.Box);
+        Assert.True(entry.DueAt <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task Review_Correct_MovesUpOneBox_AndSchedulesByThatBoxsInterval()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+        var entry = await svc.CreateAsync(Alice, Create());
+
+        for (var box = 0; box < NotebookService.IntervalDays.Length; box++)
+        {
+            var days = NotebookService.IntervalDays[box];
+            var before = DateTime.UtcNow;
+            entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+
+            Assert.Equal(box + 1, entry.Box);
+            Assert.InRange(entry.DueAt, before.AddDays(days), DateTime.UtcNow.AddDays(days));
+            Assert.False(entry.Mastered);
+        }
+    }
+
+    [Fact]
+    public async Task Review_CorrectFromLastBox_MastersTheWord()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+        var entry = await svc.CreateAsync(Alice, Create());
+        for (var i = 0; i < NotebookService.IntervalDays.Length; i++)
+            entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+
+        entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+
+        Assert.True(entry.Mastered);
+    }
+
+    [Fact]
+    public async Task Review_Wrong_SendsWordBackToBoxZero_DueNow()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+        var entry = await svc.CreateAsync(Alice, Create());
+        entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+        entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+
+        entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: false);
+
+        Assert.Equal(0, entry.Box);
+        Assert.True(entry.DueAt <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task Update_Unmastering_RestartsTheSchedule()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+        var entry = await svc.CreateAsync(Alice, Create());
+        entry = await svc.ReviewAsync(Alice, entry.NotebookEntryId, correct: true);
+        await svc.UpdateAsync(Alice, entry.NotebookEntryId, new NotebookUpdateRequest(entry.Word, null, null, true));
+
+        var updated = await svc.UpdateAsync(Alice, entry.NotebookEntryId, new NotebookUpdateRequest(entry.Word, null, null, false));
+
+        Assert.Equal(0, updated.Box);
+        Assert.True(updated.DueAt <= DateTime.UtcNow);
+    }
+
+    [Fact]
+    public async Task Review_OtherUsersEntry_ThrowsNotFound()
+    {
+        var svc = new NotebookService(NewDb(), NoGemini);
+        var entry = await svc.CreateAsync(Alice, Create());
+
+        await Assert.ThrowsAsync<NotFoundException>(() => svc.ReviewAsync(Bob, entry.NotebookEntryId, correct: true));
+    }
 }

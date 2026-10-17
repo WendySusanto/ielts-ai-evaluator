@@ -72,6 +72,21 @@ export function useNotebook() {
     [setData],
   );
 
+  /** Records one flashcard answer; the server moves the word between Leitner boxes. */
+  const review = useCallback(
+    async (id: string, correct: boolean) => {
+      try {
+        const entry = await api.post<NotebookEntry>(`${URL}/${id}/review`, { correct });
+        setData((prev) => prev?.map((e) => (e.notebookEntryId === id ? entry : e)) ?? null);
+        return entry;
+      } catch (e) {
+        showError(e);
+        return null;
+      }
+    },
+    [setData],
+  );
+
   /** Deletes straight away and offers Undo, instead of asking first: a mis-click costs a tap. */
   const remove = useCallback(
     async (entry: NotebookEntry) => {
@@ -102,7 +117,7 @@ export function useNotebook() {
     [save, update, setData],
   );
 
-  return { entries: data ?? [], isLoading, error, refetch, find, save, update, remove };
+  return { entries: data ?? [], isLoading, error, refetch, find, save, update, review, remove };
 }
 
 export type Notebook = ReturnType<typeof useNotebook>;

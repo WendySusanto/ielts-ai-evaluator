@@ -18,6 +18,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNotebook } from "@/hooks/use-notebook";
+import { daysUntilNextDue, dueEntries } from "@/lib/notebook";
 import { getRelativeTime } from "@/lib/utils";
 import type { NotebookEntry, NotebookSource } from "@/types/notebook";
 import ErrorPage from "./ErrorPage";
@@ -69,6 +70,9 @@ const Notebook = () => {
 
   const { entries } = notebook;
   const learning = entries.filter((e) => !e.mastered);
+  const now = new Date();
+  const due = dueEntries(entries, now);
+  const nextIn = daysUntilNextDue(entries, now);
   const q = query.trim().toLowerCase();
   const visible = entries.filter(
     (e) =>
@@ -109,9 +113,13 @@ const Notebook = () => {
             <Plus />
             Add word
           </Button>
-          <Button onClick={() => setReviewing(true)} disabled={learning.length === 0}>
+          <Button onClick={() => setReviewing(true)} disabled={due.length === 0}>
             <GraduationCap />
-            Review{learning.length > 0 && ` (${learning.length})`}
+            {due.length > 0
+              ? `Review (${due.length} due)`
+              : nextIn != null
+                ? `Next review in ${nextIn} ${nextIn === 1 ? "day" : "days"}`
+                : "Review"}
           </Button>
         </div>
       </div>
@@ -170,7 +178,7 @@ const Notebook = () => {
               {q || source !== "all"
                 ? "No words match your search."
                 : tab === "mastered"
-                  ? "No mastered words yet — mark one in review or tick it below."
+                  ? "No mastered words yet — a word graduates after six correct reviews, or tick one below."
                   : "Everything here is mastered. Nice work!"}
             </p>
           ) : (
@@ -266,7 +274,7 @@ const Notebook = () => {
         />
       )}
       {reviewing && (
-        <ReviewDialog entries={learning} notebook={notebook} onClose={() => setReviewing(false)} />
+        <ReviewDialog entries={due} notebook={notebook} onClose={() => setReviewing(false)} />
       )}
     </div>
   );

@@ -262,7 +262,7 @@ public class WritingServiceTests
 
         var errorRequired = root.GetProperty("properties").GetProperty("errors").GetProperty("items").GetProperty("required")
             .EnumerateArray().Select(e => e.GetString()).ToList();
-        Assert.Equal(new[] { "quote", "correction", "rule" }, errorRequired);
+        Assert.Equal(new[] { "quote", "correction", "category", "rule" }, errorRequired);
 
         var upgradeRequired = root.GetProperty("properties").GetProperty("vocabularyUpgrades").GetProperty("items").GetProperty("required")
             .EnumerateArray().Select(e => e.GetString()).ToList();
@@ -281,6 +281,19 @@ public class WritingServiceTests
         Assert.Equal(
             new[] { "TaskAchievement", "TaskResponse", "CoherenceCohesion", "LexicalResource", "GrammaticalRangeAccuracy" },
             name.GetProperty("enum").EnumerateArray().Select(e => e.GetString()).ToArray());
+    }
+
+    /// <summary>Writing errors share the speaking categories, plus the two only writing has, so the
+    /// dashboard can count a learner's mistakes across both skills.</summary>
+    [Fact]
+    public void GeminiSchema_PinsErrorCategoriesWithAnEnum()
+    {
+        using var doc = JsonDocument.Parse(WritingFeedbackPrompts.GeminiSchema);
+        var category = doc.RootElement.GetProperty("properties").GetProperty("errors")
+            .GetProperty("items").GetProperty("properties").GetProperty("category");
+        Assert.Equal(
+            new[] { "tense", "article", "agreement", "preposition", "word form", "word choice", "plural", "word order", "spelling", "punctuation", "other" },
+            category.GetProperty("enum").EnumerateArray().Select(e => e.GetString()).ToArray());
     }
 
     /// <summary>The scoring call thinks at the configured level and gets the long, final timeout.

@@ -10,6 +10,7 @@
     "check:lexical": "node --experimental-strip-types --no-warnings src/checks/lexical.check.ts",
     "check:notebook": "node --experimental-strip-types --no-warnings src/checks/notebook.check.ts",
     "check:speaking-feedback": "node --experimental-strip-types --no-warnings src/checks/speaking-feedback.check.ts",
+    "check:writing-feedback": "node --experimental-strip-types --no-warnings src/checks/writing-feedback.check.ts",
     "preview": "vite preview"
   },
   "engines": {

@@ -1,14 +1,17 @@
+import { Fragment } from "react";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useApi } from "@/hooks/use-api";
 import { useNotebook } from "@/hooks/use-notebook";
 import { SaveWordButton } from "@/components/notebook/SaveWordButton";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BandScore } from "@/components/feedback/BandScore";
 import { CriterionCard } from "@/components/feedback/CriterionCard";
 import { DetailedFeedbackSkeleton } from "@/components/skeleton/DetailedFeedbackSkeleton";
 import type { WritingEvaluationDetail } from "@/types/evaluation";
+import { annotate } from "@/lib/writing-feedback";
 import ErrorPage from "./ErrorPage";
 
 const TASK_LABELS: Record<string, string> = {
@@ -51,6 +54,7 @@ const DetailedFeedback = () => {
   const { feedback } = evaluationData;
   const hasVocabUpgrades = feedback.vocabularyUpgrades.length > 0;
   const hasImprovedExcerpt = feedback.improvedExcerpt.trim().length > 0;
+  const segments = annotate(evaluationData.essayText, feedback.errors.map((e) => e.quote));
 
   return (
     <div className="space-y-6">
@@ -113,26 +117,58 @@ const DetailedFeedback = () => {
         <CardContent className="space-y-6">
           {/* Capped measure: the card runs to 1152px, well past a readable line. */}
           <div className="max-w-[68ch] whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {evaluationData.essayText}
+            {segments.map((s, i) =>
+              s.error === undefined ? (
+                <Fragment key={i}>{s.text}</Fragment>
+              ) : (
+                // A link, not a tooltip: it works on touch, and the fix stays written in one place.
+                <a
+                  key={i}
+                  href={`#correction-${s.error + 1}`}
+                  className="rounded-sm bg-destructive/10 underline decoration-destructive decoration-wavy underline-offset-4 hover:bg-destructive/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {s.text}
+                  <sup aria-hidden="true" className="ml-0.5 font-semibold text-destructive">
+                    {s.error + 1}
+                  </sup>
+                  <span className="sr-only">, see correction {s.error + 1}</span>
+                </a>
+              ),
+            )}
           </div>
 
           {feedback.errors.length > 0 && (
             <div className="space-y-3 border-t border-border pt-4">
               <h3 className="text-sm font-semibold">Corrections</h3>
-              {/* ponytail: a matched-quote list is v1 of annotation; true inline
-                  highlighting of the essay text above is deferred until we need it */}
-              <ul className="space-y-3">
+              <ol className="space-y-3">
                 {feedback.errors.map((err, i) => (
-                  <li key={i} className="text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="line-through text-destructive">{err.quote}</span>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <span className="text-primary font-medium">{err.correction}</span>
+                  // scroll-mt clears the 64px sticky header when a mark jumps here.
+                  <li
+                    key={i}
+                    id={`correction-${i + 1}`}
+                    className="flex gap-3 rounded-md text-sm scroll-mt-20 target:bg-destructive/10"
+                  >
+                    <span className="w-5 shrink-0 text-right font-semibold tabular-nums text-muted-foreground">
+                      {i + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="line-through text-destructive">{err.quote}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-primary font-medium">{err.correction}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {err.category && (
+                          <Badge variant="secondary" className="mr-2 capitalize">
+                            {err.category}
+                          </Badge>
+                        )}
+                        {err.rule}
+                      </p>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">{err.rule}</p>
                   </li>
                 ))}
-              </ul>
+              </ol>
             </div>
           )}
         </CardContent>

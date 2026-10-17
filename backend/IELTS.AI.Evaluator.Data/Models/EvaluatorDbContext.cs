@@ -90,6 +90,8 @@ namespace IELTS.AI.Evaluator.Data.Models
                 e.Property(x => x.Replaces).HasMaxLength(100);
                 e.Property(x => x.Level).HasMaxLength(10);
                 e.Property(x => x.Source).HasMaxLength(10);
+                // Words that existed before scheduling become due the moment the column is added.
+                e.Property(x => x.DueAt).HasDefaultValueSql("NOW()");
                 e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Cascade);
                 e.HasIndex(x => new { x.UserId, x.CreatedAt });
             });

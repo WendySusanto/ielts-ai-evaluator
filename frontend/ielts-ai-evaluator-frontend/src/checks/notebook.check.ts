@@ -1,6 +1,6 @@
 // Same setup as lexical.check.ts: `npm run check:notebook`.
 import assert from "node:assert/strict";
-import { cardFront, findPhrase, shuffle } from "../lib/notebook.ts";
+import { cardFront, daysUntilNextDue, dueEntries, findPhrase, shuffle } from "../lib/notebook.ts";
 
 // Case-insensitive, and stretches over an inflection.
 assert.deepEqual(findPhrase("It Exacerbates the problem.", "exacerbate"), [
@@ -49,5 +49,17 @@ assert.deepEqual(cardFront({ word: "ubiquitous", example: "Phones are everywhere
 const input = [1, 2, 3, 4, 5];
 assert.deepEqual([...shuffle(input)].sort(), [1, 2, 3, 4, 5]);
 assert.deepEqual(input, [1, 2, 3, 4, 5]);
+
+// Review schedule: only unmastered words whose time has come; the wait rounds up to whole days.
+const now = new Date("2026-10-18T12:00:00Z");
+const words = [
+  { id: "due", mastered: false, dueAt: "2026-10-18T11:00:00Z" },
+  { id: "now", mastered: false, dueAt: "2026-10-18T12:00:00Z" },
+  { id: "later", mastered: false, dueAt: "2026-10-20T06:00:00Z" },
+  { id: "mastered", mastered: true, dueAt: "2026-10-01T00:00:00Z" },
+];
+assert.deepEqual(dueEntries(words, now).map((w) => w.id), ["due", "now"]);
+assert.equal(daysUntilNextDue(words.slice(2), now), 2); // 1.75 days away
+assert.equal(daysUntilNextDue([words[3]], now), null); // nothing left to learn
 
 console.log("notebook: ok");

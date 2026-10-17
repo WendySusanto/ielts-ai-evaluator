@@ -19,5 +19,10 @@ namespace IELTS.AI.Evaluator.Data.Models
         public string Source { get; set; } = default!;
         public Guid? SourceId { get; set; }
         public bool Mastered { get; set; }
+        /// <summary>Leitner box: 0 for a new or just-missed word, one up per correct review.
+        /// See NotebookService.IntervalDays.</summary>
+        public int Box { get; set; }
+        /// <summary>When the word next comes up for review. New and missed words are due at once.</summary>
+        public DateTime DueAt { get; set; } = DateTime.UtcNow;
     }
 }

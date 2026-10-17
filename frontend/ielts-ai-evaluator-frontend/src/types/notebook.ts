@@ -14,6 +14,10 @@ export interface NotebookEntry {
   /** The session it was saved from; null for manual entries. */
   sourceId: string | null;
   mastered: boolean;
+  /** Leitner box: 0 for new or just-missed words, one up per correct review. */
+  box: number;
+  /** When the word next comes up for review (ISO, UTC). */
+  dueAt: string;
   createdAt: string;
 }
 

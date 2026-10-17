@@ -58,6 +58,23 @@ export function shuffle<T>(items: readonly T[]): T[] {
   return out;
 }
 
+interface Scheduled {
+  mastered: boolean;
+  dueAt: string;
+}
+
+/** Words still being learned whose review has come round. */
+export function dueEntries<T extends Scheduled>(entries: readonly T[], now: Date): T[] {
+  return entries.filter((e) => !e.mastered && Date.parse(e.dueAt) <= now.getTime());
+}
+
+/** Whole days, rounded up, until the next word still being learned comes due; null if none is. */
+export function daysUntilNextDue(entries: readonly Scheduled[], now: Date): number | null {
+  const times = entries.filter((e) => !e.mastered).map((e) => Date.parse(e.dueAt));
+  if (times.length === 0) return null;
+  return Math.max(0, Math.ceil((Math.min(...times) - now.getTime()) / 86_400_000));
+}
+
 export const canSpeak = typeof window !== "undefined" && "speechSynthesis" in window;
 
 /** Reads text aloud with the browser's own voice — British English, as in the exam. */

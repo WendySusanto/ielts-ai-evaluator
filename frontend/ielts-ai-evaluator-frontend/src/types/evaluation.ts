@@ -14,6 +14,8 @@ export interface WritingError {
   quote: string;
   correction: string;
   rule: string;
+  /** e.g. "article", "spelling"; null/absent on essays marked before categories existed. */
+  category?: string | null;
 }
 
 /** A word/phrase from the essay paired with a stronger alternative. */

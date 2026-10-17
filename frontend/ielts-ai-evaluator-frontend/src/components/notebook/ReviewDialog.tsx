@@ -77,8 +77,9 @@ function Back({ entry }: { entry: NotebookEntry }) {
   );
 }
 
-/** Flashcards over the words still being learned, in random order. "Mastered" saves straight
- * away; "Still learning" keeps the word for the next round. */
+/** Flashcards over the words due for review, in random order. "Got it" moves a word up a Leitner
+ * box (mastering it from the last one); "Still learning" sends it back to the first box and keeps
+ * it for another round. */
 export function ReviewDialog({
   entries,
   notebook,
@@ -91,7 +92,8 @@ export function ReviewDialog({
   const [deck, setDeck] = useState(() => shuffle(entries));
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
-  const [masteredIds, setMasteredIds] = useState<Set<string>>(new Set());
+  const [knownIds, setKnownIds] = useState<Set<string>>(new Set());
+  const [busy, setBusy] = useState(false);
 
   const current = deck[index];
   const next = () => {
@@ -99,22 +101,23 @@ export function ReviewDialog({
     setIndex((i) => i + 1);
   };
 
-  const markMastered = async () => {
-    const saved = await notebook.update(current.notebookEntryId, {
-      word: current.word,
-      meaning: current.meaning,
-      example: current.example,
-      mastered: true,
-    });
-    if (!saved) return;
-    setMasteredIds((ids) => new Set(ids).add(current.notebookEntryId));
-    next();
+  const answer = async (correct: boolean) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const saved = await notebook.review(current.notebookEntryId, correct);
+      if (!saved) return;
+      if (correct) setKnownIds((ids) => new Set(ids).add(current.notebookEntryId));
+      next();
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const stillLearning = deck.filter((e) => !masteredIds.has(e.notebookEntryId));
+  const stillLearning = deck.filter((e) => !knownIds.has(e.notebookEntryId));
   const again = () => {
     setDeck(shuffle(stillLearning));
-    setMasteredIds(new Set());
+    setKnownIds(new Set());
     setIndex(0);
   };
 
@@ -137,10 +140,12 @@ export function ReviewDialog({
             </div>
             {revealed ? (
               <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="outline" onClick={next}>
+                <Button variant="outline" onClick={() => answer(false)} disabled={busy}>
                   Still learning
                 </Button>
-                <Button onClick={markMastered}>Mastered</Button>
+                <Button onClick={() => answer(true)} disabled={busy}>
+                  Got it
+                </Button>
               </div>
             ) : (
               <div className="flex justify-end">
@@ -153,7 +158,7 @@ export function ReviewDialog({
         ) : (
           <div className="space-y-4">
             <p>
-              {masteredIds.size} mastered · {stillLearning.length} still learning
+              {knownIds.size} got right · {stillLearning.length} still learning
             </p>
             <div className="flex flex-wrap justify-end gap-2">
               <Button variant="outline" onClick={onClose}>

@@ -8,8 +8,9 @@ public record WritingCriterion(
     List<string> Examples,
     List<string> Improvements);
 
-/// <summary>A specific grammar/vocabulary/spelling mistake, quoted verbatim from the essay.</summary>
-public record WritingError(string Quote, string Correction, string Rule);
+/// <summary>A specific grammar/vocabulary/spelling mistake, quoted verbatim from the essay. Category is
+/// null on essays marked before it existed: feedback is jsonb read back through this record.</summary>
+public record WritingError(string Quote, string Correction, string Rule, string? Category = null);
 
 /// <summary>A word/phrase from the essay paired with a stronger alternative.</summary>
 public record VocabularyUpgrade(string Original, string Upgrade, string Context);
@@ -88,12 +89,17 @@ public static class WritingFeedbackPrompts
                             ""type"": ""STRING"",
                             ""description"": ""The same phrase or sentence, corrected.""
                         },
+                        ""category"": {
+                            ""type"": ""STRING"",
+                            ""enum"": [""tense"", ""article"", ""agreement"", ""preposition"", ""word form"", ""word choice"", ""plural"", ""word order"", ""spelling"", ""punctuation"", ""other""],
+                            ""description"": ""The kind of mistake; 'other' only when none of the rest fits.""
+                        },
                         ""rule"": {
                             ""type"": ""STRING"",
                             ""description"": ""The grammar, spelling, or usage rule that was broken, explained simply enough for a learner to apply it elsewhere.""
                         }
                     },
-                    ""required"": [""quote"", ""correction"", ""rule""]
+                    ""required"": [""quote"", ""correction"", ""category"", ""rule""]
                 }
             },
             ""vocabularyUpgrades"": {
@@ -148,8 +154,8 @@ Follow these rules when producing the response:
   copy-pasted from the essay text, not paraphrased) that justify the score, both when praising strengths
   and when flagging weaknesses.
 - For every entry in errors, quote the exact erroneous phrase from the essay verbatim, give the corrected
-  version, and explain the underlying rule simply enough that the candidate can apply it to a different
-  sentence next time.
+  version, name its category, and explain the underlying rule simply enough that the candidate can apply
+  it to a different sentence next time.
 - For every entry in vocabularyUpgrades, quote the original word or phrase and its surrounding sentence
   verbatim from the essay, then suggest a natural, higher-band alternative that would fit in that exact
   sentence.

@@ -63,6 +63,18 @@ public class Notebook
         return new OkObjectResult(entry);
     }
 
+    [Function("Notebook_Review")]
+    public async Task<IActionResult> ReviewAsync(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v2/notebook/{id:guid}/review")] HttpRequest req,
+        FunctionContext context,
+        Guid id)
+    {
+        var body = await new StreamReader(req.Body).ReadToEndAsync();
+        var request = JsonSerializer.Deserialize<NotebookReviewRequest>(body, Web)!;
+        var entry = await _service.ReviewAsync(context.GetUserId()!.Value, id, request.Correct);
+        return new OkObjectResult(entry);
+    }
+
     [Function("Notebook_Delete")]
     public async Task<IActionResult> DeleteAsync(
         [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "v2/notebook/{id:guid}")] HttpRequest req,

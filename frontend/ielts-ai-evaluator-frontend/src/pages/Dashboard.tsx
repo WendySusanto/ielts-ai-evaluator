@@ -1,5 +1,6 @@
 import { DashboardSkeleton } from "@/components/skeleton/DashboardSkeleton";
 import { BandTrendCard } from "@/components/dashboard/BandTrendCard";
+import { FocusCard } from "@/components/dashboard/FocusCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { friendlyError } from "@/lib/friendly-error";
 import { getRelativeTime } from "@/lib/utils";
 import { DashboardData } from "@/types/dashboard";
 import type { User } from "@/types/User";
-import { BookOpen, CalendarDays, Clock, Mic, PenTool } from "lucide-react";
+import { BookMarked, BookOpen, CalendarDays, Clock, Mic, PenTool } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import ErrorPage from "./ErrorPage";
 
@@ -178,6 +179,19 @@ const Dashboard = () => {
                   {writingCount} writing · {speakingCount} speaking evaluations
                 </p>
               )}
+
+              {dashboardData.wordsDue > 0 && (
+                <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <BookMarked className="h-4 w-4 shrink-0" />
+                  <Link
+                    to="/notebook"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    {dashboardData.wordsDue} {dashboardData.wordsDue === 1 ? "word" : "words"} due
+                    for review
+                  </Link>
+                </p>
+              )}
             </div>
 
             <div className="flex flex-col gap-3 md:w-56 md:shrink-0">
@@ -193,6 +207,10 @@ const Dashboard = () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* What to practise next. Guarded: the SPA and the API deploy from separate workflows, so
+          the old API can briefly answer without focus. */}
+      {dashboardData.focus && <FocusCard focus={dashboardData.focus} />}
 
       {/* Progress over time */}
       <BandTrendCard

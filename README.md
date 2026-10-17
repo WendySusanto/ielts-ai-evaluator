@@ -25,9 +25,13 @@ A candidate picks a prompt and either writes an essay or holds a spoken conversa
 
 Source: [`WritingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/WritingService.cs), [`SpeakingService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/SpeakingService.cs), [`GeminiStructuredClient.cs`](backend/IELTS.AI.Evaluator.Functions/Services/GeminiStructuredClient.cs)
 
-**Vocabulary notebook.** Every vocabulary upgrade in writing and speaking feedback has a bookmark that saves it to a per-user notebook, together with the sentence the candidate actually wrote or said and the weaker word it replaces. Words can also be added by hand: **Fill with AI** asks Gemini whether the word is real English, returns the likely intended spelling if it isn't, and otherwise drafts a meaning, an example sentence and a CEFR level for the candidate to edit. Browsers expose no dictionary API, so that one call doubles as the spelling check, with the browser's own spellcheck underlining typos as they're typed. Flashcard review quizzes each word from its own context: "a stronger word for *very big*" over the candidate's own sentence, or a manual word blanked out of its example.
+**Vocabulary notebook.** Every vocabulary upgrade in writing and speaking feedback has a bookmark that saves it to a per-user notebook, together with the sentence the candidate actually wrote or said and the weaker word it replaces. Words can also be added by hand: **Fill with AI** asks Gemini whether the word is real English, returns the likely intended spelling if it isn't, and otherwise drafts a meaning, an example sentence and a CEFR level for the candidate to edit. Browsers expose no dictionary API, so that one call doubles as the spelling check, with the browser's own spellcheck underlining typos as they're typed. Flashcard review quizzes each word from its own context: "a stronger word for *very big*" over the candidate's own sentence, or a manual word blanked out of its example. Review is scheduled with Leitner boxes. A word answered correctly comes back after 1, 3, 7, 14 and then 30 days and is mastered on the next correct answer, while a missed word starts over. The Review button offers only the words that are due, and the dashboard says when some are.
 
 Source: [`NotebookService.cs`](backend/IELTS.AI.Evaluator.Functions/Services/NotebookService.cs), [`WordSuggestion.cs`](backend/IELTS.AI.Evaluator.Functions/DTOs/WordSuggestion.cs), [`Notebook.tsx`](frontend/ielts-ai-evaluator-frontend/src/pages/Notebook.tsx), [`notebook.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/notebook.ts)
+
+**Focus areas.** The dashboard reads the last ten writing and ten speaking evaluations back out of their stored feedback and names the criterion pulling each skill down most, with the latest advice the examiner model wrote for it. Task Achievement and Task Response are averaged as one, and Azure's pronunciation band counts when there was audio. It also lists the mistake categories that came up at least twice, each with its most recent example. Nothing is generated for it: there is no Gemini call, only the jsonb that is already there. Writing errors carry the same categories as speaking ones, plus spelling and punctuation, so the two skills count together. Essays marked before that field existed contribute bands but no mistakes. On the writing feedback page, every error is marked where it sits in the essay and numbered to its correction. Quotes are matched verbatim apart from whitespace, and one the model reworded stays in the list unmarked.
+
+Source: [`FocusAreas.cs`](backend/IELTS.AI.Evaluator.Functions/Services/FocusAreas.cs), [`FocusCard.tsx`](frontend/ielts-ai-evaluator-frontend/src/components/dashboard/FocusCard.tsx), [`writing-feedback.ts`](frontend/ielts-ai-evaluator-frontend/src/lib/writing-feedback.ts)
 
 ---
 
@@ -115,6 +119,7 @@ cd frontend/ielts-ai-evaluator-frontend
 npm run check:lexical
 npm run check:notebook
 npm run check:speaking-feedback
+npm run check:writing-feedback
 ```
 
 The database ships with no seed prompts. Register, then promote yourself with

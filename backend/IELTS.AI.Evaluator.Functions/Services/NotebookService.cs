@@ -10,14 +10,18 @@ public record NotebookCreateRequest(string Word, string? Meaning, string? Exampl
 
 public record NotebookUpdateRequest(string Word, string? Meaning, string? Example, bool Mastered);
 
+public record NotebookReviewRequest(bool Correct);
+
 public record NotebookEntryDto(Guid NotebookEntryId, string Word, string? Meaning, string? Example,
-    string? Replaces, string? Level, string Source, Guid? SourceId, bool Mastered, DateTime CreatedAt);
+    string? Replaces, string? Level, string Source, Guid? SourceId, bool Mastered, DateTime CreatedAt,
+    int Box, DateTime DueAt);
 
 public interface INotebookService
 {
     Task<List<NotebookEntryDto>> ListAsync(Guid userId);
     Task<NotebookEntryDto> CreateAsync(Guid userId, NotebookCreateRequest request);
     Task<NotebookEntryDto> UpdateAsync(Guid userId, Guid id, NotebookUpdateRequest request);
+    Task<NotebookEntryDto> ReviewAsync(Guid userId, Guid id, bool correct);
     Task DeleteAsync(Guid userId, Guid id);
     Task<WordSuggestion> SuggestAsync(string word, CancellationToken ct = default);
 }
@@ -25,6 +29,10 @@ public interface INotebookService
 public class NotebookService : INotebookService
 {
     private static readonly string[] Sources = ["Manual", "Writing", "Speaking"];
+
+    /// <summary>Leitner intervals: days until the next review after a correct answer from box 0, 1, ...
+    /// A correct answer from the box past the last one masters the word: six in a row, about 55 days.</summary>
+    public static readonly int[] IntervalDays = [1, 3, 7, 14, 30];
 
     private readonly EvaluatorDbContext _db;
     private readonly IGeminiStructuredClient _gemini;
@@ -84,7 +92,35 @@ public class NotebookService : INotebookService
         entry.Word = word;
         entry.Meaning = Optional(request.Meaning, "Meaning", 500);
         entry.Example = Optional(request.Example, "Example", 500);
+        // Taking a word out of Mastered puts it back at the start of the schedule.
+        if (entry.Mastered && !request.Mastered)
+        {
+            entry.Box = 0;
+            entry.DueAt = DateTime.UtcNow;
+        }
         entry.Mastered = request.Mastered;
+        await _db.SaveChangesAsync();
+        return ToDto(entry);
+    }
+
+    /// <summary>Scored on the server clock, like everything else that decides progress.</summary>
+    public async Task<NotebookEntryDto> ReviewAsync(Guid userId, Guid id, bool correct)
+    {
+        var entry = await GetOwnedAsync(userId, id);
+        if (!correct)
+        {
+            entry.Box = 0;
+            entry.DueAt = DateTime.UtcNow;
+        }
+        else if (entry.Box >= IntervalDays.Length)
+        {
+            entry.Mastered = true;
+        }
+        else
+        {
+            entry.DueAt = DateTime.UtcNow.AddDays(IntervalDays[entry.Box]);
+            entry.Box++;
+        }
         await _db.SaveChangesAsync();
         return ToDto(entry);
     }
@@ -132,5 +168,5 @@ public class NotebookService : INotebookService
     }
 
     private static NotebookEntryDto ToDto(NotebookEntry n) => new(n.NotebookEntryId, n.Word, n.Meaning,
-        n.Example, n.Replaces, n.Level, n.Source, n.SourceId, n.Mastered, n.CreatedAt);
+        n.Example, n.Replaces, n.Level, n.Source, n.SourceId, n.Mastered, n.CreatedAt, n.Box, n.DueAt);
 }
