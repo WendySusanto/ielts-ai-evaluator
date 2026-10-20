@@ -1,5 +1,6 @@
 // src/pages/Login.tsx
 import { LogoMark } from "@/components/AppSidebar";
+import { DisclaimerNote, SiteFooter } from "@/components/Disclaimer";
 import { GoogleIcon } from "@/components/GoogleIcon";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -132,23 +133,21 @@ export default function Login() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <div className="flex flex-col items-center gap-2">
+      <Link to="/welcome" className="flex flex-col items-center gap-2">
         <LogoMark size={40} />
         <span className="text-xl font-semibold text-foreground">
-          When IELTS?
+          When Band 7?
         </span>
-      </div>
+      </Link>
 
       <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1 pb-4">
+        <CardHeader className="space-y-3 pb-4">
           <CardTitle asChild>
             <h1 className="text-center text-3xl font-bold text-primary">
               Welcome back
             </h1>
           </CardTitle>
-          <p className="text-center text-muted-foreground">
-            Sign in to continue
-          </p>
+          <DisclaimerNote />
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Social Sign In */}
@@ -300,6 +299,7 @@ export default function Login() {
           </p>
         </CardContent>
       </Card>
+      <SiteFooter />
     </div>
   );
 }

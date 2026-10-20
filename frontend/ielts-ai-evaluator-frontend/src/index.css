@@ -54,7 +54,7 @@
      Without it those render light over the dark palette. */
   color-scheme: light;
 
-  /* When IELTS? light: warm cream canvas, white cards, teal primary, orange tips */
+  /* When Band 7? light: warm cream canvas, white cards, teal primary, orange tips */
   --background: oklch(0.977 0.008 84);
   --foreground: oklch(0.25 0.02 240);
   --card: oklch(1 0 0);

@@ -14,6 +14,7 @@ import { useLocation, useNavigate } from "react-router";
 import { signOut } from "firebase/auth";
 import { auth as authFirebase } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { SiteFooter } from "./Disclaimer";
 
 // Route → header title. First matching prefix wins; "/" is exact.
 const TITLES: [string, string][] = [
@@ -118,6 +119,7 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       <div className="flex-1 w-full max-w-6xl mx-auto px-4 md:px-8 py-8">
         {children}
       </div>
+      <SiteFooter />
     </div>
   );
 }

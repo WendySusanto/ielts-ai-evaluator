@@ -28,7 +28,7 @@ export const PrivateRoute = ({
           </span>
         </div>
         <span className="text-xl font-semibold text-foreground">
-          When IELTS?
+          When Band 7?
         </span>
         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
           Signing you in
@@ -42,7 +42,15 @@ export const PrivateRoute = ({
         </div>
       </div>
     );
-  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
+  // The site root opens on the public landing page; deep links go straight to sign-in.
+  if (!user)
+    return (
+      <Navigate
+        to={location.pathname === "/" ? "/welcome" : "/login"}
+        state={{ from: location }}
+        replace
+      />
+    );
   if (requireAdmin && role.toLowerCase() !== "admin") {
     return <Navigate to="/" replace />;
   }

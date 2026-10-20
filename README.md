@@ -1,6 +1,8 @@
-# When IELTS?
+# When Band 7?
 
 Scores IELTS writing and speaking practice against the official band descriptors and returns criterion-by-criterion feedback, built for self-studying test candidates who need to know where they actually stand.
+
+> Independent practice tool. Not affiliated with or endorsed by IELTS, IDP, British Council or Cambridge. The site opens on a public landing page that says so before any sign-in form, and the same line sits under the sign-in and sign-up titles and in every page footer ([`Disclaimer.tsx`](frontend/ielts-ai-evaluator-frontend/src/components/Disclaimer.tsx)).
 
 [LIVE DEMO](https://orange-desert-0c2792e00.3.azurestaticapps.net/)
 

@@ -1,4 +1,4 @@
-# Deployment Checklist — When IELTS?
+# Deployment Checklist — When Band 7?
 
 Prep reference for the first production deployment. Nothing here provisions anything.
 

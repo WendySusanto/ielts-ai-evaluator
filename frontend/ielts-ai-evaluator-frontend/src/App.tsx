@@ -10,6 +10,7 @@ import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import DetailedFeedback from "./pages/DetailedFeedback";
 import FeedbackHistory from "./pages/FeedbackHistory";
+import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Notebook from "./pages/Notebook";
@@ -30,7 +31,8 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Routes>
-            {/* Auth Routes */}
+            {/* Public Routes */}
+            <Route path="/welcome" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             {/* Main Application Routes */}

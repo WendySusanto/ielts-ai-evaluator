@@ -131,7 +131,7 @@ export function AppSidebar() {
             {!collapsed && (
               <div className="min-w-0">
                 <h2 className="font-semibold text-lg leading-tight truncate">
-                  When IELTS?
+                  When Band 7?
                 </h2>
                 <p className="text-xs tracking-widest text-muted-foreground truncate">
                   LEARN · SPEAK · WRITE
