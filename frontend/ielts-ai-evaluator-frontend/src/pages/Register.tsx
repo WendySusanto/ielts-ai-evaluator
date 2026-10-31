@@ -9,29 +9,11 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
 } from "firebase/auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Eye,
-  EyeOff,
-  Loader2,
-  Mail,
-  Lock,
-  UserPlus,
-  User,
-  Check,
-  X,
-} from "lucide-react";
-import { LogoMark } from "@/components/AppSidebar";
-import { DisclaimerNote, SiteFooter } from "@/components/Disclaimer";
+import { Loader2, Check, X } from "lucide-react";
+import { AuthInput, AuthShell, PasswordInput } from "@/components/AuthShell";
 import { GoogleIcon } from "@/components/GoogleIcon";
 
 // Simple email regex for client-side validation
@@ -140,8 +122,6 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   // Which sign-up is in flight, so only that button shows a spinner.
   const [pending, setPending] = useState<"email" | "google" | null>(null);
@@ -246,261 +226,149 @@ export default function Register() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <Link to="/welcome" className="flex flex-col items-center gap-2">
-        <LogoMark size={40} />
-        <span className="text-xl font-semibold text-foreground">
-          When Band 7?
-        </span>
-      </Link>
+    <AuthShell title="Create account">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={handleGoogle}
+        className="h-12 w-full rounded-full bg-card font-semibold"
+      >
+        {pending === "google" ? (
+          <Loader2 className="animate-spin" />
+        ) : (
+          <GoogleIcon />
+        )}
+        Continue with Google
+      </Button>
 
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-3 pb-4">
-          <CardTitle asChild>
-            <h1 className="text-center text-3xl font-bold text-primary">
-              Create Account
-            </h1>
-          </CardTitle>
-          <DisclaimerNote />
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Social Sign Up */}
-          <div className="space-y-3">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              onClick={handleGoogle}
-              className="w-full"
-            >
-              {pending === "google" ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
-              <span>Continue with Google</span>
-            </Button>
-            <div className="flex items-center gap-2">
-              <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <Separator className="flex-1" />
-            </div>
-          </div>
+      <div className="my-6 flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="text-sm text-muted-foreground">or with email</span>
+        <Separator className="flex-1" />
+      </div>
 
-          <form onSubmit={handleEmailSignUp} className="space-y-4" noValidate>
-            {/* Display Name Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="displayName"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Full Name
-              </label>
-              <div className="relative">
-                <User className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="displayName"
-                  type="text"
-                  autoComplete="name"
-                  disabled={busy}
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder="Your name"
-                  className="pl-10"
-                  aria-invalid={error?.field === "displayName"}
-                  aria-describedby={error ? "register-error" : undefined}
-                  required
-                  minLength={2}
-                />
-              </div>
-            </div>
+      <form onSubmit={handleEmailSignUp} className="space-y-5" noValidate>
+        <div className="space-y-2">
+          <label htmlFor="displayName" className="text-sm font-medium text-foreground">
+            Full name
+          </label>
+          <AuthInput
+            id="displayName"
+            type="text"
+            autoComplete="name"
+            disabled={busy}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Your name"
+            aria-invalid={error?.field === "displayName"}
+            aria-describedby={error ? "register-error" : undefined}
+            required
+            minLength={2}
+          />
+        </div>
 
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  disabled={busy}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="pl-10"
-                  aria-invalid={error?.field === "email"}
-                  aria-describedby={error ? "register-error" : undefined}
-                  required
-                />
-              </div>
-            </div>
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-medium text-foreground">
+            Email
+          </label>
+          <AuthInput
+            id="email"
+            type="email"
+            autoComplete="email"
+            disabled={busy}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            aria-invalid={error?.field === "email"}
+            aria-describedby={error ? "register-error" : undefined}
+            required
+          />
+        </div>
 
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  disabled={busy}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-10 pr-11"
-                  aria-invalid={error?.field === "password"}
-                  aria-describedby={error ? "register-error" : undefined}
-                  required
-                  minLength={8}
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((s) => !s)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="text-xs">
-                    {showPassword ? "Hide password" : "Show password"}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <PasswordStrength password={password} />
-            </div>
+        <div className="space-y-2">
+          <label htmlFor="password" className="text-sm font-medium text-foreground">
+            Password
+          </label>
+          <PasswordInput
+            id="password"
+            autoComplete="new-password"
+            disabled={busy}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error?.field === "password"}
+            aria-describedby={error ? "register-error" : undefined}
+            required
+            minLength={8}
+          />
+          <PasswordStrength password={password} />
+        </div>
 
-            {/* Confirm Password Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="confirmPassword"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Confirm Password
-              </label>
-              <div className="relative">
-                <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  autoComplete="new-password"
-                  disabled={busy}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-10 pr-11"
-                  aria-invalid={
-                    error?.field === "confirmPassword" ||
-                    (!!confirmPassword && password !== confirmPassword)
-                  }
-                  aria-describedby="confirmPassword-hint"
-                  required
-                  minLength={8}
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmPassword((s) => !s)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      aria-label={
-                        showConfirmPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="text-xs">
-                    {showConfirmPassword ? "Hide password" : "Show password"}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-              <p
-                id="confirmPassword-hint"
-                className="text-xs text-destructive empty:hidden"
-                aria-live="polite"
-              >
-                {confirmPassword && password !== confirmPassword
-                  ? "Passwords do not match"
-                  : ""}
-              </p>
-            </div>
-
-            {/* Remember Me */}
-            <div className="flex items-center justify-between gap-4">
-              <label
-                htmlFor="remember"
-                className="flex items-center gap-2 text-sm cursor-pointer select-none"
-              >
-                <Checkbox
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  disabled={busy}
-                  id="remember"
-                />
-                <span className="text-foreground font-medium">Remember me</span>
-              </label>
-              <Link
-                to="/login"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Have an account?
-              </Link>
-            </div>
-
-            {error && (
-              <div
-                id="register-error"
-                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2"
-                role="alert"
-                aria-live="assertive"
-              >
-                {error.message}
-              </div>
-            )}
-
-            <Button type="submit" disabled={busy} className="w-full font-semibold">
-              {pending === "email" ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <UserPlus />
-              )}
-              Create Account
-            </Button>
-          </form>
-
-          <p className="text-xs text-center text-muted-foreground leading-relaxed">
-            By creating an account, you agree to our terms and privacy policy.
-            <span className="mx-1 font-medium">Remember me</span> controls
-            session persistence.
+        <div className="space-y-2">
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">
+            Confirm password
+          </label>
+          <PasswordInput
+            id="confirmPassword"
+            autoComplete="new-password"
+            disabled={busy}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            aria-invalid={
+              error?.field === "confirmPassword" ||
+              (!!confirmPassword && password !== confirmPassword)
+            }
+            aria-describedby="confirmPassword-hint"
+            required
+            minLength={8}
+          />
+          <p
+            id="confirmPassword-hint"
+            className="text-xs text-destructive empty:hidden"
+            aria-live="polite"
+          >
+            {confirmPassword && password !== confirmPassword
+              ? "Passwords do not match"
+              : ""}
           </p>
-        </CardContent>
-      </Card>
-      <SiteFooter />
-    </div>
+        </div>
+
+        <label
+          htmlFor="remember"
+          className="flex w-fit cursor-pointer select-none items-center gap-2.5 text-sm"
+        >
+          <Checkbox
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            disabled={busy}
+            id="remember"
+          />
+          <span className="text-foreground">Remember me</span>
+        </label>
+
+        {error && (
+          <div
+            id="register-error"
+            className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+            aria-live="assertive"
+          >
+            {error.message}
+          </div>
+        )}
+
+        <Button type="submit" disabled={busy} className="h-12 w-full rounded-full font-semibold">
+          {pending === "email" && <Loader2 className="animate-spin" />}
+          Create account
+        </Button>
+      </form>
+
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        Already have an account?{" "}
+        <Link to="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

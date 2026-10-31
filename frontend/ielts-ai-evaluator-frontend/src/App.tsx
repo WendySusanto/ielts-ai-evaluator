@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AppSidebar } from "./components/AppSidebar";
 import MainLayout from "./components/MainLayout";
 import { PrivateRoute } from "./components/PrivateRoute";
@@ -10,7 +10,6 @@ import Admin from "./pages/Admin";
 import Dashboard from "./pages/Dashboard";
 import DetailedFeedback from "./pages/DetailedFeedback";
 import FeedbackHistory from "./pages/FeedbackHistory";
-import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Notebook from "./pages/Notebook";
@@ -32,7 +31,8 @@ function App() {
           <Toaster />
           <Routes>
             {/* Public Routes */}
-            <Route path="/welcome" element={<Landing />} />
+            {/* ponytail: the old landing page's URL, kept so saved links still reach sign-in */}
+            <Route path="/welcome" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             {/* Main Application Routes */}

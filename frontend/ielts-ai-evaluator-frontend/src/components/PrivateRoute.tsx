@@ -42,15 +42,8 @@ export const PrivateRoute = ({
         </div>
       </div>
     );
-  // The site root opens on the public landing page; deep links go straight to sign-in.
-  if (!user)
-    return (
-      <Navigate
-        to={location.pathname === "/" ? "/welcome" : "/login"}
-        state={{ from: location }}
-        replace
-      />
-    );
+  // Signed-out visitors always land on sign-in, which carries the app's pitch and disclaimer.
+  if (!user) return <Navigate to="/login" state={{ from: location }} replace />;
   if (requireAdmin && role.toLowerCase() !== "admin") {
     return <Navigate to="/" replace />;
   }

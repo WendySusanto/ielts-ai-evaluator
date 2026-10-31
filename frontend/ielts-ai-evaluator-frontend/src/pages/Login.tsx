@@ -1,23 +1,15 @@
 // src/pages/Login.tsx
-import { LogoMark } from "@/components/AppSidebar";
-import { DisclaimerNote, SiteFooter } from "@/components/Disclaimer";
+import { AuthInput, AuthShell, PasswordInput } from "@/components/AuthShell";
 import { GoogleIcon } from "@/components/GoogleIcon";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
 } from "firebase/auth";
-import { Eye, EyeOff, KeyRound, Loader2, Lock, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -51,14 +43,14 @@ const mapAuthError = (code: string): AuthError => {
 };
 
 export default function Login() {
-  const { signIn, signInWithGoogle, user, loading } = useAuth();
+  const { signIn, signInWithGoogle, sendPasswordReset, user, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true); // default checked for convenience
-  // Which sign-in is in flight, so only that button shows a spinner.
-  const [pending, setPending] = useState<"email" | "google" | null>(null);
+  // Which request is in flight, so only that button shows a spinner.
+  const [pending, setPending] = useState<"email" | "google" | "reset" | null>(null);
   const [error, setError] = useState<AuthError | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
   const from =
@@ -76,6 +68,7 @@ export default function Login() {
 
   const validate = (): boolean => {
     setError(null);
+    setNotice(null);
     if (!email) {
       setError({ field: "email", message: "Email is required." });
       return false;
@@ -115,6 +108,7 @@ export default function Login() {
 
   const handleGoogle = async () => {
     setError(null);
+    setNotice(null);
     try {
       setPending("google");
       // Google sign-in uses LOCAL to persist unless user unchecks remember
@@ -131,175 +125,147 @@ export default function Login() {
     }
   };
 
+  // Sends the reset link to whatever is typed in Email, so there is no separate page to build.
+  const handleForgotPassword = async () => {
+    setError(null);
+    setNotice(null);
+    const address = email.trim();
+    if (!emailRegex.test(address)) {
+      setError({
+        field: "email",
+        message: "Enter your email above, then tap Forgot password.",
+      });
+      return;
+    }
+    // Same answer whether or not the address has an account, so the form can't be used to probe.
+    const sent = `If ${address} has an account, a password reset link is on its way. Check your inbox.`;
+    try {
+      setPending("reset");
+      await sendPasswordReset(address);
+      setNotice(sent);
+    } catch (err) {
+      const code = authErrorCode(err);
+      if (code === "auth/user-not-found") setNotice(sent);
+      else setError(mapAuthError(code));
+    } finally {
+      setPending(null);
+    }
+  };
+
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 p-6">
-      <Link to="/welcome" className="flex flex-col items-center gap-2">
-        <LogoMark size={40} />
-        <span className="text-xl font-semibold text-foreground">
-          When Band 7?
-        </span>
-      </Link>
+    <AuthShell title="Sign in">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={busy}
+        onClick={handleGoogle}
+        className="h-12 w-full rounded-full bg-card font-semibold"
+      >
+        {pending === "google" ? (
+          <Loader2 className="animate-spin" />
+        ) : (
+          <GoogleIcon />
+        )}
+        Continue with Google
+      </Button>
 
-      <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-3 pb-4">
-          <CardTitle asChild>
-            <h1 className="text-center text-3xl font-bold text-primary">
-              Welcome back
-            </h1>
-          </CardTitle>
-          <DisclaimerNote />
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Social Sign In */}
-          <div className="space-y-3">
-            <Button
+      <div className="my-6 flex items-center gap-3">
+        <Separator className="flex-1" />
+        <span className="text-sm text-muted-foreground">or with email</span>
+        <Separator className="flex-1" />
+      </div>
+
+      <form onSubmit={handleEmailSignIn} className="space-y-5" noValidate>
+        <div className="space-y-2">
+          <label htmlFor="email" className="text-sm font-medium text-foreground">
+            Email
+          </label>
+          <AuthInput
+            id="email"
+            type="email"
+            autoComplete="email"
+            disabled={busy}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            aria-invalid={error?.field === "email"}
+            aria-describedby={error ? "login-error" : undefined}
+            required
+          />
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="password" className="text-sm font-medium text-foreground">
+              Password
+            </label>
+            <button
               type="button"
-              variant="outline"
+              onClick={handleForgotPassword}
               disabled={busy}
-              onClick={handleGoogle}
-              className="w-full"
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:opacity-50"
             >
-              {pending === "google" ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <GoogleIcon />
-              )}
-              <span>Continue with Google</span>
-            </Button>
-            <div className="flex items-center gap-2">
-              <Separator className="flex-1" />
-              <span className="text-xs text-muted-foreground">or</span>
-              <Separator className="flex-1" />
-            </div>
+              {pending === "reset" && <Loader2 className="size-3.5 animate-spin" />}
+              Forgot password?
+            </button>
           </div>
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            disabled={busy}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={error?.field === "password"}
+            aria-describedby={error ? "login-error" : undefined}
+            required
+            minLength={6}
+          />
+        </div>
 
-          <form onSubmit={handleEmailSignIn} className="space-y-5" noValidate>
-            {/* Email Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="email"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  disabled={busy}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="pl-10"
-                  aria-invalid={error?.field === "email"}
-                  aria-describedby={error ? "login-error" : undefined}
-                  required
-                />
-              </div>
-            </div>
+        <label
+          htmlFor="remember"
+          className="flex w-fit cursor-pointer select-none items-center gap-2.5 text-sm"
+        >
+          <Checkbox
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+            disabled={busy}
+            id="remember"
+          />
+          <span className="text-foreground">Remember me</span>
+        </label>
 
-            {/* Password Field */}
-            <div className="space-y-1.5">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium text-card-foreground"
-              >
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  disabled={busy}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-10 pr-11"
-                  aria-invalid={error?.field === "password"}
-                  aria-describedby={error ? "login-error" : undefined}
-                  required
-                  minLength={6}
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((s) => !s)}
-                      className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-card-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                      aria-label={
-                        showPassword ? "Hide password" : "Show password"
-                      }
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="text-xs">
-                    {showPassword ? "Hide password" : "Show password"}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+        {error && (
+          <div
+            id="login-error"
+            className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            role="alert"
+            aria-live="assertive"
+          >
+            {error.message}
+          </div>
+        )}
+        {notice && (
+          <div
+            className="rounded-xl border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-foreground"
+            role="status"
+          >
+            {notice}
+          </div>
+        )}
 
-            {/* Remember Me */}
-            <div className="flex items-center justify-between gap-4">
-              <label
-                htmlFor="remember"
-                className="flex items-center gap-2 text-sm cursor-pointer select-none"
-              >
-                <Checkbox
-                  checked={remember}
-                  onChange={(e) => setRemember(e.target.checked)}
-                  disabled={busy}
-                  id="remember"
-                />
-                <span className="text-foreground font-medium">Remember me</span>
-              </label>
-              <Link
-                to="/register"
-                className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Create account
-              </Link>
-            </div>
+        <Button type="submit" disabled={busy} className="h-12 w-full rounded-full font-semibold">
+          {pending === "email" && <Loader2 className="animate-spin" />}
+          Sign in
+        </Button>
+      </form>
 
-            {error && (
-              <div
-                id="login-error"
-                className="text-sm rounded-md border border-destructive/40 bg-destructive/10 text-destructive px-3 py-2"
-                role="alert"
-                aria-live="assertive"
-              >
-                {error.message}
-              </div>
-            )}
-
-            <Button type="submit" disabled={busy} className="w-full font-semibold">
-              {pending === "email" ? (
-                <Loader2 className="animate-spin" />
-              ) : (
-                <KeyRound />
-              )}
-              Sign In
-            </Button>
-          </form>
-
-          <p className="text-xs text-center text-muted-foreground leading-relaxed">
-            This site uses cookies only for authentication persistence when you
-            select
-            <span className="mx-1 font-medium">Remember me</span>. No tracking
-            cookies.
-          </p>
-        </CardContent>
-      </Card>
-      <SiteFooter />
-    </div>
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        New here?{" "}
+        <Link to="/register" className="font-semibold text-primary underline-offset-4 hover:underline">
+          Create a free account
+        </Link>
+      </p>
+    </AuthShell>
   );
 }
