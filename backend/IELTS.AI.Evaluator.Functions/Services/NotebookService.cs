@@ -133,10 +133,8 @@ public class NotebookService : INotebookService
         await _db.SaveChangesAsync();
     }
 
-    /// <summary>Checks the spelling of a word the learner typed and drafts its meaning and example.
-    /// Nothing is saved — the learner edits the draft before adding it.</summary>
-    // ponytail: no usage row, unlike ExaminerTurnUsage. A lookup is a few hundred tokens and the
-    // rate limit caps it at 60/hour per user; record usage if this spend ever needs to be visible.
+    /// <summary>Spell-checks a typed word and drafts its meaning and example; nothing is saved.</summary>
+    // ponytail: no usage row (a few hundred tokens, capped at 60/hour); add one if the spend matters.
     public async Task<WordSuggestion> SuggestAsync(string word, CancellationToken ct = default)
     {
         var result = await _gemini.GenerateAsync<WordSuggestion>(

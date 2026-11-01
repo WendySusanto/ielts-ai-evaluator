@@ -18,16 +18,8 @@ public record GeminiPart(string? Text, string? MimeType = null, byte[]? Data = n
 
 public interface IGeminiStructuredClient
 {
-    /// <summary>Calls Gemini generateContent with responseMimeType=application/json and the given
-    /// responseSchema (Gemini schema JSON as a string), deserializing the reply into T. Retries
-    /// transient rejections; see <see cref="GeminiStructuredClient.RetryDelays"/>. A non-null
-    /// thinkingBudget (Gemini 2.5 style; 0 turns thinking off) or thinkingLevel (Gemini 3 style:
-    /// "low" | "medium" | "high") is sent as thinkingConfig; with neither, the model default applies.
-    /// A non-blank endpoint replaces the configured one, which is how the examiner turn reaches a
-    /// different model than scoring does — the model name is part of the URL. Blank or null keeps
-    /// GeminiApiEndpoint. A non-null timeout replaces the default 45s per attempt and is final when it
-    /// fires (a <see cref="TimeoutException"/>, never a retry): it is for slow, expensive calls, where
-    /// a second attempt pays for a second generation and outlives the Functions host's 230s HTTP limit.</summary>
+    /// <summary>Gemini call with a JSON responseSchema, deserialized into T; retries transient errors.
+    /// Optional thinking config, endpoint (picks the model) and timeout (default 45s, never retried).</summary>
     Task<GeminiResult<T>> GenerateAsync<T>(string systemInstruction, string userContent, string responseSchemaJson,
         CancellationToken ct = default, int? thinkingBudget = null, string? endpoint = null,
         string? thinkingLevel = null, TimeSpan? timeout = null);
@@ -43,28 +35,22 @@ public class GeminiStructuredClient : IGeminiStructuredClient
 {
     private static readonly JsonSerializerOptions CamelCase = new(JsonSerializerDefaults.Web);
 
-    /// <summary>Gemini answers 429 (quota) and 503 (model overloaded) routinely under load, and
-    /// both clear on their own within seconds — so a single attempt turns a vendor hiccup into a
-    /// lost evaluation. Every other status is deterministic (400 schema, 401/403 key), and
-    /// retrying those only makes the user wait longer for the same failure.</summary>
-    // ponytail: fixed backoff, no jitter, Retry-After header ignored. One request per user action,
-    // so there is no thundering herd to spread out — add jitter if evaluations ever run in batches.
+    /// <summary>Only 429/503 are retried: they clear in seconds; anything else just fails again.
+    /// ponytail: fixed backoff, no jitter — add jitter if evaluations ever run in batches.</summary>
     internal static readonly TimeSpan[] RetryDelays = [TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3)];
 
     /// <summary>Per-attempt limit for ordinary calls. Retried like any other hiccup, so the worst
     /// case is 45+1+45+3+45 ≈ 139s — inside the Functions host's 230s HTTP limit.</summary>
     internal static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(45);
 
-    /// <summary>For the two scoring calls. A whole essay or spoken session at a high thinking level
-    /// can take well over a minute; 150s still leaves room for one quick 429/503 retry inside the
-    /// Functions host's 230s HTTP limit.</summary>
+    /// <summary>For the two scoring calls: long enough for a slow high-thinking call, short enough to fit
+    /// one 429/503 retry inside the host's 230s HTTP limit.</summary>
     public static readonly TimeSpan ScoringTimeout = TimeSpan.FromSeconds(150);
 
     private static readonly string[] ThinkingLevels = ["low", "medium", "high"];
 
-    /// <summary>Reads a thinking-level setting. Anything outside the three levels — a typo, or
-    /// "minimal", which gemini-3.8-flash rejects with a 400 — comes back null, so the call omits
-    /// thinkingConfig and runs at the model default instead of failing every evaluation.</summary>
+    /// <summary>Parses a thinking level. Anything but low/medium/high (a typo, or "minimal", which
+    /// 3.8-flash rejects) returns null, so the call uses the model default instead of failing.</summary>
     public static string? ThinkingLevelSetting(string? configured)
     {
         var level = configured?.Trim().ToLowerInvariant();
@@ -74,10 +60,8 @@ public class GeminiStructuredClient : IGeminiStructuredClient
     private static bool IsTransient(HttpStatusCode status) =>
         status is HttpStatusCode.TooManyRequests or HttpStatusCode.ServiceUnavailable;
 
-    /// <summary>The 45s per-attempt timeout surfaces as TaskCanceledException, and a dropped
-    /// connection as HttpRequestException — both are the same kind of vendor hiccup as a 503 and
-    /// used to end a whole evaluation on the first occurrence. A cancellation the caller actually
-    /// asked for is not transient, so ct is checked before retrying.</summary>
+    /// <summary>Timeouts and dropped connections are transient like a 503 — but a cancellation the caller
+    /// asked for is not, so ct is checked first.</summary>
     private static bool IsTransient(Exception ex, CancellationToken ct) =>
         !ct.IsCancellationRequested && ex is HttpRequestException or TaskCanceledException;
 

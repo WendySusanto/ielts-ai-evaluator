@@ -3,13 +3,8 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace IELTS.AI.Evaluator.Data.Models
 {
-    /// <summary>
-    /// Design-time factory used by the EF Core CLI tools (dotnet ef migrations ...).
-    /// At runtime the DbContext is configured via dependency injection in the
-    /// Functions host, so the connection string here only needs to be valid enough
-    /// for the provider to scaffold migrations. It reads from the DbConnectionString
-    /// environment variable when present, otherwise falls back to a local default.
-    /// </summary>
+    /// <summary>Design-time factory for the `dotnet ef` CLI only; at runtime the DbContext comes from DI.
+    /// Reads the DbConnectionString env var, else a local default.</summary>
     public class EvaluatorDbContextFactory : IDesignTimeDbContextFactory<EvaluatorDbContext>
     {
         public EvaluatorDbContext CreateDbContext(string[] args)

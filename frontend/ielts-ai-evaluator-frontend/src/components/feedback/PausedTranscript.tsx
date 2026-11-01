@@ -3,17 +3,14 @@ import {
   parseLexicalTranscript,
 } from "@/lib/lexical";
 
-// A pause is drawn, not printed, so it has to be wide enough to notice and narrow enough not to
-// push the words around. Clamped, because a 12-second silence should read as "very long", not
-// as a bar that breaks the bubble.
+// Pause bar width: wide enough to notice, narrow enough not to shove the words; clamped so a
+// 12s silence doesn't break the bubble.
 const MIN_BAR_PX = 10;
 const MAX_BAR_PX = 72;
 const PX_PER_SECOND = 14;
 
-/** One candidate answer as it was actually recognized: no punctuation, no tidied-up false
- * starts, and every silence over a second drawn as a bar. Red once a pause passes
- * LONG_PAUSE_SECONDS, green below it. The colour never carries the meaning on its own — each
- * bar states its length in a label, for screen readers and on hover. */
+/** One answer as recognized (no punctuation or tidying), each pause over 1s drawn as a bar: red
+ * past LONG_PAUSE_SECONDS, green below, and labelled for screen readers. */
 export function PausedTranscript({ lexical }: { lexical: string }) {
   return (
     <p className="text-sm leading-7 text-muted-foreground">

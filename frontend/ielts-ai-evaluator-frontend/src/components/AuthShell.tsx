@@ -1,6 +1,5 @@
-// src/components/AuthShell.tsx — the split sign-in / sign-up layout. Signed-out visitors land here
-// directly, so the brand panel does the job the old landing page did: what the app is, and the
-// disclaimer before any form.
+// Split sign-in / sign-up layout. Signed-out visitors land here, so the brand panel replaces the
+// old landing page: what the app is, plus the disclaimer.
 import { LogoMark } from "@/components/AppSidebar";
 import { DISCLAIMER } from "@/components/Disclaimer";
 import { Input } from "@/components/ui/input";

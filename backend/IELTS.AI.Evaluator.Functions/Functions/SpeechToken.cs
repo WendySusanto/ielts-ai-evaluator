@@ -7,9 +7,8 @@ using Microsoft.Azure.Functions.Worker;
 
 namespace IELTS.AI.Evaluator.Functions.Functions;
 
-/// <summary>v2 Azure Speech token endpoint. Thin: no try/catch — missing configuration
-/// surfaces as InvalidOperationException, which the exception middleware maps to a bare
-/// 500 (message logged there, not exposed on the wire).</summary>
+/// <summary>v2 Azure Speech token endpoint. No try/catch: missing config throws, and the exception
+/// middleware turns it into a bare 500.</summary>
 public class SpeechToken
 {
     private readonly ISpeechTokenService _service;
@@ -28,11 +27,8 @@ public class SpeechToken
     {
         var dto = await _service.GetTokenAsync(context.CancellationToken);
 
-        // Audit, not business logic — the token works directly against Azure, so this row is the
-        // only trace that this user could spend. Written after the token is issued so a failed
-        // Azure call doesn't leave a phantom entry, and deliberately not swallowed: an audit that
-        // fails silently is worse than a failed request. No cancellation token for the same reason:
-        // once a spendable token has left the building, the audit row has to land.
+        // Audit row: written after the token is issued, never swallowed or cancelled — once a spendable
+        // token has left, this is the only trace that this user could spend.
         _db.SpeechTokenIssues.Add(new SpeechTokenIssue { UserId = context.GetUserId()!.Value });
         await _db.SaveChangesAsync(CancellationToken.None);
 

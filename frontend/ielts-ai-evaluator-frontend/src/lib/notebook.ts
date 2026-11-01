@@ -2,10 +2,8 @@
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Splits `text` around the first case-insensitive occurrence of `phrase` as [before, match,
- * after]. The trailing \w* stretches the match over an inflection ("exacerbate" → "exacerbates").
- * ponytail: irregular forms ("take a toll" → "took a toll") are not found; callers fall back to
- * the plain text. Match on a lemma list if that happens often enough to matter. */
+/** Splits `text` around the first case-insensitive `phrase` as [before, match, after]; \w* catches
+ * inflections. ponytail: irregular forms ("took a toll") aren't found; callers show plain text. */
 export function findPhrase(text: string, phrase: string): [string, string, string] | null {
   const trimmed = phrase.trim();
   if (!trimmed) return null;
@@ -25,10 +23,8 @@ interface CardSource {
   replaces?: string | null;
 }
 
-/** What the front of a review card asks. The back always shows the word itself.
- * - upgrade: saved from feedback — the learner's own sentence with the weak word marked.
- * - cloze: a manual word whose example contains it — the example with the word blanked.
- * - word: nothing to quiz from — the word, to recall its meaning. */
+/** Card front (the back shows the word): "upgrade" marks the weak word in the learner's sentence,
+ * "cloze" blanks the word in its example, "word" just asks for its meaning. */
 export type CardFront =
   | { kind: "upgrade"; sentence: string; parts: [string, string, string] | null; replaces: string }
   | { kind: "cloze"; parts: [string, string, string]; hint: string | null }

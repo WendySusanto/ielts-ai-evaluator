@@ -213,9 +213,8 @@ public class SpeakingServiceTests
         Assert.Contains("Raw recognition", gemini.LastUserContent);
     }
 
-    /// <summary>answers[].answer points back into this numbering, so an answer without raw
-    /// recognition (typed, or from before a resume) still takes its number — otherwise every later
-    /// answer's feedback would land on the wrong turn.</summary>
+    /// <summary>answers[].answer indexes this numbering, so an answer without raw recognition still
+    /// takes its number — otherwise later feedback lands on the wrong turn.</summary>
     [Fact]
     public async Task Evaluate_NumbersAnswersInOrder_InBothRenderings()
     {
@@ -379,9 +378,8 @@ public class SpeakingServiceTests
         Assert.Null(evaluation.Error);
     }
 
-    /// <summary>The page learns about a failure from the poll, not from the (possibly long gone)
-    /// request, so the failure has to be written down — and the request still fails for anyone still
-    /// waiting on it.</summary>
+    /// <summary>The page learns of a failure from the poll, so it must be written down — and the
+    /// request still fails for anyone waiting on it.</summary>
     [Fact]
     public async Task Evaluate_GeminiFails_MarksTheEvaluationFailed_AndRethrows()
     {
@@ -947,10 +945,8 @@ public class SpeakingServiceTests
         Assert.Equal(new[] { "phrase", "level", "replaces", "original", "improved" }, vocabularyRequired);
     }
 
-    /// <summary>Without a temperature pin, a description saying "one of exactly" is a request, not a
-    /// rule: two of three live runs came back with "Lexical Resource" and "Grammatical Range and
-    /// Accuracy" instead of the keys the feedback screen looks up. An enum is enforced by structured
-    /// output, so every fixed-vocabulary field is pinned with one.</summary>
+    /// <summary>A description saying "one of exactly" is only a request — live runs returned other keys.
+    /// Structured output enforces an enum, so every fixed-vocabulary field uses one.</summary>
     [Fact]
     public void GeminiSchema_PinsFixedVocabulariesWithEnums()
     {
@@ -967,9 +963,8 @@ public class SpeakingServiceTests
             Enum(properties.GetProperty("errors").GetProperty("items").GetProperty("properties").GetProperty("category")));
     }
 
-    /// <summary>propertyOrdering is what makes Gemini write the evidence before the band. A property
-    /// it leaves out or misspells silently loses that ordering, so every object in the schema must
-    /// list exactly its own properties.</summary>
+    /// <summary>propertyOrdering makes Gemini write evidence before the band; a missing or misspelled
+    /// entry silently drops it, so each object must list exactly its own properties.</summary>
     [Fact]
     public void GeminiSchema_PropertyOrdering_ListsEveryPropertyExactlyOnce()
     {
@@ -996,9 +991,8 @@ public class SpeakingServiceTests
                 yield return child;
     }
 
-    /// <summary>The scoring call thinks at the configured level and gets the long, final timeout.
-    /// Asserted on this service, not only the client, because the requirement is that THIS call
-    /// sends them.</summary>
+    /// <summary>The scoring call uses the configured thinking level and the long, final timeout —
+    /// asserted on this service because THIS call must send them.</summary>
     [Fact]
     public async Task Evaluate_UsesConfiguredThinkingLevel_AndScoringTimeout()
     {

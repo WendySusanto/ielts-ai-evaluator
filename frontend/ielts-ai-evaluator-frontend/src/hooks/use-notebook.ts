@@ -28,9 +28,8 @@ const toCreateRequest = (e: NotebookEntry): NotebookCreateRequest => ({
   sourceId: e.sourceId,
 });
 
-/** The user's notebook plus the mutations that keep it in sync. Call once per page and pass the
- * result down; every mutation patches the loaded list rather than refetching it.
- * Mutations report their own errors as toasts and resolve to null on failure. */
+/** The notebook plus mutations that patch the loaded list (no refetch). Call once per page and pass
+ * it down; mutations toast their own errors and resolve to null on failure. */
 export function useNotebook() {
   const { data, isLoading, error, refetch, setData } = useApi<NotebookEntry[]>(URL);
 

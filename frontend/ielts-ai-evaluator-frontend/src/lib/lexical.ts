@@ -7,20 +7,16 @@ const TICKS_PER_MS = 10_000;
 // Tune against real marked sessions before trusting the band it feeds.
 const PAUSE_THRESHOLD_MS = 1000;
 
-/** One recognized word with its absolute position in the session's audio. Azure rebases each
- * segment's offsets onto the whole stream, so gaps *between* segments fall out of the same
- * arithmetic as gaps within one — and those are the long silences that matter most. */
+/** A recognized word at its absolute position in the session audio, so gaps between segments —
+ * the long silences that matter most — come out of the same arithmetic. */
 export interface TimedWord {
   Word: string;
   Offset: number;
   Duration: number;
 }
 
-/** Renders one candidate turn as Azure's raw lexical text with [pause N.Ns] markers inserted
- * wherever two words sit at least PAUSE_THRESHOLD_MS apart. A recognizer's display text is
- * auto-punctuated, with false starts and repetitions tidied away — which quietly flatters the
- * candidate's grammar and erases every hesitation. This is what they actually said, and where
- * they stopped. It travels alongside the display text so the model can compare the two. */
+/** A candidate turn as Azure's raw lexical text, with [pause N.Ns] where words sit ≥ PAUSE_THRESHOLD_MS
+ * apart. Display text hides hesitations and flatters grammar; this goes beside it to compare. */
 export function buildLexicalTranscript(words: TimedWord[]): string {
   const parts: string[] = [];
   let prevEnd: number | null = null;
@@ -35,19 +31,16 @@ export function buildLexicalTranscript(words: TimedWord[]): string {
   return parts.join(" ");
 }
 
-/** Seconds from the first word's start to the last word's end — pauses inside the answer count,
- * the thinking time before its first word does not. The server divides words by this to get the
- * speech rate, so it stays a raw measurement here. 0 when nothing was recognized. */
+/** Seconds from the first word's start to the last word's end (inner pauses count, lead-in doesn't);
+ * 0 if nothing was recognized. Kept raw — the server derives the speech rate. */
 export function speakingSeconds(words: TimedWord[]): number {
   if (words.length === 0) return 0;
   const last = words[words.length - 1];
   return (last.Offset + last.Duration - words[0].Offset) / TICKS_PER_MS / 1000;
 }
 
-// ponytail: duration alone decides the colour. Where a pause falls matters more to an examiner
-// than how long it runs — a beat before a new idea is fine, the same beat mid-clause is not —
-// but that needs the pause aligned to the display text's clause boundaries. Upgrade to that if
-// the colours start disagreeing with the band.
+// ponytail: colour by duration only; where a pause falls (mid-clause vs before an idea) matters
+// more but needs clause alignment. Upgrade if the colours disagree with the band.
 export const LONG_PAUSE_SECONDS = 2;
 
 export type LexicalSegment =

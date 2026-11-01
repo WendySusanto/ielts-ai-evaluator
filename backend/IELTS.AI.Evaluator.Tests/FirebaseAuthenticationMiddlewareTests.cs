@@ -5,9 +5,8 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace IELTS.AI.Evaluator.Tests;
 
-// ponytail: tests the extracted ResolveAccountStateAsync() instead of faking FunctionContext —
-// same convention as ExceptionHandlingMiddlewareTests. What we own is "plan comes from the
-// database, not the token claim, and a missing row fails closed".
+// ponytail: tests the extracted ResolveAccountStateAsync() instead of faking FunctionContext.
+// What we own: plan comes from the DB, not the token, and a missing row fails closed.
 public class FirebaseAuthenticationMiddlewareTests
 {
     private static readonly TimeSpan Ttl = TimeSpan.FromSeconds(60);

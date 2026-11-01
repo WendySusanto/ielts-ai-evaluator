@@ -7,9 +7,8 @@ import { findPhrase } from "@/lib/notebook";
 import type { SpeakingVocabularyUpgrade } from "@/types/Speaking";
 import { ArrowRight } from "lucide-react";
 
-/** Marks the suggested phrase inside the improved sentence, so "where would I use this" is
- * answered at a glance. A phrase findPhrase can't locate renders unmarked — the sentence still
- * reads correctly. */
+/** Marks the suggested phrase inside the improved sentence; if findPhrase can't find it, the
+ * sentence renders unmarked. */
 function Highlighted({ text, phrase }: { text: string; phrase: string }) {
   const parts = findPhrase(text, phrase);
   if (!parts) return <>{text}</>;

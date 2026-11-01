@@ -8,13 +8,9 @@ import { EvaluationProgress } from "@/components/EvaluationProgress";
 import { RecordingClock } from "@/components/RecordingClock";
 import { VoiceLevelBars } from "@/components/VoiceLevelBars";
 import { useApi } from "@/hooks/use-api";
-import {
-  aggregateAssessments,
-  useSpeech,
-  type RecordedAudio,
-  type TurnAssessment,
-} from "@/hooks/use-speech";
+import { useSpeech } from "@/hooks/use-speech";
 import { ApiError, api } from "@/lib/api";
+import { aggregateAssessments, type RecordedAudio, type TurnAssessment } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type {
   ExaminerTurnRequest,

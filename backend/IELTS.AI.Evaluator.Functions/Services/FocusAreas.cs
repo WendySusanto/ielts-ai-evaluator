@@ -6,9 +6,8 @@ public record FocusCriterionDto(string Name, decimal Band, string? Tip);
 public record FocusMistakeDto(string Category, int Count, string Original, string Corrected);
 public record DashboardFocusDto(FocusCriterionDto? Writing, FocusCriterionDto? Speaking, List<FocusMistakeDto> Mistakes);
 
-/// <summary>What a learner should practise next, read from feedback already stored: the criterion
-/// pulling each skill's band down most, and the mistakes that keep coming back. No model call. The
-/// tips are the advice Gemini wrote when it marked the work.</summary>
+/// <summary>What to practise next, from stored feedback (no model call): each skill's weakest
+/// criterion, recurring mistakes, and the tips Gemini wrote.</summary>
 public static class FocusAreas
 {
     /// <summary>Evaluations per skill looked at: recent enough to describe the learner now, so a

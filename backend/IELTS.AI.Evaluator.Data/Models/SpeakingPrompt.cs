@@ -1,10 +1,6 @@
 namespace IELTS.AI.Evaluator.Data.Models
 {
-    /// <summary>
-    /// Represents an IELTS Speaking cue/topic that a candidate can practice.
-    /// Mirrors the structure of <see cref="WritingPrompt"/> but is tailored to
-    /// the three parts of the IELTS Speaking test.
-    /// </summary>
+    /// <summary>An IELTS Speaking cue/topic — the speaking counterpart of <see cref="WritingPrompt"/>.</summary>
     public class SpeakingPrompt : BaseEntity
     {
         public Guid SpeakingPromptId { get; set; }
@@ -19,10 +15,7 @@ namespace IELTS.AI.Evaluator.Data.Models
         /// <summary>The main question / cue card text shown to the candidate.</summary>
         public string QuestionText { get; set; } = default!;
 
-        /// <summary>
-        /// Optional bullet points the candidate should cover (mainly Part 2 cue cards).
-        /// Stored as newline separated text for simplicity.
-        /// </summary>
+        /// <summary>Part 2 cue card bullets, or Part 1/3's scripted questions; one per line.</summary>
         public string? Cuepoints { get; set; }
 
         /// <summary>Suggested speaking duration in seconds.</summary>

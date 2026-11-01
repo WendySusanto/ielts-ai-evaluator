@@ -22,10 +22,8 @@ public interface IAudioStore
     Task<string?> ReadUrlAsync(string blobName, TimeSpan validFor);
 }
 
-/// <summary>Blob Storage through the app's managed identity — no account key anywhere. On a developer
-/// machine DefaultAzureCredential falls back to the az login / Visual Studio account. Either identity
-/// needs Storage Blob Data Contributor on the account: it uploads, and it asks for the user
-/// delegation key that signs playback links.</summary>
+/// <summary>Blob Storage via managed identity (az login locally) — no account key. The identity needs
+/// Storage Blob Data Contributor, to upload and to sign playback links.</summary>
 public class BlobAudioStore : IAudioStore
 {
     private readonly BlobServiceClient? _service;
@@ -93,10 +91,8 @@ public class BlobAudioStore : IAudioStore
         }
     }
 
-    /// <summary>With no account key, links are signed with a user delegation key. One key signs every
-    /// link; Azure allows up to seven days, so a day's worth is fetched and reused until under an hour
-    /// is left — always longer than any link it signs.</summary>
-    // ponytail: two first reads racing both fetch a key; harmless, the later one wins.
+    /// <summary>Links are signed with a user delegation key, fetched for a day and reused until under an
+    /// hour is left. ponytail: two racing first reads both fetch one; harmless.</summary>
     private async Task<UserDelegationKey> DelegationKeyAsync()
     {
         if (_delegationKey is null || _delegationKey.SignedExpiresOn < DateTimeOffset.UtcNow.AddHours(1))

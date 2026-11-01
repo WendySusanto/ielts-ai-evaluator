@@ -8,10 +8,8 @@ export interface Segment {
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** Splits `text` into unmarked stretches and stretches matching each quote. A quote matches
- * verbatim except for whitespace, because Gemini tidies line breaks and double spaces. A quote that
- * occurs more than once takes the first occurrence no earlier quote has claimed. One that is missing,
- * or that only overlaps claimed text, is left unmarked; the caller still lists it. */
+/** Splits `text` into stretches matching each quote (whitespace-insensitive, as Gemini tidies it),
+ * each taking its first unclaimed occurrence. Unmatched quotes stay unmarked; the caller lists them. */
 export function annotate(text: string, quotes: readonly string[]): Segment[] {
   const claimed: { start: number; end: number; error: number }[] = [];
   quotes.forEach((quote, error) => {

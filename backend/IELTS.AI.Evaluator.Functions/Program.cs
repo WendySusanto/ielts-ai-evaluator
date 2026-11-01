@@ -31,9 +31,7 @@ var host = new HostBuilder()
         services.AddDbContext<EvaluatorDbContext>(options =>
             options.UseNpgsql(connectionString));
 
-        // HttpClient.Timeout is one number for every call, but an examiner turn should give up after
-        // 45s while a scoring call may need 150s — so the real per-attempt limits live in
-        // GeminiStructuredClient. This is only a backstop above the longest of them.
+        // Backstop above the longest per-attempt timeout; the real limits live in GeminiStructuredClient.
         services.AddHttpClient<IGeminiStructuredClient, GeminiStructuredClient>(
             c => c.Timeout = TimeSpan.FromMinutes(3));
         // STS token issuance is one small POST; if it hasn't answered in 10s it isn't going to.

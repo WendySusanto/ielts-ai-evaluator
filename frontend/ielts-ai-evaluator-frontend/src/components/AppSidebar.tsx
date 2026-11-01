@@ -34,9 +34,8 @@ const practiceItems: NavItem[] = [
   { title: "Notebook", url: "/notebook", icon: BookMarked },
 ];
 
-// A section stays lit on its child routes, so /writing/Task2/7 keeps "Writing"
-// highlighted while the user is mid-practice. Matches on segment boundaries so
-// /speaking never claims /speaking-feedback.
+// A section stays lit on its child routes (/writing/Task2/7 → Writing), matching whole segments
+// so /speaking never claims /speaking-feedback.
 const isNavItemActive = (pathname: string, item: NavItem) =>
   [item.url, ...(item.alsoMatch ?? [])].some(
     (base) =>

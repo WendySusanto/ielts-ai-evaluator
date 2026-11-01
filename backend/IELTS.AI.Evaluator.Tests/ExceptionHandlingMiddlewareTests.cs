@@ -3,9 +3,8 @@ using IELTS.AI.Evaluator.Functions.Middleware;
 
 namespace IELTS.AI.Evaluator.Tests;
 
-// ponytail: tests the extracted Map() instead of faking FunctionContext/HttpRequestData —
-// the isolated-worker HTTP plumbing (CreateResponse/WriteAsJsonAsync) is host-owned; the
-// wire contract we own is exactly this exception → (status, message) mapping.
+// ponytail: tests the extracted Map() instead of faking the host-owned HTTP plumbing; the
+// exception → (status, message) mapping is the contract we own.
 public class ExceptionHandlingMiddlewareTests
 {
     [Theory]

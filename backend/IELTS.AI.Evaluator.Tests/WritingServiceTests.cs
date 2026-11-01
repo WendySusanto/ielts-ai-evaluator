@@ -269,9 +269,8 @@ public class WritingServiceTests
         Assert.Equal(new[] { "original", "upgrade", "context" }, upgradeRequired);
     }
 
-    /// <summary>Without a temperature pin, a description saying "one of exactly" is a request, not a
-    /// rule: Gemini started writing "Lexical Resource" instead of the key the screens look up. An enum
-    /// is enforced by structured output, so the criterion names are pinned there.</summary>
+    /// <summary>A description saying "one of exactly" is only a request — Gemini returned "Lexical
+    /// Resource" instead of the key. Structured output enforces an enum, so it's pinned there.</summary>
     [Fact]
     public void GeminiSchema_PinsCriterionNamesWithAnEnum()
     {
@@ -296,9 +295,8 @@ public class WritingServiceTests
             category.GetProperty("enum").EnumerateArray().Select(e => e.GetString()).ToArray());
     }
 
-    /// <summary>The scoring call thinks at the configured level and gets the long, final timeout.
-    /// Asserted on this service, not only the client, because the requirement is that THIS call
-    /// sends them.</summary>
+    /// <summary>The scoring call uses the configured thinking level and the long, final timeout —
+    /// asserted on this service because THIS call must send them.</summary>
     [Fact]
     public async Task Evaluate_UsesConfiguredThinkingLevel_AndScoringTimeout()
     {

@@ -32,11 +32,8 @@ public class AuthSyncService : IAuthSyncService
     {
         var user = await _db.Users.FirstOrDefaultAsync(u => u.FirebaseUid == firebaseUid);
 
-        // Belt to the auth middleware's braces: it already rejects deleted accounts within its
-        // 60s account cache, and this stops a deleted user re-provisioning claims (or being
-        // resurrected as a second row) by calling sync directly.
-        // ponytail: a delete path should also call FirebaseAuth.DisableUserAsync +
-        // RevokeRefreshTokensAsync if you ever need the session killed inside that 60s.
+        // Backs up the auth middleware: stops a deleted user re-provisioning claims via sync. ponytail: to
+        // kill sessions within its 60s cache, also call DisableUserAsync + RevokeRefreshTokensAsync.
         if (user is { IsDeleted: true })
         {
             _logger.LogWarning("Sync rejected for deleted user, Firebase uid {Uid}", firebaseUid);

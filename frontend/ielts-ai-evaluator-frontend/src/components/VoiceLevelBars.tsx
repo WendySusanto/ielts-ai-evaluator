@@ -4,14 +4,12 @@ import { useEffect, useRef } from "react";
 const BAR_WEIGHTS = [0.55, 0.8, 1, 0.8, 0.55];
 // A silent mic still shows a row of short bars, so "listening" never looks like "off".
 const MIN_SCALE = 0.15;
-// Bars rise at once, so each syllable lands, and fall back over about a tenth of a second, so
-// the gaps between syllables don't flicker.
-// ponytail: tuned by feel, not measured — lengthen if the bars still look jittery.
+// Rise at once, fall over ~0.1s so the gaps between syllables don't flicker.
+// ponytail: tuned by feel — lengthen if the bars still look jittery.
 const RELEASE_MS = 100;
 
-/** The live mic level as five bars. Drawn straight onto the DOM each animation frame, so a 60fps
- * meter never re-renders the page around it. Decorative: the listening state is already given in
- * text. Under reduced motion the bars stand still and only their opacity follows the voice. */
+/** Live mic level as five bars, drawn straight to the DOM each frame so the page doesn't re-render.
+ * Decorative; under reduced motion only the opacity follows the voice. */
 export function VoiceLevelBars({ getLevel }: { getLevel: () => number }) {
   const barsRef = useRef<(HTMLSpanElement | null)[]>([]);
 

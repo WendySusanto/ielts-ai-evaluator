@@ -1,6 +1,14 @@
-import { api } from "@/lib/api";
 import { buildLexicalTranscript, speakingSeconds, type TimedWord } from "@/lib/lexical";
-import type { PronunciationResult, PronunciationWord, SpeechToken } from "@/types/Speaking";
+import {
+  aggregateAssessments,
+  forgetSpeechToken,
+  getSpeechToken,
+  openMic,
+  toSsml,
+  type Mic,
+  type RecordedAudio,
+  type TurnAssessment,
+} from "@/lib/speech";
 import {
   AudioConfig,
   CancellationDetails,
@@ -12,90 +20,59 @@ import {
   ResultReason,
   SpeakerAudioDestination,
   SpeechConfig,
+  SpeechRecognitionResult,
   SpeechRecognizer,
   SpeechSynthesizer,
 } from "microsoft-cognitiveservices-speech-sdk";
 import { useCallback, useEffect, useRef, useState } from "react";
-
-// Azure STS tokens expire after 10 min; refresh a couple of minutes early.
-const TOKEN_TTL_MS = 8 * 60 * 1000;
-const MAX_WORDS = 400;
 
 /** Azure's detailed recognition JSON, of which we want only the raw text and the word timings. */
 interface DetailedPhrase {
   NBest?: { Lexical?: string; Words?: TimedWord[] }[];
 }
 
-/** Per-turn pronunciation assessment: same shape as PronunciationResult minus the
- * server-computed fields, so it doubles as the input aggregateAssessments merges across turns. */
-export type TurnAssessment = Omit<PronunciationResult, "band" | "wordsPerMinute">;
-
-let cachedToken: { value: SpeechToken; expiresAt: number } | null = null;
-// The in-flight request, shared by every concurrent caller. Caching only the *resolved* value
-// deduplicated nothing while a request was still open: the mount prefetch (twice under
-// StrictMode), the greeting's speak() and the first startListening() all started before any of
-// them had answered, so each fired its own /api/speech/token — four per session against a
-// 30/hour cap. A 429 then cleared cachedToken, so the next attempt fired again.
-let inFlightToken: Promise<SpeechToken> | null = null;
-
-function getSpeechToken(): Promise<SpeechToken> {
-  if (cachedToken && cachedToken.expiresAt > Date.now()) return Promise.resolve(cachedToken.value);
-  inFlightToken ??= api
-    .get<SpeechToken>("/api/speech/token")
-    .then((value) => {
-      cachedToken = { value, expiresAt: Date.now() + TOKEN_TTL_MS };
-      return value;
-    })
-    .finally(() => {
-      inFlightToken = null; // a failed request must not be latched; the next caller retries
-    });
-  return inFlightToken;
+/** One phrase Azure finalized during the turn. */
+interface Segment {
+  /** Display text: auto-punctuated, false starts tidied away. */
+  text: string;
+  /** Raw lexical text; "" when the detailed JSON didn't come through, words likewise empty. */
+  lexical: string;
+  words: TimedWord[];
+  assessment: TurnAssessment | null;
 }
 
-const escapeXml = (s: string) =>
-  s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" })[c]!);
-
-/** Wraps examiner text in SSML. Standard neural voices get a slightly slower, examiner-like pace
- * and a short beat between sentences. HD voices (":DragonHD…") pace themselves and ignore
- * <prosody>/<break>, so they get the plain text. Voice comes from the ExaminerVoice setting. */
-function toSsml(text: string, voice: string): string {
-  const lang = voice.split("-").slice(0, 2).join("-");
-  const escaped = escapeXml(text);
-  const body = voice.includes(":DragonHD")
-    ? escaped
-    : // ponytail: naive sentence split — "Mr." gets a pause too; harmless at 300ms.
-      `<prosody rate="-8%">${escaped.replace(/([.?!])\s+(?=\S)/g, '$1<break time="300ms"/> ')}</prosody>`;
-  return (
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${escapeXml(lang)}">` +
-    `<voice name="${escapeXml(voice)}">${body}</voice></speak>`
-  );
-}
-
-/** Word-count-weights the five PA scores across turns/segments and concatenates their words
- * (capped at MAX_WORDS). Used both to merge recognized segments within one candidate turn and,
- * by callers, to merge turns into the single aggregate the backend expects. */
-export function aggregateAssessments(turns: TurnAssessment[]): PronunciationResult {
-  const weights = turns.map((t) => t.words.length || 1);
-  const totalWeight = weights.reduce((sum, w) => sum + w, 0) || 1;
-  const weighted = (pick: (t: TurnAssessment) => number) =>
-    turns.reduce((sum, t, i) => sum + pick(t) * weights[i], 0) / totalWeight;
-
-  return {
-    pronunciationScore: weighted((t) => t.pronunciationScore),
-    accuracyScore: weighted((t) => t.accuracyScore),
-    fluencyScore: weighted((t) => t.fluencyScore),
-    prosodyScore: weighted((t) => t.prosodyScore),
-    completenessScore: weighted((t) => t.completenessScore),
-    words: turns.flatMap((t) => t.words).slice(0, MAX_WORDS),
-  };
+/** Parses the raw JSON (SDK typings hide Lexical and offsets); a bad payload keeps the text alone. */
+function toSegment(text: string, result: SpeechRecognitionResult): Segment {
+  try {
+    const best = (JSON.parse(result.json) as DetailedPhrase).NBest?.[0];
+    const pa = PronunciationAssessmentResult.fromResult(result);
+    return {
+      text,
+      lexical: best?.Lexical ?? "",
+      words: best?.Words ?? [],
+      assessment: {
+        pronunciationScore: pa.pronunciationScore,
+        accuracyScore: pa.accuracyScore,
+        fluencyScore: pa.fluencyScore,
+        prosodyScore: pa.prosodyScore,
+        completenessScore: pa.completenessScore,
+        words: pa.detailResult.Words.map((w) => ({
+          word: w.Word,
+          accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? 0,
+          errorType: w.PronunciationAssessment?.ErrorType ?? "None",
+        })),
+      },
+    };
+  } catch {
+    return { text, lexical: "", words: [], assessment: null };
+  }
 }
 
 function toMessage(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-// SDK close() throws on already-disposed objects; disposal paths can legitimately race
-// (e.g. stopSpeaking vs. speak's own cleanup), so swallow that.
+// SDK close() throws on already-disposed objects, and disposal paths legitimately race.
 function safeClose(obj: { close: () => void } | null): void {
   try {
     obj?.close();
@@ -103,57 +80,6 @@ function safeClose(obj: { close: () => void } | null): void {
     // already disposed
   }
 }
-
-// Loudness (RMS, 0-1) above which the mic is hearing the candidate rather than the room: speech
-// through the browser's default auto-gain sits around 0.03-0.1, a quiet room under 0.005.
-// ponytail: fixed threshold, not an adaptive noise floor — a loud room just keeps the turn open
-// until the candidate taps stop; measure the room's level first if that turns up.
-const VOICE_RMS = 0.01;
-
-/** The mic's loudness as RMS (0-1), measured fresh on every call, plus the teardown. */
-function meterStream(stream: MediaStream) {
-  const context = new AudioContext();
-  const analyser = context.createAnalyser();
-  context.createMediaStreamSource(stream).connect(analyser);
-  const samples = new Float32Array(analyser.fftSize);
-  return {
-    rms: () => {
-      analyser.getFloatTimeDomainData(samples);
-      return Math.sqrt(samples.reduce((sum, s) => sum + s * s, 0) / samples.length);
-    },
-    close: () => {
-      context.close().catch(() => {});
-    },
-  };
-}
-
-/** RMS as a 0-1 meter reading on a decibel scale, as level meters use: a quiet room (-50 dBFS)
- * reads 0 and loud, close speech (-15 dBFS) reads 1. On a linear scale normal speech would
- * barely lift the bars. */
-const toMeterLevel = (rms: number) =>
-  Math.min(1, Math.max(0, (20 * Math.log10(rms) + 50) / 35));
-
-/** One answer's recording: the audio as the browser encoded it, and how long it ran. */
-export type RecordedAudio = { blob: Blob; seconds: number };
-
-// Containers the browser can record that Gemini also reads, best first: Chrome and Edge record webm,
-// Firefox ogg, Safari mp4. ponytail: Safari's mp4 is the one not yet tried on a real device.
-const RECORDING_TYPES = ["audio/webm;codecs=opus", "audio/ogg;codecs=opus", "audio/mp4"];
-
-/** The first type this browser can record, or null — the answer is then scored from the recognizer
- * text alone. */
-function pickRecordingType(): string | null {
-  if (typeof MediaRecorder === "undefined") return null;
-  return RECORDING_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) ?? null;
-}
-
-/** The live turn's microphone: its level for the meter, its recording, and the teardown. */
-type Mic = {
-  level: () => number;
-  startRecording: () => void;
-  stopRecording: () => Promise<RecordedAudio | null>;
-  release: () => void;
-};
 
 interface ListenOptions {
   /** Called once when the candidate has said something and then gone quiet for silenceMs. */
@@ -176,15 +102,13 @@ interface UseSpeechResult {
     /** The answer's recording; null when the browser could not record. */
     audio: RecordedAudio | null;
   }>;
-  /** Live mic loudness from 0 (silent, or not listening) to 1, measured on each call — read it
-   * from an animation frame rather than holding it in React state. */
+  /** Live mic loudness 0-1, measured per call: read it from an animation frame, not React state. */
   getMicLevel: () => number;
   interimTranscript: string;
   error: string | null;
 }
 
-/** Azure Speech SDK integration: TTS for the examiner's voice, STT + Pronunciation Assessment
- * for the candidate's turn. One hook, no extra layers around the SDK. */
+/** Azure Speech: TTS for the examiner, STT + Pronunciation Assessment for the candidate. */
 export function useSpeech(): UseSpeechResult {
   const [interimTranscript, setInterimTranscript] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -192,18 +116,12 @@ export function useSpeech(): UseSpeechResult {
   const synthesizerRef = useRef<SpeechSynthesizer | null>(null);
   const playerRef = useRef<SpeakerAudioDestination | null>(null);
   const recognizerRef = useRef<SpeechRecognizer | null>(null);
-  // In-flight startListening(); stopListening() awaits it so a fast start-then-stop
-  // can't leave a recognizer that came up live after stop already returned.
+  const micRef = useRef<Mic | null>(null); // committed alongside recognizerRef
+  // In-flight startListening(); stopListening() awaits it so a fast start-then-stop can't leak one.
   const startPromiseRef = useRef<Promise<void> | null>(null);
   const disposedRef = useRef(false);
-  const segmentsRef = useRef<string[]>([]);
-  const segmentAssessmentsRef = useRef<TurnAssessment[]>([]);
-  // Raw recognition per segment, kept beside the display text rather than replacing it.
-  const lexicalSegmentsRef = useRef<{ lexical: string; words: TimedWord[] }[]>([]);
+  const segmentsRef = useRef<Segment[]>([]);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // The live turn's mic: its meter reading, its recording and the teardown that stops the stream.
-  // Committed alongside recognizerRef.
-  const micRef = useRef<Mic | null>(null);
 
   const [supported] = useState(
     () => typeof navigator !== "undefined" && !!navigator.mediaDevices,
@@ -224,11 +142,7 @@ export function useSpeech(): UseSpeechResult {
     const synthesizer = synthesizerRef.current;
     playerRef.current = null;
     synthesizerRef.current = null;
-    // close() alone does NOT cut playback: it just ends the media stream, and the <audio>
-    // element keeps talking until it drains what it already buffered. pause() is the real
-    // stop. Because a paused element never fires 'ended', the SDK never raises onAudioEnd —
-    // the only thing that resolves an in-flight speak() — so raise it by hand. speak()'s
-    // finally block may close these again; safeClose makes the double-close harmless.
+    // pause() is the real stop (close() lets the buffer drain); it skips 'ended', so fire onAudioEnd by hand.
     player?.pause();
     safeClose(player);
     safeClose(synthesizer);
@@ -243,15 +157,13 @@ export function useSpeech(): UseSpeechResult {
       let player: SpeakerAudioDestination | null = null;
       try {
         const { token, region, voice } = await getSpeechToken();
-        // Unmounted while the token was in flight — the refs cleanup already ran, so building
-        // a player now would start audio nothing is left holding a handle to.
+        // Unmounted while the token was in flight: nothing is left to hold a handle to the audio.
         if (disposedRef.current) return;
         const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
         speechConfig.speechSynthesisVoiceName = voice;
 
         player = new SpeakerAudioDestination();
-        const audioConfig = AudioConfig.fromSpeakerOutput(player);
-        synthesizer = new SpeechSynthesizer(speechConfig, audioConfig);
+        synthesizer = new SpeechSynthesizer(speechConfig, AudioConfig.fromSpeakerOutput(player));
         synthesizerRef.current = synthesizer;
         playerRef.current = player;
 
@@ -267,23 +179,18 @@ export function useSpeech(): UseSpeechResult {
                 reject(new Error(details.errorDetails || "Speech synthesis failed"));
                 return;
               }
-              // Synthesis done, but playback isn't. onAudioEnd only fires once MediaSource
-              // has had endOfStream() called, and the SDK gates that behind isClosed — which
-              // nothing but close() sets, and which it never calls for a speaker destination
-              // passed via AudioConfig. Without this the promise waits forever. close() does
-              // not cut playback short: the element drains its buffer, then fires 'ended'.
+              // onAudioEnd waits for close(), which the SDK never calls itself; the buffer still drains.
               localPlayer.close();
             },
             (err) => reject(new Error(err)),
           );
         });
       } catch (e) {
-        cachedToken = null; // a rejected token must not be reused on the retry
+        forgetSpeechToken(); // a rejected token must not be reused on the retry
         setError(toMessage(e));
         throw e;
       } finally {
-        // Dispose THIS call's objects, not whatever the shared refs point at — a newer
-        // overlapping speak() may already own the refs. Only clear refs we still own.
+        // Dispose THIS call's objects; a newer speak() may already own the refs.
         safeClose(synthesizer);
         safeClose(player);
         if (synthesizerRef.current === synthesizer) synthesizerRef.current = null;
@@ -294,20 +201,15 @@ export function useSpeech(): UseSpeechResult {
   );
 
   const startListening = useCallback(async (opts?: ListenOptions) => {
-    // ponytail: re-entrant start is a no-op — one recognizer per hook is all the
-    // examiner-call UI needs, and it can't orphan a live mic.
+    // ponytail: re-entrant start is a no-op; one recognizer per hook is all the UI needs.
     if (recognizerRef.current || startPromiseRef.current) return;
 
     setError(null);
     setInterimTranscript("");
     segmentsRef.current = [];
-    segmentAssessmentsRef.current = [];
-    lexicalSegmentsRef.current = [];
     clearSilenceTimer();
 
-    // Armed only once speech is recognized, so thinking time before the first word never ends the
-    // turn; every recognizer event, and once armed any sound on the mic, pushes it back. Fires at
-    // most once per listen.
+    // Armed by the first recognized word (thinking time never ends a turn), pushed back by any speech.
     let silenceFired = false;
     const bumpSilenceTimer = () => {
       if (!opts?.onSilence || silenceFired) return;
@@ -322,69 +224,17 @@ export function useSpeech(): UseSpeechResult {
     const startPromise = (async () => {
       const { token, region } = await getSpeechToken();
       const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
-      // Azure's default ends a phrase after 500ms of silence, so a candidate who pauses
-      // mid-clause ("we only take photos during … a family trip") gets each fragment recognized
-      // alone, with no language-model context — that's where most misheard words came from.
-      // Pauses are measured from word timings, not segments, so this doesn't hide them.
-      // ponytail: hand-picked; raise toward 2000 if mid-sentence splits persist.
+      // ponytail: Azure's 500ms split mid-clause phrases (misheard words); raise toward 2000 if it persists.
       speechConfig.setProperty(PropertyId.Speech_SegmentationSilenceTimeoutMs, "1200");
-      // The mic stream is opened here rather than by the SDK so the silence timer and the level
-      // meter can hear the same audio. Recognizer events alone are a poor sign of speech: they
-      // trail the voice after every pause, and an "eee…" or a word Azure can't place produces
-      // none at all — enough to end the turn while the candidate is still talking. Same
-      // constraints as the SDK's own default mic, so recognition hears exactly what it did
-      // before. The SDK never stops a stream it was handed, so mic.release does.
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const meter = meterStream(stream);
-      const poll = opts?.onSilence
-        ? setInterval(() => {
-            // extends an armed timer, never arms one
-            if (silenceTimerRef.current && meter.rms() > VOICE_RMS) bumpSilenceTimer();
-          }, 100)
-        : undefined;
-      // The answer is recorded from the same stream the recognizer hears, for the scorer to listen to
-      // and for playback on the feedback page. 32 kbps: Gemini works from 16 kbps audio anyway, and
-      // five minutes stays near 1.2 MB.
-      const recordingType = pickRecordingType();
-      const recorder = recordingType
-        ? new MediaRecorder(stream, { mimeType: recordingType, audioBitsPerSecond: 32_000 })
-        : null;
-      const chunks: Blob[] = [];
-      if (recorder)
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) chunks.push(e.data);
-        };
-      let recordingStartedAt = 0;
-      const mic: Mic = {
-        level: () => toMeterLevel(meter.rms()),
-        startRecording: () => {
-          recorder?.start();
-          recordingStartedAt = Date.now();
-        },
-        stopRecording: () =>
-          new Promise((resolve) => {
-            const finish = () =>
-              resolve(
-                recorder && chunks.length > 0
-                  ? {
-                      blob: new Blob(chunks, { type: recorder.mimeType }),
-                      seconds: (Date.now() - recordingStartedAt) / 1000,
-                    }
-                  : null,
-              );
-            if (!recorder || recorder.state === "inactive") return finish();
-            recorder.onstop = finish;
-            recorder.stop();
-          }),
-        release: () => {
-          clearInterval(poll);
-          meter.close();
-          stream.getTracks().forEach((t) => t.stop());
-        },
-      };
-      const audioConfig = AudioConfig.fromStreamInput(stream);
-      const recognizer = new SpeechRecognizer(speechConfig, audioConfig);
 
+      const mic = await openMic(
+        opts?.onSilence
+          ? () => {
+              if (silenceTimerRef.current) bumpSilenceTimer(); // extends an armed timer, never arms one
+            }
+          : undefined,
+      );
+      const recognizer = new SpeechRecognizer(speechConfig, AudioConfig.fromStreamInput(mic.stream));
       const paConfig = new PronunciationAssessmentConfig(
         "",
         PronunciationAssessmentGradingSystem.HundredMark,
@@ -393,11 +243,10 @@ export function useSpeech(): UseSpeechResult {
       paConfig.enableProsodyAssessment = true;
       paConfig.applyTo(recognizer);
 
+      const committedText = () => segmentsRef.current.map((s) => s.text);
       recognizer.recognizing = (_sender, e) => {
-        // Committed segments + the open phrase. Showing only e.result.text made every
-        // finalized sentence vanish from the caption, which reads as a wrong transcript even
-        // though stopListening() still returns all of them joined.
-        setInterimTranscript([...segmentsRef.current, e.result.text].join(" "));
+        // Finalized segments plus the open phrase, so a finished sentence never drops off the caption.
+        setInterimTranscript([...committedText(), e.result.text].join(" "));
         bumpSilenceTimer();
       };
       recognizer.recognized = (_sender, e) => {
@@ -405,36 +254,8 @@ export function useSpeech(): UseSpeechResult {
         const text = e.result.text.trim();
         if (!text) return;
         bumpSilenceTimer();
-
-        segmentsRef.current.push(text);
-        // Same JSON the PA result is read from, taken directly because the SDK's DetailResult
-        // typing exposes neither Lexical nor the per-word offsets. A malformed or absent payload
-        // must never cost the candidate their turn, so this degrades to display text alone.
-        try {
-          const best = (JSON.parse(e.result.json) as DetailedPhrase).NBest?.[0];
-          if (best)
-            lexicalSegmentsRef.current.push({
-              lexical: best.Lexical ?? "",
-              words: best.Words ?? [],
-            });
-        } catch {
-          // no detailed JSON for this segment; display text still stands
-        }
-        const pa = PronunciationAssessmentResult.fromResult(e.result);
-        const words: PronunciationWord[] = pa.detailResult.Words.map((w) => ({
-          word: w.Word,
-          accuracyScore: w.PronunciationAssessment?.AccuracyScore ?? 0,
-          errorType: w.PronunciationAssessment?.ErrorType ?? "None",
-        }));
-        segmentAssessmentsRef.current.push({
-          pronunciationScore: pa.pronunciationScore,
-          accuracyScore: pa.accuracyScore,
-          fluencyScore: pa.fluencyScore,
-          prosodyScore: pa.prosodyScore,
-          completenessScore: pa.completenessScore,
-          words,
-        });
-        setInterimTranscript(segmentsRef.current.join(" "));
+        segmentsRef.current.push(toSegment(text, e.result));
+        setInterimTranscript(committedText().join(" "));
       };
       recognizer.canceled = (_sender, e) => {
         setError(e.errorDetails || "Speech recognition was canceled");
@@ -450,8 +271,7 @@ export function useSpeech(): UseSpeechResult {
         throw e;
       }
 
-      // Commit only after the recognizer is fully live; stopListening awaits
-      // startPromiseRef, so it always sees either null or a started recognizer.
+      // Commit only once live, so stopListening sees either null or a started recognizer.
       if (disposedRef.current) {
         // component unmounted mid-start: release the mic instead of committing
         recognizer.stopContinuousRecognitionAsync(
@@ -470,7 +290,7 @@ export function useSpeech(): UseSpeechResult {
     try {
       await startPromise;
     } catch (e) {
-      cachedToken = null;
+      forgetSpeechToken();
       setError(toMessage(e));
       throw e;
     } finally {
@@ -480,53 +300,40 @@ export function useSpeech(): UseSpeechResult {
 
   const stopListening = useCallback(async () => {
     clearSilenceTimer();
-    // A stop issued during startup waits for the start to land, then stops it.
-    if (startPromiseRef.current) {
-      try {
-        await startPromiseRef.current;
-      } catch {
-        // failed start already cleaned itself up; nothing to stop
-      }
-    }
+    // A stop during startup waits for the start to land; a failed start cleaned up after itself.
+    await startPromiseRef.current?.catch(() => {});
 
     const recognizer = recognizerRef.current;
+    const mic = micRef.current;
     if (!recognizer)
       return { transcript: "", lexical: "", durationSeconds: 0, assessment: null, audio: null };
-    recognizerRef.current = null; // claim it so a concurrent stop can't double-dispose
+    // Claim both so a concurrent stop can't double-dispose, nor a new start's mic be released here.
+    recognizerRef.current = null;
+    micRef.current = null;
 
-    let audio: RecordedAudio | null = null;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        recognizer.stopContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
-      });
-    } catch (e) {
-      setError(toMessage(e));
-    } finally {
-      safeClose(recognizer);
-      // After the recognizer has flushed its last phrase and before the tracks stop: stopping a
-      // track ends the recording too, and its final chunk would be lost.
-      audio = (await micRef.current?.stopRecording()) ?? null;
-      micRef.current?.release();
-      micRef.current = null;
-      setInterimTranscript("");
-    }
+    await new Promise<void>((resolve, reject) => {
+      recognizer.stopContinuousRecognitionAsync(resolve, (err) => reject(new Error(err)));
+    }).catch((e) => setError(toMessage(e)));
+    safeClose(recognizer);
+    // After the recognizer flushes, before the tracks stop: stopping a track loses the last chunk.
+    const audio = (await mic?.stopRecording()) ?? null;
+    mic?.release();
+    setInterimTranscript("");
 
-    const transcript = segmentsRef.current.join(" ").trim();
-    // One pass over every word of the turn: absolute offsets mean the silences between
-    // segments — the long ones Azure ends a phrase on — are measured the same way as the
-    // hesitations inside one. Falls back to bare lexical text when no timings came through.
-    const timedWords = lexicalSegmentsRef.current.flatMap((s) => s.words);
+    const segments = segmentsRef.current;
+    // Absolute offsets, so pauses between segments count like pauses inside one; bare text if untimed.
+    const timedWords = segments.flatMap((s) => s.words);
     const lexical = timedWords.length
       ? buildLexicalTranscript(timedWords)
-      : lexicalSegmentsRef.current
-          .map((s) => s.lexical)
-          .join(" ")
-          .trim();
-    const assessment =
-      segmentAssessmentsRef.current.length > 0
-        ? aggregateAssessments(segmentAssessmentsRef.current)
-        : null;
-    return { transcript, lexical, durationSeconds: speakingSeconds(timedWords), assessment, audio };
+      : segments.map((s) => s.lexical).filter(Boolean).join(" ");
+    const assessments = segments.flatMap((s) => s.assessment ?? []);
+    return {
+      transcript: segments.map((s) => s.text).join(" "),
+      lexical,
+      durationSeconds: speakingSeconds(timedWords),
+      assessment: assessments.length > 0 ? aggregateAssessments(assessments) : null,
+      audio,
+    };
   }, []);
 
   const getMicLevel = useCallback(() => micRef.current?.level() ?? 0, []);

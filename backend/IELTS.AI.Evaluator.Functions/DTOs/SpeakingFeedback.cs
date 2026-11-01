@@ -1,10 +1,7 @@
 namespace IELTS.AI.Evaluator.Functions.DTOs;
 
-/// <summary>One of the three Gemini-scored IELTS speaking criteria for a single session.
-/// Pronunciation is Azure PA's job (Phase 4) and is not part of this shape.
-/// Rewrites is nullable because feedback is stored as jsonb and read back through this record:
-/// sessions marked before rewrites existed have no such key, and must still open. NextBand is null
-/// for the same reason on sessions before schema v2, and for a band of 9.</summary>
+/// <summary>One Gemini-scored criterion; pronunciation comes from Azure. Rewrites/NextBand are null on
+/// sessions stored before they existed (NextBand also at band 9), which must still open.</summary>
 public record SpeakingCriterion(
     string Name,
     decimal Band,
@@ -21,10 +18,8 @@ public record SpeakingRewrite(string Original, string Improved, string Explanati
 /// that the candidate did not show, and one step that closes the gap.</summary>
 public record SpeakingNextBand(decimal Band, string Missing, string HowTo);
 
-/// <summary>Feedback on one candidate answer. Answer is the 1-based number the transcript sent to
-/// Gemini gives it ("Candidate (answer 2): ..."), counting candidate turns in conversation order.
-/// Transcript is Gemini's verbatim transcription of that answer's recording — null when the answer
-/// had none, and on sessions before schema v3.</summary>
+/// <summary>Feedback on one answer. Answer is the 1-based candidate-turn number sent to Gemini;
+/// Transcript is Gemini's transcription of its recording (null if none, or before schema v3).</summary>
 public record SpeakingAnswerFeedback(int Answer, string Comment, string SampleAnswer, string? Transcript = null);
 
 /// <summary>One grammar or word-choice mistake: the shortest verbatim stretch containing it, that
@@ -39,22 +34,15 @@ public record SpeakingPronunciationNote(string Word, string HeardAs, string Tip)
 /// Level is "C1" or "C2" — Gemini's best estimate, not an English Vocabulary Profile lookup.</summary>
 public record SpeakingVocabularyUpgrade(string Phrase, string Level, string Replaces, string Original, string Improved);
 
-/// <summary>One turn of the conversation. Role: "examiner" | "candidate".
-/// Lexical is Azure's raw recognition of a spoken candidate turn, with [pause N.Ns] markers —
-/// null for examiner turns, for typed answers, and for every session recorded before this
-/// existed. Text is display text: punctuated and tidied, so it hides the hesitations and
-/// flatters the grammar. Both are sent to the scorer precisely so it can compare them.
-/// DurationSeconds runs from the first recognized word to the end of the last, pauses included;
-/// the service turns it into a speech rate rather than trusting one from the client.</summary>
+/// <summary>One turn. Lexical is Azure's raw text with [pause] markers, kept beside the tidied Text so
+/// the scorer can compare; DurationSeconds spans first to last word, pauses included.</summary>
 public record SpeakingTurn(string Role, string Text, string? Lexical = null, decimal? DurationSeconds = null);
 
 /// <summary>One word from Azure Pronunciation Assessment's per-word breakdown.</summary>
 public record PronunciationWord(string Word, decimal AccuracyScore, string ErrorType);
 
-/// <summary>Azure Pronunciation Assessment result, aggregated client-side across candidate turns
-/// and submitted with the final evaluation. Band is always server-recomputed from
-/// PronunciationScore — never trust a client-supplied value. WordsPerMinute follows the same
-/// rule: derived server-side from the turns, whatever the client put here.</summary>
+/// <summary>Azure Pronunciation Assessment, aggregated client-side. Band and WordsPerMinute are always
+/// recomputed server-side — never trust the client's values.</summary>
 public record PronunciationResult(
     decimal Band,
     decimal PronunciationScore,
@@ -65,10 +53,8 @@ public record PronunciationResult(
     List<PronunciationWord> Words,
     decimal? WordsPerMinute = null);
 
-/// <summary>Deep structured feedback for one speaking session. camelCase on the wire —
-/// this is also the contract for the Phase 3 feedback screens. OverallBand here is the
-/// service-computed average of the three criteria below, rounded to the nearest 0.5 —
-/// not necessarily whatever Gemini put in its own overallBand field.</summary>
+/// <summary>Structured feedback for one speaking session (camelCase on the wire). OverallBand is the
+/// server's average of the criteria, rounded to 0.5 — not Gemini's own overallBand.</summary>
 public record SpeakingFeedback(
     decimal OverallBand,
     string Summary,

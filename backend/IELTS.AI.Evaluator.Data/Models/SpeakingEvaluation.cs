@@ -1,10 +1,7 @@
 namespace IELTS.AI.Evaluator.Data.Models
 {
-    /// <summary>A submitted speaking evaluation while Gemini works on it, keyed by the browser's
-    /// clientSessionId — the id the finished SpeakingSession is saved under. It is what the practice
-    /// page polls instead of holding one long request open, and what tells a retry that the first
-    /// attempt is still running. Kept apart from SpeakingSessions so history, dashboards and quotas
-    /// only ever see finished sessions.</summary>
+    /// <summary>An in-flight speaking evaluation keyed by clientSessionId: what the page polls, and what
+    /// tells a retry it's still running. Separate so history and quotas only see finished sessions.</summary>
     public class SpeakingEvaluation : BaseEntity
     {
         public Guid SpeakingEvaluationId { get; set; }

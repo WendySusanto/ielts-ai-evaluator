@@ -35,21 +35,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-/** A speaking session takes ~4 tokens and the backend caps issuance at 30/hour, so even a heavy
- * day of genuine practice lands well under this. Past it, someone is collecting tokens rather
- * than using them — a starting point for a look, not proof on its own. */
+/** ~4 tokens per session and a 30/hour cap, so real practice stays well under this. Above it,
+ * someone may be collecting tokens — worth a look, not proof. */
 const SUSPICIOUS_TOKENS_TODAY = 100;
 
-/** A full speaking session runs roughly 30–40k Gemini tokens (≈20 examiner turns plus the
- * evaluation), and the Free plan caps evaluations at 10/day, so even a relentless day of real
- * practice stays well under this. A guess calibrated on shape, not on measured data — tune it
- * once the column has shown a few weeks of real numbers. */
+/** A session is ~30–40k tokens and Free caps at 10 evaluations/day, so real use stays under this.
+ * A guess — tune it once there are a few weeks of real numbers. */
 const SUSPICIOUS_GEMINI_TOKENS_TODAY = 500_000;
 
-/** Frontend and Functions deploy from separate workflows, so a newer page can briefly talk to an
- * older API that omits these counters. Renders an em dash when that happens rather than 0 — on a
- * screen whose whole job is spotting outliers, a missing number shown as zero would hide exactly
- * the account you are looking for. */
+/** An older API may omit these counters (separate deploys): show an em dash, not 0, so a missing
+ * number can't hide an outlier. */
 const UsageCell = ({ value, threshold }: { value: number | undefined; threshold: number }) => {
   if (value === undefined) return <span className="text-muted-foreground">—</span>;
 

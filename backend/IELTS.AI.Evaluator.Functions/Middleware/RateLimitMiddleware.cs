@@ -1,5 +1,6 @@
 using System.Net;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
 using FirebaseAdmin.Auth;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -8,22 +9,19 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace IELTS.AI.Evaluator.Functions.Middleware;
 
-/// <summary>Per-user request cap, applied after authentication so the key is the verified
-/// Firebase uid (not a spoofable IP). Bounds the paid calls the daily evaluation quotas don't
-/// reach: examiner turns and Azure Speech tokens are both unmetered otherwise.</summary>
+/// <summary>Per-user request cap keyed on the verified Firebase uid. Covers the paid calls with no
+/// daily quota: examiner turns and Azure Speech tokens.</summary>
 public class RateLimitMiddleware : IFunctionsWorkerMiddleware
 {
-    // ponytail: fixed window, in-process. Exact on one instance, up to N× looser when the
-    // Function App scales to N instances — good enough to stop a scripted loop. Move the
-    // counter to Redis only if a real bill says the slack matters.
+    // ponytail: fixed window, in-process — up to N× looser across N instances, enough to stop a
+    // scripted loop. Move to Redis if a real bill says it matters.
     private static readonly Dictionary<string, (int Limit, int WindowMinutes)> PerFunction = new()
     {
         // One paid Gemini call per turn, and Turns is client-supplied, so the 8-turn cap in
         // ExaminerService is per-request only. A real Part1→Part3 session uses ~20.
         ["SpeakingV2_ExaminerTurn"] = (60, 60),
-        // Azure STS tokens last 10 min and work against the Speech resource directly, so a
-        // leaked loop here is spendable outside the app entirely. The client shares one
-        // in-flight request and caches for 8 min, so a session needs 1 plus 1 per 8 minutes.
+        // STS tokens work against Azure directly for 10 min, so a leak is spendable outside the app.
+        // The client caches for 8 min: a session needs 1 plus 1 per 8 minutes.
         ["SpeechToken_Get"] = (30, 60),
         // A paid Gemini lookup per click of "Fill with AI" — far more than anyone adds by hand.
         ["Notebook_Suggest"] = (60, 60),
@@ -54,8 +52,8 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
         {
             var res = req.CreateResponse(HttpStatusCode.TooManyRequests);
             res.Headers.Add("Retry-After", (windowMinutes * 60).ToString());
-            await res.WriteAsJsonAsync(new { message = "Too many requests. Please slow down and try again later." });
-            res.StatusCode = HttpStatusCode.TooManyRequests; // WriteAsJsonAsync resets to 200
+            res.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await res.WriteStringAsync(JsonSerializer.Serialize(new { message = "Too many requests. Please slow down and try again later." }));
             context.GetInvocationResult().Value = res;
             return;
         }
@@ -63,18 +61,14 @@ public class RateLimitMiddleware : IFunctionsWorkerMiddleware
         await next(context);
     }
 
-    /// <summary>Increments the window counter for <paramref name="key"/>; false once it exceeds
-    /// <paramref name="limit"/>. Extracted so the window logic is testable without faking the
-    /// isolated-worker FunctionContext.</summary>
+    /// <summary>Increments the window counter for <paramref name="key"/>; false once past
+    /// <paramref name="limit"/>. Extracted for unit tests.</summary>
     internal static bool TryConsume(IMemoryCache cache, string key, int limit, TimeSpan window)
     {
         StrongBox<int> counter;
 
-        // MemoryCache.GetOrCreate is not atomic: on a concurrent first hit it runs the factory
-        // on several threads and hands each its own counter, so every one of them sees "1" and
-        // passes — a burst slips past the limit. The lock guarantees a single shared counter.
-        // ponytail: one global lock, held for a dictionary lookup. Stripe it by key only if a
-        // profiler ever shows contention here.
+        // GetOrCreate isn't atomic: concurrent first hits would each get their own counter and slip past
+        // the limit. ponytail: one global lock; stripe it by key only if a profiler shows contention.
         lock (Gate)
         {
             counter = cache.GetOrCreate(key, entry =>

@@ -62,9 +62,8 @@ public class RateLimitMiddlewareTests
                 Interlocked.Increment(ref allowed);
         });
 
-        // Exactly 50, not "about 50": MemoryCache.GetOrCreate races its factory across threads,
-        // so without the lock in TryConsume each racer gets its own counter and a burst leaks
-        // past the cap. This assertion is what caught that.
+        // Exactly 50: without TryConsume's lock, racing GetOrCreate factories each get a counter and a
+        // burst leaks past the cap. This assertion caught that.
         Assert.Equal(50, allowed);
     }
 }

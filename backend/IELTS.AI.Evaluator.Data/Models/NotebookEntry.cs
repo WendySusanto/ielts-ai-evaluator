@@ -1,8 +1,7 @@
 namespace IELTS.AI.Evaluator.Data.Models
 {
-    /// <summary>One word or phrase a learner keeps for review — typed in by hand, or saved from a
-    /// feedback's vocabulary upgrades. Feedback lives in jsonb with no per-item ids, so the text is
-    /// copied here rather than referenced; SourceId only links back to the session it came from.</summary>
+    /// <summary>A word or phrase kept for review, typed in or saved from feedback. Feedback jsonb has no
+    /// per-item ids, so the text is copied here; SourceId only links back to the session.</summary>
     public class NotebookEntry : BaseEntity
     {
         public Guid NotebookEntryId { get; set; }

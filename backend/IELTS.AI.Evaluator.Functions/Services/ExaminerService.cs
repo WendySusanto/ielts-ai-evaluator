@@ -14,10 +14,8 @@ public interface IExaminerService
     Task<ExaminerTurnResult> NextTurnAsync(Guid userId, ExaminerTurnRequest request, CancellationToken ct = default);
 }
 
-/// <summary>Live examiner-turn endpoint: not quota-gated (only the final evaluation endpoint is),
-/// but hard-capped on examiner turn count so a runaway conversation can't rack up Gemini calls.
-/// Because no quota gates it, every call records its Gemini usage — that log is what makes this
-/// path visible on the admin user list.</summary>
+/// <summary>Live examiner turn: no quota (only the final evaluation has one) but a hard turn cap, and
+/// every call logs its Gemini usage so the spend shows on the admin list.</summary>
 public class ExaminerService : IExaminerService
 {
     private const int MaxExaminerTurns = 8;
@@ -54,13 +52,8 @@ public class ExaminerService : IExaminerService
             return new ExaminerTurnResult("", true);
 
         var userContent = BuildUserContent(prompt, request.Part, request.Turns);
-        // The budget belongs to the model, so it travels with the endpoint. gemini-3.5-flash-lite
-        // rejects thinkingBudget 0 with a 400 that is never retried; gemini-3.8-flash wants 0 so a
-        // follow-up question carries no thinking latency. Unset therefore cannot mean one fixed
-        // number: with no custom endpoint it means 0, the behaviour from before this was tunable;
-        // with one, it means omit thinkingConfig entirely, which every model accepts. That way a
-        // half-configured environment degrades to "maybe slower" instead of an examiner that dies
-        // on every turn. A non-zero budget is a ceiling, not a floor — unused tokens cost nothing.
+        // The budget depends on the model (flash-lite 400s on 0, 3.8-flash wants 0). Unset: 0 on the default
+        // endpoint, omitted on a custom one — so a half-configured env runs slower instead of failing.
         var examinerEndpoint = _config["GeminiExaminerApiEndpoint"];
         int? thinkingBudget = int.TryParse(_config["GeminiExaminerThinkingBudget"], out var configured)
             ? configured
@@ -95,9 +88,8 @@ public class ExaminerService : IExaminerService
         sb.AppendLine($"Question: {prompt.QuestionText}");
         if (!string.IsNullOrWhiteSpace(prompt.Cuepoints))
         {
-            // Cuepoints carries two different things: Part 2's cue card bullets, and Part 1/3's
-            // scripted question list (one per line). Labelling them apart is what lets the model
-            // ask a Part 1/3 prompt one question at a time instead of improvising the whole set.
+            // Cuepoints is Part 2's cue card bullets or Part 1/3's question list; labelling them apart lets
+            // the model ask Part 1/3 questions one at a time.
             sb.AppendLine(part.Equals("Part2", StringComparison.OrdinalIgnoreCase)
                 ? $"Cue points: {prompt.Cuepoints}"
                 : $"Scripted questions (one per line, ask in this order):\n{prompt.Cuepoints}");

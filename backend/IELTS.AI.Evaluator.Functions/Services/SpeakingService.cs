@@ -127,9 +127,8 @@ public class SpeakingService : ISpeakingService
         // recording belongs to an answer that exists.
         var clips = DecodeAudio(request.Audio, request.Turns.Count(t => !IsExaminer(t)));
 
-        // A retried submission — a refresh, a browser that gave up waiting — carries the id its first
-        // attempt used. Once that one is saved, hand it back instead of paying Gemini a second time.
-        // Checked before the quota: the retry must not be refused for the slot its first attempt used.
+        // A retry carries its first attempt's id: if that one is saved, return it instead of paying Gemini
+        // twice. Checked before the quota so the retry isn't refused for its own slot.
         var sessionId = request.ClientSessionId is { } requested && requested != Guid.Empty ? requested : Guid.NewGuid();
         if (await _db.SpeakingSessions.AsNoTracking().FirstOrDefaultAsync(s => s.SpeakingSessionId == sessionId, ct) is { } saved)
         {
@@ -139,10 +138,8 @@ public class SpeakingService : ISpeakingService
                 JsonSerializer.Deserialize<SpeakingFeedback>(saved.Feedback, CamelCase)!);
         }
 
-        // Not saved yet, but maybe still being scored: then the caller keeps polling rather than paying
-        // twice. A failed or stale attempt is simply run again.
-        // ponytail: two first attempts arriving at the same moment both pass this, and the second
-        // insert below fails on the primary key; the page sends one, so only a client bug repeats it.
+        // Still scoring → the caller keeps polling; failed or stale → run again. ponytail: two simultaneous
+        // first attempts both pass and the second insert hits the PK; only a client bug sends that.
         var evaluation = await _db.SpeakingEvaluations.FirstOrDefaultAsync(e => e.SpeakingEvaluationId == sessionId, ct);
         if (evaluation is not null && evaluation.UserId != userId)
             throw new ValidationException("Invalid session id.");
@@ -186,10 +183,8 @@ public class SpeakingService : ISpeakingService
         }
         catch (Exception ex)
         {
-            // The page learns about this from its poll, the request may be long gone. Whatever failed
-            // can still sit in the change tracker (a session that would not save), so the failure is
-            // written on a clean slate — best effort: if even that fails, the poll reports the attempt
-            // failed once it is StaleAfter old.
+            // The page learns of this from its poll. Written on a clean context (the failed save may still be
+            // tracked); best effort — if it fails too, the poll reports failure once StaleAfter passes.
             _db.ChangeTracker.Clear();
             evaluation.Status = SpeakingEvaluationStatus.Failed;
             evaluation.Error = ex is TimeoutException
@@ -208,15 +203,13 @@ public class SpeakingService : ISpeakingService
         }
     }
 
-    /// <summary>The paid part of an evaluation: Gemini, then the session, then the recordings. Runs on
-    /// CancellationToken.None throughout — the browser closing or dropping the request must not
-    /// cancel a call that is being paid for; the poll, or the History page, picks the result up.</summary>
+    /// <summary>The paid part: Gemini, session, recordings. Runs on CancellationToken.None so a closed tab
+    /// can't cancel a paid call; the poll or History picks up the result.</summary>
     private async Task<SpeakingSessionDto> ScoreAndSaveAsync(Guid userId, SpeakingEvaluateRequest request,
         SpeakingPrompt prompt, PronunciationResult? pronunciation, List<DecodedClip> clips, SpeakingEvaluation evaluation)
     {
-        // No temperature: Gemini 3 models are tuned for their default, and lowering it risks looping
-        // and weaker reasoning (Google's 3.8 Flash migration guide says to strip it). Bands stay
-        // steady through the rubric in SpeakingFeedbackPrompts and the server-side average below.
+        // No temperature: Gemini 3 is tuned for its default (Google says to strip it). Bands stay steady via
+        // the rubric and the server-side average.
         var thinkingLevel = GeminiStructuredClient.ThinkingLevelSetting(_config["GeminiScoringThinkingLevel"]);
         Task<GeminiResult<SpeakingFeedback>> Score(IReadOnlyCollection<DecodedClip> recordings) =>
             _gemini.GenerateAsync<SpeakingFeedback>(SpeakingFeedbackPrompts.SystemPrompt,
@@ -229,9 +222,8 @@ public class SpeakingService : ISpeakingService
         {
             result = await Score(clips);
         }
-        // A 400 is rejected before any generation, so it costs nothing — and when the request carried
-        // audio, an encoding Gemini will not read is the likeliest cause. Retry once without it so the
-        // candidate still gets feedback, scored from the recognizer text alone.
+        // A 400 costs nothing and, with audio, likely means an unreadable encoding: retry once without it so
+        // the candidate still gets feedback from the recognizer text.
         catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.BadRequest && clips.Count > 0)
         {
             result = await Score([]);
@@ -348,10 +340,8 @@ public class SpeakingService : ISpeakingService
 
     private static decimal RoundToHalf(decimal value) => Math.Round(value * 2, MidpointRounding.AwayFromZero) / 2;
 
-    /// <summary>Words per minute across every spoken candidate turn: total words over total
-    /// speaking time, not an average of per-turn rates, which would let a three-word answer weigh
-    /// as much as a two-minute one. Words come from the raw lexical text — the display text drops
-    /// repetitions the candidate really spoke. Null when there is too little speech to mean anything.</summary>
+    /// <summary>Total words over total speaking time (not a per-turn average, so short answers don't
+    /// over-weigh), counted from the raw lexical text. Null when there's too little speech.</summary>
     internal static decimal? SpeechRate(IEnumerable<SpeakingTurn> candidateTurns)
     {
         var spoken = candidateTurns.Where(t => t.DurationSeconds > 0 && !string.IsNullOrWhiteSpace(t.Lexical)).ToList();
@@ -375,9 +365,8 @@ public class SpeakingService : ISpeakingService
     /// regardless of which endpoint is building the prompt from client-controlled turns.</summary>
     internal static void ValidateConversationCap(List<SpeakingTurn> turns)
     {
-        // Lexical counts too: it is client-controlled and BuildUserParts renders it verbatim
-        // into the same paid call, so leaving it out would let a caller smuggle in a second
-        // unbounded transcript past a cap that only ever looked at Text.
+        // Lexical counts too: it's client-controlled and goes verbatim into the paid call, so it's capped
+        // like Text.
         var conversationLength = turns.Sum(t => (t.Text?.Length ?? 0) + (t.Lexical?.Length ?? 0));
         if (conversationLength > MaxConversationLength)
             throw new ValidationException("Conversation exceeds the maximum length of 30,000 characters.");
@@ -429,18 +418,16 @@ public class SpeakingService : ISpeakingService
         sb.AppendLine($"Question: {prompt.QuestionText}");
         if (!string.IsNullOrWhiteSpace(prompt.Cuepoints))
             sb.AppendLine($"Cue points: {prompt.Cuepoints}");
-        // Gemini cannot time pauses itself, and only some answers come with a recording, so this is
-        // the measured hesitation/pacing signal for the Fluency and Coherence band. Stated explicitly
-        // when absent so it scores blind knowingly.
+        // Gemini can't time pauses and not every answer has audio, so this is the measured fluency signal;
+        // stated explicitly when absent so it scores knowingly blind.
         sb.AppendLine(pronunciation is null
             ? "Measured speech fluency: not available (no spoken audio was assessed for this session)."
             : $"Measured speech fluency (0-100, from pause length, pause placement and speech rate): {pronunciation.FluencyScore:F0}");
         sb.AppendLine(pronunciation?.WordsPerMinute is { } wpm
             ? $"Measured speech rate: {wpm:F0} words per minute (speaking time only, pauses included)"
             : "Measured speech rate: not available.");
-        // Candidate answers are numbered 1..n in conversation order, and the feedback refers back to
-        // them by number (answers[].answer) — so both renderings below carry the same numbers, and a
-        // typed answer with no raw recognition still takes its place in the count.
+        // Feedback refers to answers by number (answers[].answer), so both renderings keep the same 1..n
+        // numbering — a typed answer still takes its place.
         var numbered = new List<(SpeakingTurn Turn, int? Answer)>();
         var answerCount = 0;
         foreach (var turn in turns)
@@ -461,9 +448,7 @@ public class SpeakingService : ISpeakingService
             }
         }
 
-        // The same candidate speech, unpolished. Only spoken turns have it, so the block is
-        // omitted entirely for a typed session rather than printed empty — an empty heading
-        // reads to the model like the candidate said nothing.
+        // Raw candidate speech; omitted for a typed session, since an empty heading reads as silence.
         var rawAnswers = numbered.Where(n => n.Answer is not null && !string.IsNullOrWhiteSpace(n.Turn.Lexical)).ToList();
         if (rawAnswers.Count > 0)
         {

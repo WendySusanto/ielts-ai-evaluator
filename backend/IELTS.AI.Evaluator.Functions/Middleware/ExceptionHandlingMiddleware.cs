@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using IELTS.AI.Evaluator.Functions.Exceptions;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
@@ -28,9 +29,7 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             var (status, message, isDomain) = Map(ex);
             if (!isDomain) _logger.LogError(ex, "Unhandled exception");
 
-            // If the response already started streaming (e.g. the exception surfaced during
-            // result serialization), CreateResponse would throw "StatusCode cannot be set".
-            // Nothing can rewrite the wire at that point — log and let the host finish.
+            // Response already streaming (e.g. failed during serialization): it can't be rewritten, so just log.
             if (context.GetHttpContext()?.Response.HasStarted == true)
             {
                 _logger.LogError(ex, "Exception after response started; response cannot be rewritten");
@@ -38,16 +37,16 @@ public class ExceptionHandlingMiddleware : IFunctionsWorkerMiddleware
             }
 
             var res = req.CreateResponse((HttpStatusCode)status);
-            await res.WriteAsJsonAsync(new { message });
-            res.StatusCode = (HttpStatusCode)status; // WriteAsJsonAsync resets to 200
+            // Not WriteAsJsonAsync: it forces 200 and, under ASP.NET Core integration, starts the
+            // response — so setting StatusCode afterwards throws.
+            res.Headers.Add("Content-Type", "application/json; charset=utf-8");
+            await res.WriteStringAsync(JsonSerializer.Serialize(new { message }));
             context.GetInvocationResult().Value = res;
         }
     }
 
-    /// <summary>Exception → (status, message). DomainException (possibly wrapped one level deep,
-    /// e.g. by the worker's invocation pipeline) maps to its own status/message; anything else
-    /// is a bare 500 with no detail leaked. Extracted so the wire mapping is unit-testable
-    /// without faking the isolated-worker HTTP types.</summary>
+    /// <summary>Exception → (status, message): a DomainException (or one wrapped one level deep) keeps
+    /// its own; anything else is a bare 500. Extracted for unit tests.</summary>
     internal static (int Status, string Message, bool IsDomain) Map(Exception ex)
     {
         var domain = (ex as DomainException) ?? (ex.InnerException as DomainException);

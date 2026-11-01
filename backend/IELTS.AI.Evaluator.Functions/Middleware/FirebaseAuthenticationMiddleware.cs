@@ -7,14 +7,12 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 using System.Net;
+using System.Text.Json;
 
 namespace IELTS.AI.Evaluator.Functions.Middleware;
 
-/// <summary>Verifies the Firebase ID token, then resolves the caller's plan and deleted flag
-/// from the database rather than the token's custom claims. Claims are cached in the ID token
-/// for up to an hour, so trusting them would let a demoted admin keep admin powers — and a
-/// deleted account keep working — until the token happened to refresh. The lookup is cached
-/// per user for <see cref="AccountCacheTtl"/>, which is the real staleness bound.</summary>
+/// <summary>Verifies the Firebase token, then reads plan/deleted from the DB, since token claims can be
+/// an hour stale. Cached per user for <see cref="AccountCacheTtl"/>, the real staleness bound.</summary>
 public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
 {
     private static readonly TimeSpan AccountCacheTtl = TimeSpan.FromSeconds(60);
@@ -78,10 +76,8 @@ public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
         await next(context);
     }
 
-    /// <summary>Reads the caller's plan and deleted flag, memoised for <paramref name="ttl"/>.
-    /// A missing row is treated as deleted: a claim pointing at a user that no longer exists is
-    /// not a valid account. Extracted so the caching and fail-closed behaviour are testable
-    /// without faking the isolated-worker FunctionContext.</summary>
+    /// <summary>Plan/deleted for a user, cached for <paramref name="ttl"/>. A missing row counts as
+    /// deleted (fail closed). Extracted for unit tests.</summary>
     internal static async Task<AccountState> ResolveAccountStateAsync(
         IMemoryCache cache, EvaluatorDbContext db, Guid userId, TimeSpan ttl)
     {
@@ -102,8 +98,9 @@ public class FirebaseAuthenticationMiddleware : IFunctionsWorkerMiddleware
     private static async Task Reject(FunctionContext context, HttpRequestData req, HttpStatusCode status, string message)
     {
         var res = req.CreateResponse(status);
-        await res.WriteAsJsonAsync(new { message });
-        res.StatusCode = status;
+        // Not WriteAsJsonAsync: it forces 200 and starts the response, so the status can't be restored.
+        res.Headers.Add("Content-Type", "application/json; charset=utf-8");
+        await res.WriteStringAsync(JsonSerializer.Serialize(new { message }));
         context.GetInvocationResult().Value = res;
     }
 }

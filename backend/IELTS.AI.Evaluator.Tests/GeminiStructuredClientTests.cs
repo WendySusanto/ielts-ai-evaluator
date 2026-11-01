@@ -197,9 +197,8 @@ public class GeminiStructuredClientTests
     public void ThinkingLevelSetting_KeepsTheThreeLevels_DropsAnythingElse(string? configured, string? expected) =>
         Assert.Equal(expected, GeminiStructuredClient.ThinkingLevelSetting(configured));
 
-    /// <summary>The examiner turn and the scoring call want different models, and the model name
-    /// lives inside the endpoint URL. A caller-supplied endpoint therefore has to beat the
-    /// configured one; null keeps the configured default, which every other test here relies on.</summary>
+    /// <summary>The model lives in the endpoint URL, so a caller-supplied endpoint must win; null keeps
+    /// the configured default.</summary>
     [Fact]
     public async Task GenerateAsync_WithEndpoint_OverridesTheConfiguredOne()
     {
@@ -223,9 +222,8 @@ public class GeminiStructuredClientTests
         Assert.Equal("https://example.test/v1beta/models/gemini:generateContent", handler.Uri!.ToString());
     }
 
-    /// <summary>An override that is present but blank is what a half-configured environment looks
-    /// like — Azure App Settings happily stores an empty string. That must degrade to the default
-    /// endpoint, not take down the examiner with "configuration missing".</summary>
+    /// <summary>App Settings can hold an empty string: a blank override must fall back to the default
+    /// endpoint, not fail with "configuration missing".</summary>
     [Fact]
     public async Task GenerateAsync_WithBlankEndpoint_FallsBackToTheConfiguredOne()
     {
@@ -265,9 +263,8 @@ public class GeminiStructuredClientTests
         }
     }
 
-    /// <summary>The 45s HttpClient timeout surfaces as TaskCanceledException and a dropped
-    /// connection as HttpRequestException. Both used to end the evaluation on first occurrence,
-    /// losing a whole spoken session to a hiccup that clears in seconds.</summary>
+    /// <summary>Timeouts (TaskCanceledException) and dropped connections (HttpRequestException) are
+    /// retried — they used to lose a whole session to a seconds-long hiccup.</summary>
     [Fact]
     public async Task GenerateAsync_RetriesTimeoutAndConnectionFault_ThenSucceeds()
     {
@@ -280,9 +277,8 @@ public class GeminiStructuredClientTests
         Assert.Equal(3, handler.Attempts);
     }
 
-    /// <summary>A caller-requested cancellation is the same exception type as a timeout, so only the
-    /// token tells them apart. Retrying an abandoned request spends on the paid endpoint for a user
-    /// who is already gone.</summary>
+    /// <summary>A caller cancellation looks like a timeout and only the token tells them apart; retrying
+    /// it pays for a user who's already gone.</summary>
     [Fact]
     public async Task GenerateAsync_CancelledDuringSend_IsNotRetried()
     {

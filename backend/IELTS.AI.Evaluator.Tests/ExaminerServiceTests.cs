@@ -138,9 +138,8 @@ public class ExaminerServiceTests
         Assert.Contains("politely redirect", ExaminerPrompts.SystemPrompt);
     }
 
-    /// <summary>The examiner turn is the one call a candidate waits through in silence, so it runs
-    /// on its own (cheaper, faster) model. The model name lives in the endpoint, so routing it
-    /// means handing GenerateAsync a different endpoint — see GeminiExaminerApiEndpoint.</summary>
+    /// <summary>The examiner turn runs on its own faster model; the model lives in the endpoint, so
+    /// routing means passing a different endpoint (GeminiExaminerApiEndpoint).</summary>
     [Fact]
     public async Task NextTurnAsync_RoutesToTheExaminerEndpoint()
     {
@@ -166,10 +165,8 @@ public class ExaminerServiceTests
         Assert.Null(gemini.LastEndpoint);
     }
 
-    /// <summary>The thinking budget belongs to the model, not to the code: gemini-3.5-flash-lite
-    /// rejects thinkingBudget 0 with a 400, while gemini-3.7-flash requires it to stay fast. A
-    /// hardcoded 0 therefore makes GeminiExaminerApiEndpoint unusable for half the models it could
-    /// point at — and 400 is not retried, so the examiner would fail on every turn.</summary>
+    /// <summary>The budget depends on the model: flash-lite 400s on 0, and a 400 is never retried, so a
+    /// hardcoded 0 would kill every examiner turn on those models.</summary>
     [Fact]
     public async Task NextTurnAsync_SendsTheConfiguredThinkingBudget()
     {
@@ -194,10 +191,8 @@ public class ExaminerServiceTests
         Assert.Equal(0, gemini.LastThinkingBudget);
     }
 
-    /// <summary>A typo in an App Setting falls back rather than throwing, matching how
-    /// SpeakingService already treats DailySpeakingQuota. With no custom endpoint the fallback is 0,
-    /// the long-standing default; the custom-endpoint case is covered separately below, where the
-    /// same typo omits thinkingConfig instead so no model can reject it.</summary>
+    /// <summary>A typo'd App Setting falls back instead of throwing: 0 with no custom endpoint (the
+    /// custom-endpoint case is tested below).</summary>
     [Fact]
     public async Task NextTurnAsync_WithUnparsableBudget_FallsBackToZero()
     {
@@ -209,12 +204,8 @@ public class ExaminerServiceTests
         Assert.Equal(0, gemini.LastThinkingBudget);
     }
 
-    /// <summary>Half-configured is the first state every environment passes through: someone sets
-    /// the endpoint in the portal and has not got to the budget yet. Defaulting to 0 there would
-    /// send thinkingBudget 0 to a model that may reject it with a 400 — which is never retried, so
-    /// every examiner turn dies. Omitting thinkingConfig instead works on every model, so the worst
-    /// case degrades to "maybe slower" rather than "dead". Budget stays 0 when no endpoint is set,
-    /// which is the behaviour every environment had before any of this was tunable.</summary>
+    /// <summary>Endpoint set but no budget yet: omit thinkingConfig (works on every model) rather than
+    /// send 0, which some models reject with a never-retried 400.</summary>
     [Fact]
     public async Task NextTurnAsync_WithCustomEndpointButNoBudget_OmitsThinkingConfig()
     {

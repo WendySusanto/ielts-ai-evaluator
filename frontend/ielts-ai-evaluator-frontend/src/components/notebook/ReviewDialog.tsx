@@ -77,9 +77,8 @@ function Back({ entry }: { entry: NotebookEntry }) {
   );
 }
 
-/** Flashcards over the words due for review, in random order. "Got it" moves a word up a Leitner
- * box (mastering it from the last one); "Still learning" sends it back to the first box and keeps
- * it for another round. */
+/** Flashcards over due words, shuffled. "Got it" moves a word up a Leitner box (mastered after the
+ * last); "Still learning" sends it back to box one. */
 export function ReviewDialog({
   entries,
   notebook,

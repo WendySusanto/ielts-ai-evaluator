@@ -2,9 +2,8 @@ namespace IELTS.AI.Evaluator.Functions.DTOs;
 
 public record WordSuggestionRequest(string Word);
 
-/// <summary>Gemini's check and fill for one word a learner typed into the notebook. When IsWord
-/// is false the other fields are empty and Suggestion holds the likely intended spelling, or is
-/// empty/absent when there is none.</summary>
+/// <summary>Gemini's check and fill for a typed notebook word. When IsWord is false the other fields
+/// are empty and Suggestion holds the likely intended spelling, if any.</summary>
 public record WordSuggestion(bool IsWord, string? Suggestion, string Meaning, string Example, string Level);
 
 /// <summary>Gemini responseSchema + system prompt for the notebook's "Fill with AI" lookup.

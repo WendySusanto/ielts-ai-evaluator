@@ -16,9 +16,8 @@ public record WritingEvaluationDetailDto(Guid WritingEvaluationId, string TaskTy
 
 public interface IWritingService
 {
-    /// <summary>The token aborts the work *before* Gemini is paid; once the call returns, the row is
-    /// written regardless — see the SaveChangesAsync call. Only the paid paths take a token: a
-    /// cancelled history read saves an indexed query and nothing else.</summary>
+    /// <summary>The token can abort only before Gemini is paid; after that the row is always saved.
+    /// Only paid paths take a token.</summary>
     Task<WritingEvaluationDto> EvaluateAsync(Guid userId, string role, WritingEvaluateRequest request,
         CancellationToken ct = default);
     Task<List<WritingHistoryItemDto>> GetHistoryAsync(Guid userId);
@@ -89,9 +88,7 @@ public class WritingService : IWritingService
         };
 
         _db.WritingEvaluations.Add(evaluation);
-        // Deliberately not ct: Gemini has already been called and billed. Honouring a cancellation
-        // here would throw away feedback the user paid for and leave the spend with no row to show
-        // for it — the one place where finishing the write beats reacting to the disconnect.
+        // Deliberately not ct: Gemini is already billed, so cancelling now would lose paid feedback.
         await _db.SaveChangesAsync(CancellationToken.None);
 
         return new WritingEvaluationDto(evaluation.WritingEvaluationId, evaluation.OverallBand, result.Value);

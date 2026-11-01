@@ -1,9 +1,7 @@
 // Kept free of imports so `npm run check:speaking-feedback` can run it under plain Node, like lexical.ts.
 
-/** For each turn, the item whose `answer` matches its candidate answer number — feedback, a
- * recording — or undefined. Candidate answers are numbered 1..n in conversation order, every
- * non-examiner turn counting — the numbering SpeakingService puts in the transcript it sends to
- * Gemini, so the two must stay in step. Examiner turns, and answers with no item, get undefined. */
+/** For each turn, the item whose `answer` matches its candidate answer number (1..n over non-examiner
+ * turns, as SpeakingService numbers them for Gemini — keep in step), else undefined. */
 export function matchAnswersToTurns<A extends { answer: number }>(
   turns: { role: string }[],
   answers: A[] | null | undefined,

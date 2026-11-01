@@ -1,9 +1,7 @@
 namespace IELTS.AI.Evaluator.Data.Models
 {
-    /// <summary>Gemini usage for one live examiner turn. Evaluations already carry their own
-    /// PromptTokens/CompletionTokens on SpeakingSession and WritingEvaluation, but examiner turns
-    /// produce no such row — and they are the one paid path with no daily quota in front of it,
-    /// so without this table the most abusable Gemini spend is the only spend nobody can see.</summary>
+    /// <summary>Gemini usage per examiner turn. Evaluations record their own tokens, but this is the one
+    /// paid path with no daily quota — without this table its spend would be invisible.</summary>
     public class ExaminerTurnUsage : BaseEntity
     {
         public Guid ExaminerTurnUsageId { get; set; }

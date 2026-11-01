@@ -5,9 +5,8 @@ const clock = (seconds: number) => {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 };
 
-/** Recording used so far against the session limit. Ticks on its own while `running`, so the
- * practice page does not re-render every second. When a turn ends the live part is kept until the
- * page adds that turn's recording to `recordedSeconds`, so the clock never jumps backwards. */
+/** Recording used against the session limit. Ticks on its own so the page doesn't re-render each
+ * second, and holds the live part until `recordedSeconds` catches up so it never jumps back. */
 export function RecordingClock({
   recordedSeconds,
   running,

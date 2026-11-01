@@ -18,10 +18,8 @@ namespace IELTS.AI.Evaluator.Data.Models
         /// <summary>Where each answer's recording is kept for playback: [{answer, blobName}], jsonb.
         /// Null when nothing was recorded, storage is not configured, or every upload failed.</summary>
         public string? AudioClips { get; set; }
-        /// <summary>Which feedback schema produced Feedback: 1 for every session marked before
-        /// versioning (the migration backfills it), 2 from the schema with answers, errors and
-        /// nextBand, 3 adds the transcript taken from each recording and pronunciation notes. Lets old
-        /// sessions be told apart without sniffing their JSON.</summary>
+        /// <summary>Feedback schema version: 1 = before versioning, 2 = answers/errors/nextBand,
+        /// 3 = per-recording transcript + pronunciation notes. Saves sniffing the JSON.</summary>
         public int FeedbackVersion { get; set; } = 1;
         public string AiModel { get; set; } = string.Empty;
         public int PromptTokens { get; set; }

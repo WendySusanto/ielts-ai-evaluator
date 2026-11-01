@@ -11,9 +11,8 @@ export interface User {
 
 // Matches backend AdminUserDto — GET /api/manage/users (admin, read-only list).
 export interface AdminUser extends User {
-  /** Azure Speech tokens handed to this user since UTC midnight. A session takes ~4 and the
-   * backend caps it at 30/hour, so a number near 30 means someone is pulling tokens, not
-   * practising. It counts requests, not spend — the TTS/STT calls bypass our backend. */
+  /** Speech tokens issued since UTC midnight: ~4 per session, capped at 30/hour, so near 30 means
+   * someone is pulling tokens. Counts requests, not spend. */
   speechTokensToday: number;
   /** Gemini prompt + completion tokens since UTC midnight, across writing evaluations, speaking
    * evaluations and live examiner turns. Unlike speechTokensToday this is real billed usage. */

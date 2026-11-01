@@ -13,10 +13,8 @@ public record UpdateProfileRequest(string FullName, decimal IELTSTargetScore, Da
 public record UserProfileDto(Guid UserId, string Email, string FullName, string Plan,
     decimal? IeltsTargetScore, DateTimeOffset? TargetTestDate, DateTime CreatedAt);
 
-/// <summary>The admin list's own shape rather than UserProfileDto + fields: the two usage
-/// counters are abuse signals, and /api/me has no business computing or returning them.
-/// GeminiTokensToday sums prompt + completion across all three paid paths (writing evaluations,
-/// speaking evaluations, live examiner turns).</summary>
+/// <summary>Admin list shape: the usage counters are abuse signals /api/me shouldn't compute.
+/// GeminiTokensToday sums all three paid paths (writing, speaking, examiner turns).</summary>
 public record AdminUserDto(Guid UserId, string Email, string FullName, string Plan,
     decimal? IeltsTargetScore, DateTimeOffset? TargetTestDate, DateTime CreatedAt,
     int SpeechTokensToday, int GeminiTokensToday);
@@ -65,10 +63,8 @@ public class UserService : IUserService
             .OrderByDescending(u => u.CreatedAt)
             .ToListAsync();
 
-        // Each counter is one grouped query joined in memory — per-user counts would be an N+1.
-        // UTC day boundary, same convention as the daily evaluation quotas.
-        // ponytail: four aggregates per page load, each over an indexed (UserId, CreatedAt).
-        // Fine while the user list is one unpaginated page; revisit together, not before.
+        // One grouped query per counter (no N+1), UTC day like the quotas. ponytail: four aggregates per
+        // load over indexed (UserId, CreatedAt); fine while the list is one unpaginated page.
         var todayUtc = DateTime.UtcNow.Date;
 
         var speechToday = await _db.SpeechTokenIssues
@@ -87,9 +83,8 @@ public class UserService : IUserService
             geminiToday.GetValueOrDefault(u.UserId))).ToList();
     }
 
-    /// <summary>Prompt + completion tokens per user since <paramref name="since"/>, summed across
-    /// the three tables that bill Gemini. Kept as three queries rather than a union so each one
-    /// stays a plain indexed aggregate.</summary>
+    /// <summary>Prompt + completion tokens per user since <paramref name="since"/>, across the three
+    /// billing tables — three queries, not a union, so each stays an indexed aggregate.</summary>
     private async Task<Dictionary<Guid, int>> SumGeminiTokensAsync(DateTime since)
     {
         var totals = new Dictionary<Guid, int>();
@@ -121,9 +116,8 @@ public class UserService : IUserService
         return totals;
     }
 
-    /// <summary>Soft delete: flips IsDeleted, which FirebaseAuthenticationMiddleware turns into a
-    /// 403 once its 60-second account cache expires. The Firebase account itself is left alone —
-    /// the user can still sign in, they just cannot reach any endpoint.</summary>
+    /// <summary>Soft delete: the auth middleware returns 403 once its 60s cache expires. The Firebase
+    /// account stays — the user can sign in but reach no endpoint.</summary>
     public async Task DeleteUserAsync(Guid actingAdminId, Guid targetUserId)
     {
         // An admin deleting themselves would revoke their own access to this screen, and with it

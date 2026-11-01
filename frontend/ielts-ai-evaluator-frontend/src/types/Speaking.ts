@@ -36,9 +36,8 @@ export interface SpeakingPromptUpsertRequest {
 export interface SpeakingTurn {
   role: "examiner" | "candidate";
   text: string;
-  /** Candidate turns only, and only when spoken: Azure's raw lexical recognition with
-   * [pause N.Ns] markers. `text` is display text — punctuated and tidied — so it alone
-   * hides both the hesitations and the grammar the candidate actually produced. */
+  /** Spoken candidate turns only: Azure's raw lexical text with [pause N.Ns] markers, since `text` is
+   * tidied and hides the hesitations and the real grammar. */
   lexical?: string;
   /** Spoken candidate turns only: first word to last, pauses included. The server derives the
    * speech rate from this and `lexical`; the client never sends a rate of its own. */
@@ -202,9 +201,8 @@ export interface PronunciationWord {
   errorType: string;
 }
 
-/** Azure Pronunciation Assessment result, aggregated client-side across candidate turns and
- * submitted with the final evaluation. Band is always server-recomputed from pronunciationScore
- * — the client never sends a meaningful value. */
+/** Azure Pronunciation Assessment, aggregated client-side. The server always recomputes the band
+ * from pronunciationScore. */
 export interface PronunciationResult {
   band?: number;
   pronunciationScore: number;
