@@ -10,6 +10,7 @@ import { VoiceLevelBars } from "@/components/VoiceLevelBars";
 import { useApi } from "@/hooks/use-api";
 import { useSpeech } from "@/hooks/use-speech";
 import { ApiError, api } from "@/lib/api";
+import { questionProgress } from "@/lib/speaking-feedback";
 import { aggregateAssessments, type RecordedAudio, type TurnAssessment } from "@/lib/speech";
 import { cn } from "@/lib/utils";
 import type {
@@ -38,10 +39,6 @@ const TALK_SECONDS = 120;
 // Quiet time after the candidate's last word before the turn is sent. Long enough for a
 // mid-answer thinking pause; the mic button still stops a turn early.
 const SILENCE_MS = 3000;
-// Mirrors ExaminerService's hard cap on examiner turns per part — the examiner can't ask more
-// than this, so it's what the progress bar counts against.
-const MAX_QUESTIONS: Record<string, number> = { Part2: 3 };
-const MAX_QUESTIONS_DEFAULT = 8;
 // A resumable session goes stale after a day — past that, restoring a half-forgotten
 // conversation is more confusing than starting clean.
 const DRAFT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -620,11 +617,7 @@ const SpeakingPractice = () => {
     ? prompt.cuepoints.split("\n").filter((c) => c.trim().length > 0)
     : [];
   const showCueCard = prompt.part === "Part2" && candidateTurnCount === 0;
-  const questionCap = MAX_QUESTIONS[prompt.part] ?? MAX_QUESTIONS_DEFAULT;
-  // The examiner can wrap up early, so a completed part shows a full bar regardless of count.
-  const questionsAsked = partComplete
-    ? questionCap
-    : Math.min(turns.filter((t) => t.role === "examiner").length, questionCap);
+  const questions = questionProgress(prompt.part, prompt.cuepoints, turns, partComplete);
   const micDisabled = callState !== "yourTurn" && callState !== "listening";
   const busy = callState === "thinking";
 
@@ -662,10 +655,10 @@ const SpeakingPractice = () => {
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>Questions</span>
           <span className="font-medium tabular-nums">
-            {questionsAsked}/{questionCap}
+            {partComplete ? "Part complete" : `${questions.asked}/${questions.total}`}
           </span>
         </div>
-        <Progress value={(questionsAsked / questionCap) * 100} />
+        <Progress value={(questions.asked / questions.total) * 100} />
       </div>
 
       {/* Conversation */}

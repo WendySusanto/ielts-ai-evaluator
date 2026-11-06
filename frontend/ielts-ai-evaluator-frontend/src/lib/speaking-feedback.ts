@@ -25,3 +25,28 @@ export function groupByCategory<E extends { category: string }>(errors: E[]): [s
   }
   return [...groups].sort((a, b) => b[1].length - a[1].length);
 }
+
+// Mirror ExaminerService.MaxExaminerTurns and the "ask 4-6 of your own" line in ExaminerPrompts.
+const EXAMINER_TURN_CAP = 8;
+const UNSCRIPTED_QUESTIONS = 5;
+
+/** The examiner's progress through a live speaking part, for the counter above the conversation. The
+ * total is what the examiner plans to ask — Part 1/3's script (`cuepoints`, one question per line), or
+ * Part 2's cue card plus one rounding-off question — not the server's hard turn cap, which only stops a
+ * runaway examiner. A finished part counts as every question asked: its last examiner line is a
+ * closing remark, and an early finish (the recording limit) still ends the part. */
+export function questionProgress(
+  part: string,
+  cuepoints: string | null | undefined,
+  turns: { role: string }[],
+  partComplete: boolean,
+): { asked: number; total: number } {
+  const script = (cuepoints ?? "").split("\n").filter((line) => line.trim()).length;
+  const total = Math.min(part === "Part2" ? 2 : script || UNSCRIPTED_QUESTIONS, EXAMINER_TURN_CAP);
+  // ponytail: a follow-up question counts like a scripted one, so the counter can reach the total a
+  // question early. Exact counting needs the examiner endpoint to say which scripted question it is on.
+  const asked = partComplete
+    ? total
+    : Math.min(turns.filter((t) => t.role === "examiner").length, total);
+  return { asked, total };
+}
